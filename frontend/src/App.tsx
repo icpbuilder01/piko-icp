@@ -242,6 +242,20 @@ function App() {
     if (miningRef.current) {
       try {
         const freshWork = await anonymousMother.getWork();
+        // The worker already exited its search loop the moment it found a
+        // nonce (see miner.worker.ts) -- it's idle now, waiting for a fresh
+        // "work" message to resume. Reported live: right after a real win,
+        // this getWork() call can still momentarily return the
+        // just-solved height (ordinary IC query-routing lag, not a bug in
+        // this call itself) -- if that height matches what was last posted
+        // to the worker, the dedup check in the effect below would
+        // conclude "nothing changed" and never repost, leaving the worker
+        // permanently idle until the tab is manually stopped and
+        // restarted. Clearing the ref here forces the next post through
+        // regardless -- worst case it very briefly re-searches an
+        // already-solved height until the following poll corrects it,
+        // which is harmless, versus the freeze this prevents.
+        lastPostedWorkKeyRef.current = null;
         setWork(freshWork as unknown as Work);
       } catch (err) {
         console.error("Failed to fetch fresh work", err);
