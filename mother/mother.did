@@ -69,6 +69,7 @@ type Stats =
    nextHalvingHeight: nat;
    retargetIntervalBlocks: nat;
    targetBlockTimeNanos: nat;
+   totalIcpBurnedE8s: nat;
    totalMinted: nat;
  };
 type PendingNatChange = 

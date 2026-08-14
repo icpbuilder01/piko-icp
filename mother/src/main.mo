@@ -155,6 +155,15 @@ actor self {
   // setMiningFeeE8s() as real demand data comes in.
   var miningFeeE8s : Nat = 5_000_000;
 
+  // Cumulative ICP (e8s) actually burned to icpBurnOwner, across every
+  // sweepTreasury() call ever made -- incremented only once a burn
+  // transfer is confirmed #Ok, never for an attempt that failed or
+  // traps (that ICP just stays in this canister's balance for the next
+  // sweep to retry, uncounted until it really leaves). The running
+  // public answer to "how much real ICP has mining PIKO destroyed so
+  // far" -- see getStats().
+  var totalIcpBurned : Nat = 0;
+
   var recentBlocks : [Types.Block] = [];
   // Persisted, not transient: this is real, specific PIKO owed to specific
   // miners (a block was accepted, its mint just hasn't landed yet). Making
@@ -406,6 +415,7 @@ actor self {
       targetBlockTimeNanos = TARGET_BLOCK_TIME_NANOS;
       blocksUntilRetarget = retargetAnchorHeight + RETARGET_INTERVAL_BLOCKS - height;
       lastRetargetAt;
+      totalIcpBurnedE8s = totalIcpBurned;
     };
   };
 
@@ -801,7 +811,7 @@ actor self {
     let burnAmount = spendable - cyclesAmount;
 
     if (burnAmount > 0) {
-      let _burnOutcome = try {
+      let burnOutcome = try {
         ?(
           await IcpLedger.icrc1_transfer({
             from_subaccount = null;
@@ -813,6 +823,10 @@ actor self {
           })
         );
       } catch (_e) { null };
+      switch (burnOutcome) {
+        case (? #Ok(_)) { totalIcpBurned += burnAmount };
+        case (_) {};
+      };
     };
 
     var cyclesMinted : ?Nat = null;
