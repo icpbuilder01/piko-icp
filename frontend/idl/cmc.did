@@ -42,6 +42,15 @@ type NotifyError = variant {
 
 type NotifyCreateCanisterResult = variant { Ok : principal; Err : NotifyError };
 
+// Used by MinerCard.tsx's "Top up cycles" action -- converts ICP paid to
+// the CMC into cycles for an *existing* canister (as opposed to
+// notify_create_canister, which spends its 500B-cycle share on creating a
+// brand new one). Mirrors mother/src/types.mo's own NotifyTopUpArg/Result,
+// which mother uses on itself via sweepTreasury() -- same protocol, just
+// triggered from the browser for a user-owned miner instead.
+type NotifyTopUpArg = record { block_index : BlockIndex; canister_id : principal };
+type NotifyTopUpResult = variant { Ok : nat; Err : NotifyError };
+
 // Used by deployMiner.ts to work out how many cycles a given ICP amount
 // will actually yield *before* spending it -- the canister-creation fee
 // (500B cycles, charged by the destination subnet, not this canister) is
@@ -52,5 +61,6 @@ type IcpXdrConversionRateResponse = record { data : IcpXdrConversionRate; hash_t
 
 service : {
   notify_create_canister : (NotifyCreateCanisterArg) -> (NotifyCreateCanisterResult);
+  notify_top_up : (NotifyTopUpArg) -> (NotifyTopUpResult);
   get_icp_xdr_conversion_rate : () -> (IcpXdrConversionRateResponse) query;
 }
