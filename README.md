@@ -63,7 +63,7 @@ This mirrors the design the project was inspired by, with a few explicit
   via Web Crypto varies a lot by device) -- watch actual block times on the
   dashboard and adjust.
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
-  `miningFeeE8s` (**0.01 ICP**, admin-adjustable via `setMiningFeeE8s` -- kept
+  `miningFeeE8s` (**0.05 ICP**, admin-adjustable via `setMiningFeeE8s` -- kept
   low deliberately during the adoption phase, see "Read this before mining"
   below) from
   the submitter's own ICP balance via `icrc2_transfer_from`, into `mother`'s
@@ -98,7 +98,7 @@ This mirrors the design the project was inspired by, with a few explicit
     nothing -- there is exactly one winner per block, never more (`mother`
     re-checks the chain height right after the fee pull, before ever
     minting, so a losing submission can never mutate state or double-pay).
-  - **Read this before mining**: even at a deliberately low 0.01 ICP/block
+  - **Read this before mining**: even at a deliberately low 0.05 ICP/block
     with no PIKO market yet, mining is a real-money cost for a token with no
     established, liquid value, and you can lose that cost even with a
     genuinely valid proof if someone else's lands first. There is no way to
