@@ -148,6 +148,26 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
     }
   }
 
+  // Plain resume: just start() again on the existing ICP allowance, which
+  // pausing never touched. Deliberately separate from "Approve + start"
+  // below (which re-approves a specific amount and needs status.icpBalanceE8s
+  // to size it) -- resuming after a pause shouldn't require status to have
+  // loaded any more than pausing should, see Pause's own history.
+  async function handleResume() {
+    setBusy("finish");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await getMinerActorAt(canisterId, identity).start();
+      setActionMessage("Resumed.");
+      await refreshStatus();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Resuming failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function handleWithdraw() {
     const amount = parseAmount(withdrawAmount);
     if (amount === null || amount <= 0n) {
@@ -206,14 +226,17 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
             {status.mining ? "mining" : "stopped"}
           </span>
         )}
-        {/* Not gated on status having loaded: getStatus() fails to decode on
-            a miner still running pre-pikoBalance code (a hard requirement
-            of the current candid, not optional), which must never also
-            hide the one button that stops it -- stop() itself doesn't need
-            status to be known, and is safe to call regardless of whether
-            it's actually mining. */}
+        {/* Neither Pause nor Resume is gated on status having loaded:
+            getStatus() fails to decode on a miner still running
+            pre-pikoBalance code (a hard requirement of the current candid,
+            not optional), which must never also hide the two buttons that
+            actually control whether it's mining -- both stop() and start()
+            work regardless of whether status is known. */}
         <button type="button" className="button secondary small" onClick={handlePause} disabled={busy !== null}>
           {busy === "stop" ? "Pausing..." : "Pause"}
+        </button>
+        <button type="button" className="button secondary small" onClick={handleResume} disabled={busy !== null}>
+          {busy === "finish" ? "Resuming..." : "Resume"}
         </button>
         <button type="button" className="button secondary small" onClick={handleUpdateCode} disabled={busy !== null}>
           {busy === "update" ? "Updating..." : "Update code"}
