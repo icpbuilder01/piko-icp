@@ -80,6 +80,7 @@ function App() {
   const [work, setWork] = useState<Work | null>(null);
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [balance, setBalance] = useState<bigint | null>(null);
+  const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
 
   const [mining, setMining] = useState(false);
   const [hashrate, setHashrate] = useState(0);
@@ -148,6 +149,25 @@ function App() {
       setBalance(null);
     }
   }, [identity, refreshBalance]);
+
+  const refreshIcpBalance = useCallback(async (id: Identity) => {
+    try {
+      const icpLedger = getIcpLedgerActor(id);
+      const raw = await icpLedger.icrc1_balance_of({ owner: id.getPrincipal() });
+      setIcpBalance(raw as unknown as bigint);
+    } catch (err) {
+      console.error("Failed to fetch ICP balance", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (identity) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing with the ICP ledger, not derived state
+      refreshIcpBalance(identity);
+    } else {
+      setIcpBalance(null);
+    }
+  }, [identity, refreshIcpBalance]);
 
   const refreshAllowance = useCallback(async (id: Identity) => {
     try {
@@ -246,11 +266,13 @@ function App() {
         setConfettiTrigger((n) => n + 1);
         refreshDashboard();
         refreshBalance(id);
+        refreshIcpBalance(id);
         refreshAllowance(id);
       } else {
         const reason = insufficientIcpReason(result.Err);
         if (reason) {
           handleStopMining();
+          refreshIcpBalance(id);
           setMiningMessage(`Mining stopped: ${reason}. Approve more ICP to keep mining.`);
           return;
         }
@@ -354,6 +376,10 @@ function App() {
     : 0;
 
   const feeApproved = work ? (allowance ?? 0n) >= work.miningFeeE8s : false;
+  // icpBalance is only known once fetched (post-login) -- treat "not loaded
+  // yet" as "not insufficient" so the button isn't wrongly blocked while
+  // still loading.
+  const insufficientIcpBalance = work && icpBalance !== null ? icpBalance < work.miningFeeE8s : false;
 
   return (
     <main className="page">
@@ -511,7 +537,11 @@ function App() {
                   Stop mining
                 </button>
               ) : (
-                <button className="button button-cta" onClick={handleStartMining} disabled={!work}>
+                <button
+                  className="button button-cta"
+                  onClick={handleStartMining}
+                  disabled={!work || insufficientIcpBalance}
+                >
                   Start mining
                 </button>
               )}
@@ -526,6 +556,13 @@ function App() {
                 </div>
               )}
             </div>
+            {insufficientIcpBalance && (
+              <p className="wallet-hint warning">
+                Not enough ICP to mine — you have {formatIcp(icpBalance ?? 0n)} ICP, but each
+                submission costs {work ? formatIcp(work.miningFeeE8s) : "..."} ICP. Top up your
+                wallet to start mining.
+              </p>
+            )}
             {!feeApproved && (
               <p className="wallet-hint">
                 Hashing itself is free (it's your own CPU) — the{" "}

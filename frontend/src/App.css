@@ -832,6 +832,11 @@ section.block .miner-panel-head h2 {
   margin: 0;
 }
 
+.wallet-hint.warning {
+  color: var(--critical);
+  font-weight: 600;
+}
+
 /* ---- Table ---- */
 
 table.blocks {
