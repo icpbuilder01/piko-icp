@@ -1,0 +1,126 @@
+/* Dashboard-specific additions -- layered on top of index.css (tokens) and
+   App.css (the "chunky retro" component system: .page/.header/.brand,
+   section.block, .stat-grid/.stat-tile, .meter-track/.meter-fill,
+   .pulse-dot, .live-pill/.live-dot, table.blocks). Only what's genuinely
+   new to this page lives here. */
+
+.dashboard-page code {
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  font-size: 0.9em;
+}
+
+/* ---- Hero figures: the chain height & current reward this page leads
+   with. Sans (not mono/display), large, proportional figures -- a
+   standalone big number reads better without tabular-nums, which is for
+   columns of aligned digits, not a single headline value. ---- */
+
+.hero-figure-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin-bottom: 18px;
+}
+
+.hero-figure-label {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.hero-figure {
+  font-family: var(--font-sans);
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.hero-figure-sub {
+  font-size: 1.6rem;
+  color: var(--accent-strong);
+}
+
+.stat-value-small {
+  font-size: 0.92rem;
+}
+
+/* ---- Meters: two on this page (supply minted, blocks until retarget) --
+   distinct tones so they read apart from each other without relying on
+   their captions alone. ---- */
+
+.meter-block {
+  margin-top: 14px;
+}
+
+.meter-fill-accent {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--accent),
+    var(--accent) 8px,
+    var(--accent-strong) 8px,
+    var(--accent-strong) 16px
+  );
+}
+
+.meter-fill-spark {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--spark),
+    var(--spark) 8px,
+    color-mix(in srgb, var(--spark) 70%, black) 8px,
+    color-mix(in srgb, var(--spark) 70%, black) 16px
+  );
+}
+
+/* ---- Status pill: mining / stopped on the reference miner. Color is
+   never the only signal -- always paired with the "mining"/"stopped"
+   label, per the good/critical status tokens' intended use. ---- */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-good {
+  color: #d7f5e2;
+}
+
+.status-critical {
+  color: #ffd9d3;
+}
+
+.miner-error-note {
+  margin: 14px 18px 0;
+  color: var(--critical);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.dashboard-footnote {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.6;
+  text-align: center;
+  margin-top: 8px;
+}
