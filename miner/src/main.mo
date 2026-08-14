@@ -87,12 +87,24 @@ actor self {
     count;
   };
 
-  func computeHash(prev : Blob, atHeight : Nat, nonce : Nat) : Blob {
-    let bytes = Array.concat(
-      Array.concat(Blob.toArray(prev), natToBytes8(atHeight)),
-      natToBytes8(nonce),
-    );
-    Sha256.fromArray(#sha256, bytes);
+  // previousHash and height are the same for every attempt within a batch
+  // -- only the nonce actually varies. headerBytes() below builds that
+  // constant prefix once per tick instead of once per attempt (the
+  // in-browser worker already does this -- see
+  // frontend/src/worker/miner.worker.ts's `header`). Re-deriving it from
+  // scratch on every single hash, as this used to, meant paying real
+  // cycles to redo the same Blob.toArray + Array.concat work millions of
+  // times per submission for no reason: real waste, since it's the
+  // canister (not the caller) that pays for every attempt, successful or
+  // not -- unlike browser mining, where failed attempts cost nothing.
+  // Output is byte-for-byte identical either way (concatenation is
+  // associative), just computed cheaper.
+  func headerBytes(prev : Blob, atHeight : Nat) : [Nat8] {
+    Array.concat(Blob.toArray(prev), natToBytes8(atHeight));
+  };
+
+  func hashWithHeader(header : [Nat8], nonce : Nat) : Blob {
+    Sha256.fromArray(#sha256, Array.concat(header, natToBytes8(nonce)));
   };
 
   // ---- Mining loop ----
@@ -119,11 +131,12 @@ actor self {
       case null { lastError := ?"getWork() call failed"; return };
     };
 
+    let header = headerBytes(w.previousHash, w.height);
     var nonce = nextNonce;
     var found : ?Nat = null;
     var i = 0;
     label search while (i < batchSizePerTick) {
-      let candidate = computeHash(w.previousHash, w.height, nonce);
+      let candidate = hashWithHeader(header, nonce);
       attempts += 1;
       if (leadingZeroBits(candidate) >= w.difficultyBits) {
         found := ?nonce;

@@ -867,7 +867,7 @@ table.blocks td.mono {
   line-height: 1.65;
 }
 
-.story-block p.pull-quote {
+p.pull-quote {
   font-family: var(--font-display);
   font-size: 1.05rem;
   font-weight: 700;
