@@ -40,15 +40,30 @@ export default defineConfig(({ command }) => {
     }),
   ];
 
+  // Two static pages in one canister: the main site (index.html) and the
+  // read-only monitoring dashboard (dashboard.html) -- Rollup needs every
+  // HTML entry listed explicitly, unlike vite's dev server which serves any
+  // .html file by path with no config.
+  const build = {
+    rollupOptions: {
+      input: {
+        main: "index.html",
+        dashboard: "dashboard.html",
+      },
+    },
+  };
+
   // If we're only building this is enough
   if (command !== "serve") {
-    return { plugins };
+    return { plugins, build };
   }
 
   // Local dev server: look up the local network's root key and the
   // canister ids for both canisters the frontend talks to directly.
   const environment = process.env.ICP_ENVIRONMENT || "local";
-  const CANISTER_NAMES = ["mother", "ledger"];
+  // "miner" added for Dashboard.tsx, which reads the reference miner
+  // instance's status alongside mother/ledger.
+  const CANISTER_NAMES = ["mother", "ledger", "miner"];
 
   const networkStatus = JSON.parse(
     execSync(`icp network status -e ${environment} --json`, { encoding: "utf-8" })
