@@ -653,7 +653,7 @@ function App() {
           out.
         </p>
         {identity ? (
-          <DeployMiner identity={identity} />
+          <DeployMiner identity={identity} miningFeeE8s={work?.miningFeeE8s ?? 0n} />
         ) : (
           <p className="empty-state">Log in above to deploy one from here.</p>
         )}

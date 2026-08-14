@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
 import { deployMiner, type DeployProgress } from "../lib/deployMiner";
-import { parseAmount } from "../lib/format";
+import { parseAmount, formatAmount } from "../lib/format";
 
 interface DeployMinerProps {
   identity: Identity;
+  // Current live mining fee (e8s) -- used to size the default funding
+  // amount. 0n while chain stats haven't loaded yet.
+  miningFeeE8s: bigint;
 }
 
 const DEFAULT_CYCLES_ICP = "0.3";
-const DEFAULT_FUND_ICP = "0.5";
+// How many blocks' worth of the *current* mining fee to pre-fill the
+// funding field with. A dedicated miner is meant to run unattended for a
+// while -- defaulting to "one block" (an earlier version of this
+// component did, hardcoded at "0.5") meant it could stop after its very
+// first attempt.
+const DEFAULT_FUND_BLOCKS = 10n;
 
 const STEP_LABELS: Record<DeployProgress["step"], string> = {
   paying: "1/6 Paying the Cycles Minting Canister",
@@ -20,13 +28,24 @@ const STEP_LABELS: Record<DeployProgress["step"], string> = {
   done: "Done",
 };
 
-export function DeployMiner({ identity }: DeployMinerProps) {
+export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
   const [cyclesIcp, setCyclesIcp] = useState(DEFAULT_CYCLES_ICP);
-  const [fundIcp, setFundIcp] = useState(DEFAULT_FUND_ICP);
+  const [fundIcp, setFundIcp] = useState("");
+  const [fundTouched, setFundTouched] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<DeployProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canisterId, setCanisterId] = useState<string | null>(null);
+
+  // Fill the funding field with DEFAULT_FUND_BLOCKS worth of the real,
+  // live mining fee once it's known -- but only if the user hasn't typed
+  // their own amount in already.
+  useEffect(() => {
+    if (!fundTouched && miningFeeE8s > 0n) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- deriving from a prop that arrives asynchronously (chain stats), not from local/derived state
+      setFundIcp(formatAmount(miningFeeE8s * DEFAULT_FUND_BLOCKS));
+    }
+  }, [miningFeeE8s, fundTouched]);
 
   async function handleDeploy() {
     const cyclesAmount = parseAmount(cyclesIcp);
@@ -82,7 +101,10 @@ export function DeployMiner({ identity }: DeployMinerProps) {
               <input
                 className="input"
                 value={fundIcp}
-                onChange={(e) => setFundIcp(e.target.value)}
+                onChange={(e) => {
+                  setFundTouched(true);
+                  setFundIcp(e.target.value);
+                }}
                 inputMode="decimal"
                 disabled={running}
               />
@@ -99,7 +121,11 @@ export function DeployMiner({ identity }: DeployMinerProps) {
           {error && <p className="deploy-miner-error">{error}</p>}
           <p className="wallet-hint">
             This sends real ICP: some is converted to cycles to create and run the canister, the
-            rest funds its mining fees directly. You'll be its sole controller.
+            rest funds its mining fees directly (
+            {miningFeeE8s > 0n
+              ? `${DEFAULT_FUND_BLOCKS} blocks at the current ${formatAmount(miningFeeE8s)} ICP fee, by default`
+              : "sized to the current per-block fee once it loads"}
+            ). You'll be its sole controller.
           </p>
         </>
       )}
