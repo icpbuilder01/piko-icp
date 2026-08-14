@@ -233,6 +233,28 @@ export async function deployMiner(
   return { canisterId: canisterIdText };
 }
 
+// Re-installs the miner wasm currently served at /miner.wasm onto an
+// already-deployed miner canister, in upgrade mode (preserves state --
+// mining status, PIKO/ICP/cycles balances, attempt counters). This is the
+// only way an already-deployed miner ever picks up a bug fix or new
+// feature shipped after it was created: this project's controller can't
+// upgrade it (the deploying user is the sole controller, by design -- see
+// deployMiner()'s notify_create_canister settings), so the fix has to be
+// something the owner can trigger themselves, from their own browser, with
+// their own identity. Exactly the same install_code call deployMiner()
+// itself uses for the initial install, just in "upgrade" mode instead of
+// "install".
+export async function updateMinerCode(identity: Identity, canisterId: string): Promise<void> {
+  const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
+  const management = getManagementActorFor(canisterId, identity);
+  await management.install_code({
+    mode: { __kind__: "upgrade", upgrade: {} },
+    canister_id: Principal.fromText(canisterId),
+    wasm_module: wasmModule,
+    arg: new Uint8Array(),
+  });
+}
+
 // Sends more ICP straight to an already-deployed miner canister's own
 // balance -- exactly what deployMiner()'s "funding" step does, exposed on
 // its own so a partially-set-up (or simply low-on-funds) miner can be
