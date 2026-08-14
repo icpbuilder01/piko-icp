@@ -1,0 +1,66 @@
+type TransferResult = 
+ variant {
+   Err: TransferError;
+   Ok: nat;
+ };
+type TransferError = 
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type Status = 
+ record {
+   attempts: nat;
+   batchSizePerTick: nat;
+   blocksFound: nat;
+   cyclesBalance: nat;
+   feeCyclesPerSubmit: nat;
+   icpBalanceE8s: nat;
+   lastError: opt text;
+   mining: bool;
+   motherId: principal;
+   nextNonce: nat;
+   owner: principal;
+   tickIntervalSeconds: nat;
+ };
+type ApproveResult = 
+ variant {
+   Err: ApproveError;
+   Ok: nat;
+ };
+type ApproveError = 
+ variant {
+   AllowanceChanged: record {current_allowance: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   Expired: record {ledger_time: nat64;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+service : {
+  approveIcpFee: (amountE8s: nat) -> (ApproveResult);
+  deposit: () -> (nat);
+  getStatus: () -> (Status);
+  setBatchSizePerTick: (n: nat) -> ();
+  setFeeCyclesPerSubmit: (n: nat) -> ();
+  setIcpLedger: (ledgerId: principal) -> ();
+  setTickIntervalSeconds: (n: nat) -> ();
+  start: () -> ();
+  stop: () -> ();
+  withdrawIcp: (to: principal, amountE8s: nat) -> (TransferResult);
+}
