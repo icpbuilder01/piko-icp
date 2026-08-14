@@ -49,6 +49,21 @@ actor self {
   };
   let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerId));
 
+  // frontend/miner (the reference instance) don't have their own way to
+  // earn cycles -- unlike mother, which self-funds via sweepTreasury below,
+  // they've relied entirely on manual `icp canister top-up`. Optional
+  // (not trapping if unset) since, unlike ledger, mother can run fine
+  // without knowing about either -- topUpProject() below just does nothing
+  // for whichever one isn't configured.
+  let frontendId : ?Principal = switch (Runtime.envVar<system>("PUBLIC_CANISTER_ID:frontend")) {
+    case (?text) { ?Principal.fromText(text) };
+    case null { null };
+  };
+  let referenceMinerId : ?Principal = switch (Runtime.envVar<system>("PUBLIC_CANISTER_ID:miner")) {
+    case (?text) { ?Principal.fromText(text) };
+    case null { null };
+  };
+
   // The ICP ledger used to charge (and burn) the mining fee, and the
   // account transfers to it are burned to. Defaults to the real mainnet ICP
   // ledger (ryjl3-tyaaa-aaaaa-aaaba-cai) and its real minting account
@@ -93,6 +108,11 @@ actor self {
   // (e.g. to sweep immediately rather than waiting for the next tick).
   let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h
   transient var sweepTimerId : ?Timer.TimerId = null;
+
+  // Never share cycles below this floor -- mother keeps whatever it needs
+  // for its own healthy operation first, and only forwards genuine
+  // surplus. See topUpProject() below.
+  let CYCLES_RESERVE : Nat = 2_000_000_000_000; // 2T
 
   // ---- Mining state ----
   // Genesis header: a fixed, reproducible seed (not a real value, just a
@@ -754,12 +774,61 @@ actor self {
     { swept = spendable; burned = burnAmount; cyclesFunded = cyclesAmount; cyclesMinted; notifyError };
   };
 
-  // Fires sweepTreasury() on a timer so the balance sitting in this
-  // canister's own account never grows past roughly SWEEP_INTERVAL_SECONDS
-  // worth of fees, without depending on an external keeper/cron to remember
-  // to call it. Any error inside sweepTreasury() is already swallowed
-  // internally (each leg just retries next time), so nothing further to
-  // handle here.
+  // Shares mother's own cycles surplus with frontend and the reference
+  // miner -- neither has any way to earn cycles on its own, unlike mother
+  // (which self-funds via sweepTreasury above), so both have depended
+  // entirely on manual `icp canister top-up` since launch. mother is the
+  // one canister whose running costs scale with mining activity in the
+  // first place (via the cyclesFundRatioBps share of every fee), so
+  // routing part of that back out to the two canisters that make mining
+  // possible in the first place -- the site people mine from, and the
+  // reference miner people can inspect -- closes the loop project-wide
+  // instead of just for mother.
+  //
+  // Deliberately simple: keeps CYCLES_RESERVE for itself, splits whatever
+  // is left 50/50 between the two (skipping either that isn't configured,
+  // e.g. a deployment that never set PUBLIC_CANISTER_ID:frontend). No
+  // state kept here either, for the same reason sweepTreasury keeps none:
+  // it just re-reads Cycles.balance() fresh every call.
+  public shared func topUpProject() : async { toFrontend : Nat; toMiner : Nat } {
+    let balance = Cycles.balance();
+    if (balance <= CYCLES_RESERVE) { return { toFrontend = 0; toMiner = 0 } };
+
+    let targets = Array.filterMap<?Principal, Principal>(
+      [frontendId, referenceMinerId],
+      func(t) { t },
+    );
+    if (targets.size() == 0) { return { toFrontend = 0; toMiner = 0 } };
+
+    let surplus = balance - CYCLES_RESERVE;
+    let share = surplus / targets.size();
+    let Management : Types.ManagementActor = actor (Principal.toText(Principal.fromText("aaaaa-aa")));
+
+    var sentToFrontend = 0;
+    var sentToMiner = 0;
+    for (target in targets.vals()) {
+      let _outcome = try {
+        await (with cycles = share) Management.deposit_cycles({ canister_id = target });
+        ?();
+      } catch (_e) { null };
+      switch (_outcome) {
+        case (?()) {
+          if (?target == frontendId) { sentToFrontend += share };
+          if (?target == referenceMinerId) { sentToMiner += share };
+        };
+        case null {};
+      };
+    };
+    { toFrontend = sentToFrontend; toMiner = sentToMiner };
+  };
+
+  // Fires sweepTreasury() then topUpProject() on a timer so neither depends
+  // on an external keeper/cron remembering to call them: the ICP balance
+  // sitting in this canister's own account never grows past roughly
+  // SWEEP_INTERVAL_SECONDS worth of fees, and any cycles surplus gets
+  // shared with frontend/miner on the same cadence. Errors inside either
+  // are already swallowed internally (each leg just retries next time), so
+  // nothing further to handle here.
   func armSweepTimer<system>() {
     switch (sweepTimerId) {
       case (?id) { Timer.cancelTimer(id) };
@@ -767,7 +836,10 @@ actor self {
     };
     sweepTimerId := ?Timer.recurringTimer<system>(
       #seconds SWEEP_INTERVAL_SECONDS,
-      func() : async () { ignore (await sweepTreasury()) },
+      func() : async () {
+        ignore (await sweepTreasury());
+        ignore (await topUpProject());
+      },
     );
   };
 

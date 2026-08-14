@@ -87,6 +87,16 @@ module {
     notify_top_up : (NotifyTopUpArg) -> async NotifyTopUpResult;
   };
 
+  /// The IC management canister (aaaaa-aa) -- used by topUpProject() in
+  /// main.mo to share mother's own cycles surplus with frontend/miner,
+  /// neither of which has any other way to earn cycles. deposit_cycles
+  /// credits whatever cycles are attached to *this* call to canister_id;
+  /// unlike notify_top_up, no ICP/CMC round-trip is involved, since these
+  /// are cycles mother already has.
+  public type ManagementActor = actor {
+    deposit_cycles : ({ canister_id : Principal }) -> async ();
+  };
+
   /// Result of one sweepTreasury() call -- see main.mo for why this is
   /// stateless (every field is derived fresh from the live ICP balance,
   /// nothing here is a running counter that could drift).
