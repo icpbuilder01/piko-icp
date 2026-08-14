@@ -27,6 +27,7 @@ interface Stats {
   ledgerId: { toText(): string };
   miningFeeE8s: bigint;
   icpLedgerId: { toText(): string };
+  totalIcpBurnedE8s: bigint;
 }
 
 interface Block {
@@ -558,6 +559,10 @@ function App() {
                 <div className="stat-value">
                   {stats.nextHalvingHeight.toLocaleString()}
                 </div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-label">ICP burned</div>
+                <div className="stat-value">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
               </div>
             </div>
             <div className="meter">

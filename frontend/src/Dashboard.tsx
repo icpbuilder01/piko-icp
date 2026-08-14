@@ -18,6 +18,7 @@ interface Stats {
   targetBlockTimeNanos: bigint;
   blocksUntilRetarget: bigint;
   lastRetargetAt: bigint;
+  totalIcpBurnedE8s: bigint;
 }
 
 interface Block {
@@ -177,6 +178,10 @@ function Dashboard() {
               <div className="stat-tile">
                 <div className="stat-label">mother's cycles</div>
                 <div className="stat-value">{motherCycles !== null ? formatCycles(motherCycles) : "..."}</div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-label">ICP burned, all-time</div>
+                <div className="stat-value">{formatIcp(stats.totalIcpBurnedE8s)}</div>
               </div>
             </div>
 
