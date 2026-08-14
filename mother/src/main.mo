@@ -120,11 +120,11 @@ actor self {
   // claimed pendingRewards land past the cap once the ledger recovers.
   var totalMinted : Nat = 0;
   // ICP burned (sent to the ICP ledger's minting account) per accepted
-  // block, in e8s. Default 0.01 ICP -- kept deliberately low during the
+  // block, in e8s. Default 0.05 ICP -- kept deliberately low during the
   // adoption phase (see README) so the entry cost doesn't fight the
   // "mine right in your browser, no friction" pitch; adjustable via
   // setMiningFeeE8s() as real demand data comes in.
-  var miningFeeE8s : Nat = 1_000_000;
+  var miningFeeE8s : Nat = 5_000_000;
 
   var recentBlocks : [Types.Block] = [];
   // Persisted, not transient: this is real, specific PIKO owed to specific
