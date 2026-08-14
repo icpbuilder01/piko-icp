@@ -469,8 +469,10 @@ function App() {
             </div>
             {!feeApproved && (
               <p className="wallet-hint">
-                Costs {work ? formatIcp(work.miningFeeE8s) : "..."} ICP per block, win
-                or lose. Approve once to cover ~{APPROVE_BLOCKS} attempts.
+                Hashing itself is free (it's your own CPU) — the{" "}
+                {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee is only charged each
+                time you <em>submit</em> a valid proof, win or lose. This approval covers
+                about {APPROVE_BLOCKS} submissions before you'll need to approve again.
               </p>
             )}
           </>
