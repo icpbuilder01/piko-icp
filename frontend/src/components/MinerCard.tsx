@@ -206,11 +206,15 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
             {status.mining ? "mining" : "stopped"}
           </span>
         )}
-        {status?.mining && (
-          <button type="button" className="button secondary small" onClick={handlePause} disabled={busy !== null}>
-            {busy === "stop" ? "Pausing..." : "Pause"}
-          </button>
-        )}
+        {/* Not gated on status having loaded: getStatus() fails to decode on
+            a miner still running pre-pikoBalance code (a hard requirement
+            of the current candid, not optional), which must never also
+            hide the one button that stops it -- stop() itself doesn't need
+            status to be known, and is safe to call regardless of whether
+            it's actually mining. */}
+        <button type="button" className="button secondary small" onClick={handlePause} disabled={busy !== null}>
+          {busy === "stop" ? "Pausing..." : "Pause"}
+        </button>
         <button type="button" className="button secondary small" onClick={handleUpdateCode} disabled={busy !== null}>
           {busy === "update" ? "Updating..." : "Update code"}
         </button>
