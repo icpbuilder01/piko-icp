@@ -22,6 +22,14 @@ type TransferFromError =
    TooOld;
  };
 type Time = int;
+type SweepResult = 
+ record {
+   burned: nat;
+   cyclesFunded: nat;
+   cyclesMinted: opt nat;
+   notifyError: opt text;
+   swept: nat;
+ };
 type SubmitResult = 
  variant {
    Err: SubmitError;
@@ -44,15 +52,39 @@ type SubmitError =
  };
 type Stats = 
  record {
+   cmcId: principal;
    currentReward: nat;
+   cyclesFundRatioBps: nat;
+   cyclesFundRatioLocked: bool;
    difficultyBits: nat;
    height: nat;
+   icpBurnOwner: principal;
+   icpFeeTargetLocked: bool;
    icpLedgerId: principal;
    ledgerId: principal;
    maxSupply: nat;
    miningFeeE8s: nat;
    nextHalvingHeight: nat;
    totalMinted: nat;
+ };
+type PendingNatChange = 
+ record {
+   readyAt: Time;
+   value: nat;
+ };
+type PendingIcpFeeTarget = 
+ record {
+   burnOwner: principal;
+   cmcId: principal;
+   ledgerId: principal;
+   readyAt: Time;
+ };
+type PendingAdminChanges = 
+ record {
+   cyclesFundRatio: opt PendingNatChange;
+   difficulty: opt PendingNatChange;
+   icpFeeTarget: opt PendingIcpFeeTarget;
+   timelockNanos: int;
  };
 type LeaderboardEntry = 
  record {
@@ -69,15 +101,29 @@ type Block =
    timestamp: Time;
  };
 service : {
+  cancelPendingCyclesFundRatio: () -> ();
+  cancelPendingDifficulty: () -> ();
+  cancelPendingIcpFeeTarget: () -> ();
   claimPendingReward: () -> (SubmitResult);
   cyclesBalance: () -> (nat) query;
+  executeCyclesFundRatioBps: () -> ();
+  executeDifficulty: () -> ();
+  executeIcpFeeTarget: () -> ();
   getLeaderboard: () -> (vec LeaderboardEntry) query;
+  getPendingAdminChanges: () -> (PendingAdminChanges) query;
   getPendingReward: () -> (nat) query;
   getRecentBlocks: () -> (vec Block) query;
   getStats: () -> (Stats) query;
+  getTotalPendingRewards: () -> (nat) query;
   getWork: () -> (Work) query;
-  setDifficulty: (bits: nat) -> ();
-  setIcpFeeTarget: (ledgerId: principal, burnOwner: principal) -> ();
+  lockCyclesFundRatio: () -> ();
+  lockIcpFeeTarget: () -> ();
+  proposeCyclesFundRatioBps: (bps: nat) -> ();
+  proposeDifficulty: (bits: nat) -> ();
+  proposeIcpFeeTarget: (ledgerId: principal, burnOwner: principal,
+   cyclesMintingCanister: principal) -> ();
+  pruneStaleAttempts: () -> (nat);
   setMiningFeeE8s: (e8s: nat) -> ();
   submitProof: (nonce: nat) -> (SubmitResult);
+  sweepTreasury: () -> (SweepResult);
 }

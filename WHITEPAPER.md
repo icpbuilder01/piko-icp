@@ -15,11 +15,13 @@ browser tab via the Web Crypto API, or in a self-owned canister running
 around the clock -- and every submission is independently re-verified by the
 coordinating canister before anything is minted.
 
-Mining is not free: each accepted proof burns a fixed amount of ICP,
-permanently, to the ICP ledger's own minting account. Losing a close race
-also burns the fee -- there is no refund. That real, occasionally-wasted
-cost is deliberate: it is what makes mining a genuine competition instead of
-a free claim on the supply.
+Mining is not free: each accepted proof costs a fixed amount of ICP, pulled
+from the miner and non-refundable from that instant on -- most of it burned
+permanently to the ICP ledger's own minting account, a small share converted
+to cycles to help fund the protocol's own canisters (&sect;4). Losing a
+close race costs the same fee -- there is no refund. That real,
+occasionally-wasted cost is deliberate: it is what makes mining a genuine
+competition instead of a free claim on the supply.
 
 ## 1. Why another token
 
@@ -56,13 +58,18 @@ the same height is accepted.
 4. **Verify.** The coordinator recomputes the hash itself -- it never trusts
    a client-supplied result -- and rejects anything that doesn't clear the
    current target.
-5. **Pay.** The mining fee is pulled from the miner's own ICP balance and
-   sent to the ICP ledger's minting account. This happens whether or not the
-   submission goes on to win.
+5. **Pay.** The mining fee is pulled from the miner's own ICP balance into
+   the coordinator's. This happens whether or not the submission goes on to
+   win, and is never refunded from this point on.
 6. **Settle.** If the chain height hasn't moved since the search began, this
    submission wins: the block advances, and the reward is minted to the
    miner's principal. If someone else's proof landed first, this one is
-   rejected -- its fee stays burned regardless.
+   rejected -- its fee is gone regardless.
+7. **Burn.** Fees aren't sent to their final destination one at a time --
+   that would mean paying an extra ICP ledger transfer fee on every single
+   block. Instead they accumulate in the coordinator's own balance, and a
+   periodic sweep (automatic, hourly) burns most of it and converts a
+   configured share to cycles (&sect;4).
 
 ## 3. Tokenomics
 
@@ -83,13 +90,31 @@ it. Difficulty is not yet auto-retargeting -- it's set by the coordinator's
 controller based on observed block times, a simplification the roadmap
 (&sect;8) addresses.
 
-## 4. The burn
+## 4. The burn -- and the cycles that keep the lights on
 
-The mining fee is not collected by the project. Every accepted submission's
-fee -- and every losing submission's fee -- is transferred to the ICP
-ledger's own minting account (`rrkah-fqaaa-aaaaa-aaaaq-cai`), which is how
-ICP is destroyed under the ICRC-1 standard. It is a real, permanent,
-publicly verifiable burn, not a claim.
+The mining fee is not collected by the project as revenue. Every accepted
+submission's fee -- and every losing submission's fee -- ends up split two
+ways once it's swept:
+
+- **The large majority (100% minus `cyclesFundRatioBps`, default 80%) is
+  transferred to the ICP ledger's own minting account**
+  (`rrkah-fqaaa-aaaaa-aaaaq-cai`), which is how ICP is destroyed under the
+  ICRC-1 standard. A real, permanent, publicly verifiable burn, not a claim.
+- **The remaining share (`cyclesFundRatioBps`, default 20%) is converted to
+  cycles** via the Internet Computer's Cycles Minting Canister, and used to
+  fund the coordinator canister's own compute -- the alternative being that
+  this canister depends on someone remembering to manually top it up with
+  cycles forever, indefinitely, by hand. Cycles obtained this way can't be
+  converted back into ICP or any other asset; this is fuel for the protocol
+  to keep running, not revenue anyone can extract or spend.
+
+This split doesn't happen block-by-block -- fees accumulate in the
+coordinator's own ICP balance and get swept out (burned + converted)
+automatically on an hourly timer, so the fee doesn't pay a second ICP ledger
+transfer fee on every single block just to be moved along. The split ratio
+itself is disclosed live via `getStats()`, and -- like the burn destination
+itself -- can be locked permanently by the controller once tuned, so it
+becomes a promise enforced by code rather than by a key (&sect;6).
 
 **Pay-to-play, not play-to-win.** Paying the fee does not guarantee a
 reward. If another submission's fee lands first for the same block, this
@@ -130,24 +155,38 @@ What it cannot yet claim is trustlessness in the strict sense. `mother`,
 `ledger`, `miner`, and `frontend` currently share a single controller. A
 canister controller can install new code at any time, which means the
 guarantees in this paper hold only as long as that controller chooses not
-to change them -- whether by altering the supply logic, or by redirecting
-the burn destination. This is disclosed here deliberately rather than left
-implicit.
+to change them by replacing the code outright. This is disclosed here
+deliberately rather than left implicit.
 
-**What removes this trust requirement:** *blackholing* -- permanently
-removing all controllers from a canister -- makes it unupgradable by
-anyone, forever. The roadmap (&sect;8) covers blackholing `ledger` and
-`mother` once the mechanism has run long enough, in production, without a
-code change. Until then, PIKO's rules are open-source and verifiable, but
-not yet immutable.
+**Parameter changes, short of a code upgrade, are timelocked.** Difficulty
+and the ICP fee target (which ledger, which burn account, which CMC) can't
+change in a single transaction: they're proposed, visible on-chain for
+48 hours, and only take effect after that delay -- long enough for anyone
+watching to notice and react before a change lands. The burn/cycles split
+ratio gets the same treatment for a related reason: it can never move funds
+off-protocol, but an instantly-changeable ratio would make "X% of every fee
+is burned" just as unreliable a promise as an unlocked burn address. Each of
+these can also be **permanently locked** by the controller once tuned,
+turning that specific promise from "enforced by a key" into "enforced by
+code" well before the whole canister is blackholed.
+
+**What removes the remaining trust requirement:** *blackholing* --
+permanently removing all controllers from a canister -- makes it
+unupgradable by anyone, forever, closing the one door the timelock
+deliberately doesn't cover. The roadmap (&sect;8) covers blackholing
+`ledger` and `mother` once the mechanism has run long enough, in
+production, without a code change. Until then, PIKO's rules are open-source
+and verifiable, and the parameters within them move on a public delay, but
+the code itself is not yet immutable.
 
 ## 7. Risk disclosure
 
 - PIKO has no liquidity and no listed market at the time of writing. There
   is currently no way to convert PIKO back into ICP or any other asset.
-- The mining fee is real ICP, burned immediately and permanently on
-  submission -- win or lose the block. It is not refundable under any
-  circumstance.
+- The mining fee is real ICP, non-refundable the instant it's pulled --
+  win or lose the block -- and permanently burned (the large majority) or
+  converted to cycles (a small share) in batches shortly after. Under no
+  circumstance does it return to the miner who paid it.
 - This document is not investment advice, and PIKO is not a security, a
   share, or a promise of future value. Mine only with ICP you are fully
   prepared to never see again.
@@ -161,8 +200,15 @@ not yet immutable.
 - **Blackhole `ledger`.** Standard DFINITY code with the lowest bug
   surface -- the earliest candidate for permanently removing its
   controller.
+- **Lock `icpFeeTarget` and `cyclesFundRatio`** on `mother` once the burn
+  destination, CMC, and burn/cycles split are considered final -- turning
+  those specific promises into code-enforced ones ahead of blackholing
+  itself.
 - **Blackhole `mother`** once difficulty and fee parameters have
   stabilized, permanently locking in the supply cap and burn logic.
+- **Third-party security audit**, independent of this paper's own trust-model
+  disclosures, before either blackholing step above or any meaningful
+  liquidity event.
 - **Liquidity.** A PIKO/ICP pool on an ICP-native DEX, funded
   transparently, once there's a real community of miners to trade with.
 

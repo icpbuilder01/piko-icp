@@ -51,10 +51,6 @@ actor self {
   // mother/src/main.mo), so this is just a voluntary top-up, not a required
   // minimum.
   var feeCyclesPerSubmit : Nat = 1_000_000_000;
-  // If this canister's own cycle balance drops below this, mining
-  // auto-stops (mirrors "if a miner's program runs out of cycles, it stops
-  // until refueled").
-  let MIN_CYCLES_TO_MINE : Nat = 2 * feeCyclesPerSubmit;
 
   transient var timerId : ?Timer.TimerId = null;
 
@@ -104,7 +100,13 @@ actor self {
   func tick<system>() : async () {
     if (not mining) { return };
 
-    if (Cycles.balance() < MIN_CYCLES_TO_MINE) {
+    // Recomputed from the current feeCyclesPerSubmit on every tick (rather
+    // than a fixed constant) so the safety margin stays correct even after
+    // setFeeCyclesPerSubmit changes it -- a stale, too-low threshold here
+    // could let the canister burn through cycles past the point it can
+    // still afford to run.
+    let minCyclesToMine = 2 * feeCyclesPerSubmit;
+    if (Cycles.balance() < minCyclesToMine) {
       mining := false;
       cancelTimer();
       lastError := ?"stopped: cycle balance too low, call deposit() then start() again";
