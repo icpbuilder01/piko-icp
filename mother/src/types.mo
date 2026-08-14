@@ -64,6 +64,57 @@ module {
 
   public type IcpLedgerActor = actor {
     icrc2_transfer_from : (TransferFromArgs) -> async TransferFromResult;
+    icrc1_transfer : (TransferArg) -> async TransferResult;
+    icrc1_balance_of : (Account) -> async Nat;
+  };
+
+  /// Minimal Cycles Minting Canister (CMC) interface, used to convert this
+  /// canister's own ICP holdings into cycles (see sweepTreasury() in
+  /// main.mo). Mainnet CMC: rkp4c-7iaaa-aaaaa-aaaca-cai.
+  public type NotifyTopUpArg = { block_index : Nat64; canister_id : Principal };
+
+  public type NotifyError = {
+    #Refunded : { reason : Text; block_index : ?Nat64 };
+    #Processing;
+    #TransactionTooOld : Nat64;
+    #InvalidTransaction : Text;
+    #Other : { error_code : Nat64; error_message : Text };
+  };
+
+  public type NotifyTopUpResult = { #Ok : Nat; #Err : NotifyError };
+
+  public type CmcActor = actor {
+    notify_top_up : (NotifyTopUpArg) -> async NotifyTopUpResult;
+  };
+
+  /// Result of one sweepTreasury() call -- see main.mo for why this is
+  /// stateless (every field is derived fresh from the live ICP balance,
+  /// nothing here is a running counter that could drift).
+  public type SweepResult = {
+    swept : Nat;
+    burned : Nat;
+    cyclesFunded : Nat;
+    cyclesMinted : ?Nat;
+    notifyError : ?Text;
+  };
+
+  /// A queued, not-yet-applied admin change -- see ADMIN_TIMELOCK_NANOS in
+  /// main.mo. readyAt is when executeDifficulty()/executeIcpFeeTarget() are
+  /// allowed to apply it.
+  public type PendingNatChange = { value : Nat; readyAt : Time.Time };
+
+  public type PendingIcpFeeTarget = {
+    ledgerId : Principal;
+    burnOwner : Principal;
+    cmcId : Principal;
+    readyAt : Time.Time;
+  };
+
+  public type PendingAdminChanges = {
+    difficulty : ?PendingNatChange;
+    cyclesFundRatio : ?PendingNatChange;
+    icpFeeTarget : ?PendingIcpFeeTarget;
+    timelockNanos : Int;
   };
 
   /// Work miners must hash against to produce a valid proof.
@@ -108,5 +159,10 @@ module {
     ledgerId : Principal;
     miningFeeE8s : Nat;
     icpLedgerId : Principal;
+    icpBurnOwner : Principal;
+    icpFeeTargetLocked : Bool;
+    cmcId : Principal;
+    cyclesFundRatioBps : Nat;
+    cyclesFundRatioLocked : Bool;
   };
 }
