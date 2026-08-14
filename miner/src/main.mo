@@ -142,6 +142,24 @@ actor self {
         } catch (_e) { null };
         switch (result) {
           case (? #Ok(_ok)) { blocksFound += 1; lastError := null };
+          case (? #Err(#IcpFeeFailed(#InsufficientFunds(_)))) {
+            // The ICP funding this miner approved is gone -- stop instead of
+            // keep grinding (each further tick would still spend real
+            // cycles on a hash search and a submitProof call that's doomed
+            // to fail the same way). Send more ICP to this canister and
+            // call approveIcpFee() again to resume.
+            mining := false;
+            cancelTimer();
+            lastError := ?"stopped: out of ICP for the mining fee -- send more ICP here, then approveIcpFee() + start() again";
+          };
+          case (? #Err(#IcpFeeFailed(#InsufficientAllowance(_)))) {
+            // Same idea, but the ICP is still here -- only the approved
+            // allowance ran out (e.g. it was sized for N blocks and N have
+            // been mined). approveIcpFee() alone is enough to resume.
+            mining := false;
+            cancelTimer();
+            lastError := ?"stopped: ICP allowance for mother exhausted -- approveIcpFee() again, then start()";
+          };
           case (? #Err(e)) { lastError := ?debug_show (e) };
           case null { lastError := ?"submitProof() call failed" };
         };
