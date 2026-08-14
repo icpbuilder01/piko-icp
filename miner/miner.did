@@ -30,6 +30,7 @@ type Status =
    motherId: principal;
    nextNonce: nat;
    owner: principal;
+   pikoBalance: nat;
    tickIntervalSeconds: nat;
  };
 type ApproveResult = 
@@ -63,4 +64,5 @@ service : {
   start: () -> ();
   stop: () -> ();
   withdrawIcp: (to: principal, amountE8s: nat) -> (TransferResult);
+  withdrawPiko: (to: principal, amount: nat) -> (TransferResult);
 }
