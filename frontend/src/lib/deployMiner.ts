@@ -98,6 +98,22 @@ export interface DeployResult {
   canisterId: string;
 }
 
+// Thrown instead of a plain Error once the canister actually exists (i.e.
+// from the "funding"/"approving"/"starting" steps onward) -- reported bug:
+// a partial failure here (e.g. running out of ICP partway through) left the
+// user with a real canister they'd already paid to create, but no way to
+// find it again short of parsing a sentence of error text. Callers should
+// catch this specifically to recover the id and offer a retry, rather than
+// just displaying err.message.
+export class DeployError extends Error {
+  canisterId: string;
+  constructor(message: string, canisterId: string) {
+    super(message);
+    this.name = "DeployError";
+    this.canisterId = canisterId;
+  }
+}
+
 // Deploys a brand-new, personally-owned `miner` canister, entirely from the
 // browser, paid for in ICP:
 //   1. Pay the Cycles Minting Canister in ICP (notify_create_canister) --
@@ -168,14 +184,21 @@ export async function deployMiner(
   const canisterIdText = canisterId.toText();
 
   onProgress({ step: "installing", message: "Installing the miner code..." });
-  const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
-  const management = getManagementActorFor(canisterIdText, identity);
-  await management.install_code({
-    mode: { __kind__: "install", install: null },
-    canister_id: canisterId,
-    wasm_module: wasmModule,
-    arg: new Uint8Array(),
-  });
+  try {
+    const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
+    const management = getManagementActorFor(canisterIdText, identity);
+    await management.install_code({
+      mode: { __kind__: "install", install: null },
+      canister_id: canisterId,
+      wasm_module: wasmModule,
+      arg: new Uint8Array(),
+    });
+  } catch (err) {
+    throw new DeployError(
+      `Installing the miner code failed: ${err instanceof Error ? err.message : describeError(err)}.`,
+      canisterIdText,
+    );
+  }
 
   onProgress({ step: "funding", message: "Sending it ICP to cover mining fees..." });
   const fundResult = await icpLedger.icrc1_transfer({
@@ -183,8 +206,9 @@ export async function deployMiner(
     amount: fundMiningE8s,
   });
   if (fundResult.__kind__ !== "Ok") {
-    throw new Error(
-      `Miner was created (${canisterIdText}), but funding it with ICP failed: ${describeError(fundResult.Err)}. Send it ICP directly and finish setup manually.`,
+    throw new DeployError(
+      `Funding it with ICP failed: ${describeError(fundResult.Err)}.`,
+      canisterIdText,
     );
   }
 
@@ -192,14 +216,47 @@ export async function deployMiner(
   const miner = getMinerActorAt(canisterIdText, identity);
   const approveResult = await miner.approveIcpFee(fundMiningE8s);
   if (approveResult.__kind__ !== "Ok") {
-    throw new Error(
-      `Miner was created and funded (${canisterIdText}), but approveIcpFee() failed: ${describeError(approveResult.Err)}. Call it again manually to finish setup.`,
-    );
+    throw new DeployError(`approveIcpFee() failed: ${describeError(approveResult.Err)}.`, canisterIdText);
   }
 
   onProgress({ step: "starting", message: "Starting it mining..." });
-  await miner.start();
+  try {
+    await miner.start();
+  } catch (err) {
+    throw new DeployError(
+      `start() failed: ${err instanceof Error ? err.message : describeError(err)}.`,
+      canisterIdText,
+    );
+  }
 
   onProgress({ step: "done", message: "Mining, entirely on-chain -- close this tab whenever you like." });
   return { canisterId: canisterIdText };
+}
+
+// Sends more ICP straight to an already-deployed miner canister's own
+// balance -- exactly what deployMiner()'s "funding" step does, exposed on
+// its own so a partially-set-up (or simply low-on-funds) miner can be
+// topped up later without redeploying anything.
+export async function fundMinerIcp(identity: Identity, canisterId: string, amountE8s: bigint): Promise<void> {
+  const icpLedger = getIcpLedgerActor(identity);
+  const result = await icpLedger.icrc1_transfer({
+    to: { owner: Principal.fromText(canisterId) },
+    amount: amountE8s,
+  });
+  if (result.__kind__ !== "Ok") {
+    throw new Error(`Sending ICP failed: ${describeError(result.Err)}`);
+  }
+}
+
+// Re-runs approveIcpFee() + start() on an already-deployed miner --
+// exactly deployMiner()'s last two steps, exposed on their own so a miner
+// that was created (and possibly funded) but never finished setup can be
+// resumed without paying to create a second canister.
+export async function finishMinerSetup(identity: Identity, canisterId: string, approveAmountE8s: bigint): Promise<void> {
+  const miner = getMinerActorAt(canisterId, identity);
+  const approveResult = await miner.approveIcpFee(approveAmountE8s);
+  if (approveResult.__kind__ !== "Ok") {
+    throw new Error(`approveIcpFee() failed: ${describeError(approveResult.Err)}`);
+  }
+  await miner.start();
 }
