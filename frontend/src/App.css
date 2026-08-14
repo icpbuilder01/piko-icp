@@ -1111,3 +1111,18 @@ p.pull-quote {
 .footer p {
   margin: 0;
 }
+
+.footer p.footer-links {
+  margin-top: 8px;
+}
+
+.footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--text-muted);
+}
+
+.footer-links a:hover {
+  color: var(--text-secondary);
+  border-bottom-color: var(--text-secondary);
+}
