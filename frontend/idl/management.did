@@ -1,0 +1,22 @@
+// Minimal, hand-written subset of the IC management canister's interface
+// (aaaaa-aa, a protocol-level canister on every subnet, not something this
+// project deploys), covering only install_code -- used by DeployMiner.tsx
+// to install the miner wasm onto a freshly created canister. Part of the
+// stable IC interface spec: https://internetcomputer.org/docs/references/ic-interface-spec.
+
+type canister_install_mode = variant {
+  install;
+  reinstall;
+  upgrade : opt record { skip_pre_upgrade : opt bool; wasm_memory_persistence : opt variant { keep; replace } };
+};
+
+type install_code_args = record {
+  mode : canister_install_mode;
+  canister_id : principal;
+  wasm_module : blob;
+  arg : blob;
+};
+
+service : {
+  install_code : (install_code_args) -> ();
+}
