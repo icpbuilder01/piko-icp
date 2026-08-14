@@ -39,6 +39,12 @@ function friendlyMinerError(raw: string): { text: string; expected: boolean } {
       expected: true,
     };
   }
+  if (raw.includes("getWork() call failed")) {
+    return {
+      text: "Missed one call to the coordinator canister -- still mining, retries automatically every few seconds. Not a site error.",
+      expected: true,
+    };
+  }
   return { text: raw, expected: false };
 }
 
