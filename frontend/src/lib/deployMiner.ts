@@ -256,22 +256,24 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
   // timer fires every tickIntervalSeconds and each tick awaits an
   // inter-canister call to mother (getWork/submitProof) -- an upgrade that
   // lands while one of those is in flight traps outright, and a mining
-  // miner is *always* at risk of exactly that, every few seconds. Pausing
-  // first (and resuming after, if it was mining) is what the error message
-  // itself suggests, made automatic so "Update code" doesn't need to be
-  // timed by hand.
-  const statusBefore = await miner.getStatus();
-  const wasMining = statusBefore.mining;
-  if (wasMining) {
-    await miner.stop();
-    // stop() cancels *future* ticks immediately, but a tick already
-    // in-flight (mid-await on a call to mother) keeps running to
-    // completion regardless -- that's the actual "outstanding callback"
-    // the trap above is about. tickIntervalSeconds defaults to a few
-    // seconds; this comfortably outlasts one already in progress before
-    // attempting the upgrade.
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-  }
+  // miner is *always* at risk of exactly that, every few seconds.
+  //
+  // Always stop first -- safe and idempotent even if it's already stopped
+  // -- rather than checking getStatus().mining first (an earlier version
+  // of this function did exactly that, and broke *every* call to it: the
+  // whole reason to run this function at all is often to add a field like
+  // pikoBalance that the currently-installed code doesn't return yet, so
+  // requiring a successful, fully-decoded getStatus() call first made it
+  // impossible to ever fix a miner that actually needed fixing). Left
+  // stopped afterward on purpose -- resuming is the separate, explicit
+  // Resume action, not something this function should decide on its own.
+  await miner.stop();
+  // stop() cancels *future* ticks immediately, but a tick already in-flight
+  // (mid-await on a call to mother) keeps running to completion regardless
+  // -- that's the actual "outstanding callback" the trap above is about.
+  // tickIntervalSeconds defaults to a few seconds; this comfortably
+  // outlasts one already in progress before attempting the upgrade.
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 
   const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
   const management = getManagementActorFor(canisterId, identity);
@@ -290,10 +292,6 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
     wasm_module: wasmModule,
     arg: new Uint8Array(),
   });
-
-  if (wasMining) {
-    await getMinerActorAt(canisterId, identity).start();
-  }
 }
 
 // Sends more ICP straight to an already-deployed miner canister's own
