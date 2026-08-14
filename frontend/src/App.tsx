@@ -560,7 +560,7 @@ function App() {
                   {stats.nextHalvingHeight.toLocaleString()}
                 </div>
               </div>
-              <div className="stat-tile">
+              <div className="stat-tile stat-tile-wide">
                 <div className="stat-label">ICP burned</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
               </div>

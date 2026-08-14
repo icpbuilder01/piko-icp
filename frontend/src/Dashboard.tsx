@@ -179,7 +179,7 @@ function Dashboard() {
                 <div className="stat-label">mother's cycles</div>
                 <div className="stat-value">{motherCycles !== null ? formatCycles(motherCycles) : "..."}</div>
               </div>
-              <div className="stat-tile">
+              <div className="stat-tile stat-tile-wide">
                 <div className="stat-label">ICP burned, all-time</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)}</div>
               </div>
