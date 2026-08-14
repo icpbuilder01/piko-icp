@@ -730,6 +730,9 @@ function App() {
           no servers, no database. See the README for the full architecture
           and mainnet canister IDs.
         </p>
+        <p className="footer-links">
+          <a href="/dashboard.html">Live chain dashboard</a>
+        </p>
       </footer>
     </main>
   );
