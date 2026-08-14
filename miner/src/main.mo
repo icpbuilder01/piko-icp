@@ -218,6 +218,35 @@ actor self {
   public shared ({ caller }) func start<system>() : async () {
     requireOwner(caller);
     if (Principal.isController(caller)) { owner := caller };
+
+    // Same threshold tick() itself checks -- mirrored here so a start()
+    // with an empty tank fails fast with a clear reason instead of arming
+    // the timer and burning a tick's worth of hashing + a doomed
+    // submitProof before tick() discovers the same thing.
+    let minCyclesToMine = 2 * feeCyclesPerSubmit;
+    if (Cycles.balance() < minCyclesToMine) {
+      lastError := ?"cannot start: cycle balance too low, call deposit() first";
+      return;
+    };
+
+    let work = try { ?(await Mother.getWork()) } catch (_e) { null };
+    switch (work) {
+      case null {
+        lastError := ?"cannot start: getWork() call failed, try again";
+        return;
+      };
+      case (?w) {
+        let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
+        let icpBalance = try {
+          await IcpLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
+        } catch (_e) { 0 };
+        if (icpBalance < w.miningFeeE8s) {
+          lastError := ?"cannot start: not enough ICP for the mining fee, send more ICP here then start() again";
+          return;
+        };
+      };
+    };
+
     mining := true;
     lastError := null;
     armTimer<system>();
