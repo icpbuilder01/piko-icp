@@ -6,6 +6,7 @@ import { login, logout, getStoredIdentity } from "./lib/auth";
 import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
 import { formatPiko, formatIcp, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
+import { DeployMiner } from "./components/DeployMiner";
 import { Confetti } from "./components/Confetti";
 import "./App.css";
 
@@ -646,10 +647,17 @@ function App() {
           dedicated miner canister
         </h2>
         <p>
-          In-browser mining stops when you close the tab. Deploy your own{" "}
-          <code>miner</code> canister for continuous mining — same hashing,
-          same rewards, running on a timer instead of a tab:
+          In-browser mining stops when you close the tab. A dedicated{" "}
+          <code>miner</code> canister doesn't — same hashing, same rewards,
+          running on its own timer, on-chain, until the ICP you send it runs
+          out.
         </p>
+        {identity ? (
+          <DeployMiner identity={identity} />
+        ) : (
+          <p className="empty-state">Log in above to deploy one from here.</p>
+        )}
+        <p className="section-intro">Or do it by hand from the CLI:</p>
         <ol>
           <li>Clone the PIKO repository and open the project directory.</li>
           <li>
