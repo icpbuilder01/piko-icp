@@ -74,6 +74,13 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
   const [busy, setBusy] = useState<Busy>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopyId() {
+    await navigator.clipboard.writeText(canisterId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   async function refreshStatus() {
     try {
@@ -250,6 +257,9 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
         <code className="miner-card-id" title={canisterId}>
           {shortPrincipal(canisterId)}
         </code>
+        <button type="button" className="button secondary small" onClick={handleCopyId}>
+          {copied ? "Copied" : "Copy id"}
+        </button>
         {status && (
           <span className={`status-pill ${status.mining ? "status-good" : "status-critical"}`}>
             <span className="status-dot" />
