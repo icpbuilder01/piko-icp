@@ -126,8 +126,9 @@ actor self {
   var height : Nat = 0;
   // Leading zero bits required in sha256(previousHash # height # nonce).
   // 22 bits is a starting estimate for "a few minutes per block" at a small
-  // number of concurrent miners (browser + canister); tune with
-  // setDifficulty() once real traffic shows actual block times (see README).
+  // number of concurrent miners (browser + canister) -- from here on it's
+  // retargeted automatically (see "Automatic difficulty retargeting"
+  // below), never hand-set again.
   var difficultyBits : Nat = 22;
   // Total reward reserved against MAX_SUPPLY -- incremented the instant a
   // block's reward is decided (in submitProof, right when height advances),
@@ -214,6 +215,93 @@ actor self {
       0;
     };
     if (nominal > remaining) { remaining } else { nominal };
+  };
+
+  // ---- Automatic difficulty retargeting ----
+  // Bitcoin-style: difficulty adjusts itself from on-chain block
+  // timestamps only, with no controller call in the loop. This is what
+  // lets `mother` be safely blackholed later (see README's roadmap) --
+  // a hand-picked difficultyBits that could never be revisited again
+  // would either stall the chain (too hard for real participation) or
+  // blow through the supply cap in days (too easy), and there would be
+  // no way to fix either outcome once no controller remains.
+  //
+  // 5 minutes is the same "a few minutes per block" target the initial
+  // 22-bit guess above was aiming for -- retargeting just keeps hitting
+  // it automatically as real participation moves difficultyBits away
+  // from that guess, instead of requiring someone to notice and call
+  // setDifficulty() by hand.
+  let TARGET_BLOCK_TIME_NANOS : Nat = 5 * 60 * 1_000_000_000; // 5 minutes
+  // Short window (10 blocks) rather than bitcoin's ~2016: PIKO is early
+  // and low-height, so reacting quickly to real participation matters
+  // more than smoothing out noise over a long window.
+  let RETARGET_INTERVAL_BLOCKS : Nat = 10;
+  let RETARGET_TARGET_WINDOW_NANOS : Nat = RETARGET_INTERVAL_BLOCKS * TARGET_BLOCK_TIME_NANOS;
+  // Caps how far one retarget can move difficulty, mirroring bitcoin's
+  // classic 4x-per-adjustment clamp (2 bits = 4x more/less expected
+  // work per proof). Keeps one unusually fast or slow 10-block window --
+  // easy to get with only a handful of miners -- from swinging
+  // difficulty wildly on a small sample.
+  let MAX_RETARGET_STEP_BITS : Nat = 2;
+  let MIN_DIFFICULTY_BITS : Nat = 1;
+  let MAX_DIFFICULTY_BITS : Nat = 256;
+
+  // When the current retarget window started: the wall-clock time and
+  // chain height right after the previous retarget (or genesis, for the
+  // very first window). `var`, not `transient var` -- this is a real
+  // fact about the chain's history, not in-flight bookkeeping, so it
+  // must survive upgrades exactly like previousHash/height do.
+  var retargetAnchorTime : Time.Time = Time.now();
+  var retargetAnchorHeight : Nat = 0;
+  var lastRetargetAt : Time.Time = retargetAnchorTime;
+
+  // floor(log2(numerator / denominator)), clamped to [0, cap]. Integer-only
+  // (no Float) so this is trivially reproducible and auditable: it just
+  // doubles `denominator` at most `cap` times rather than doing real
+  // division/log math, which is all the small, bounded cap here needs.
+  func log2FloorClamped(numerator : Nat, denominator : Nat, cap : Nat) : Nat {
+    if (denominator == 0 or numerator <= denominator) { return 0 };
+    var scaled = denominator;
+    var steps = 0;
+    while (steps < cap and scaled * 2 <= numerator) {
+      scaled *= 2;
+      steps += 1;
+    };
+    steps;
+  };
+
+  // Applies one retarget step based on how long the just-completed window
+  // actually took vs. RETARGET_TARGET_WINDOW_NANOS, then rolls the window
+  // forward. Called from submitProof right after height advances, only
+  // once a full window has elapsed -- so as long as blocks keep getting
+  // found (by anyone), difficulty keeps tracking real block times on its
+  // own, with no external caller or keeper required.
+  func maybeRetarget(now : Time.Time) {
+    if (height < retargetAnchorHeight + RETARGET_INTERVAL_BLOCKS) { return };
+
+    let elapsed = now - retargetAnchorTime; // Int, expected positive
+    // Guards a clock/anchor anomaly (elapsed <= 0) by treating the window
+    // as having taken ~0 time -- reads as "extremely fast", which clamps
+    // to the same MAX_RETARGET_STEP_BITS increase as any other fast
+    // window, rather than trapping or under/overflowing a Nat conversion.
+    let actualNanos = if (elapsed > 0) { Int.toNat(elapsed) } else { 1 };
+
+    let newBits = if (actualNanos < RETARGET_TARGET_WINDOW_NANOS) {
+      // blocks came faster than target -> harder
+      let steps = log2FloorClamped(RETARGET_TARGET_WINDOW_NANOS, actualNanos, MAX_RETARGET_STEP_BITS);
+      Nat.min(difficultyBits + steps, MAX_DIFFICULTY_BITS);
+    } else if (actualNanos > RETARGET_TARGET_WINDOW_NANOS) {
+      // blocks came slower than target -> easier
+      let steps = log2FloorClamped(actualNanos, RETARGET_TARGET_WINDOW_NANOS, MAX_RETARGET_STEP_BITS);
+      if (steps >= difficultyBits) { MIN_DIFFICULTY_BITS } else {
+        Nat.max(difficultyBits - steps, MIN_DIFFICULTY_BITS);
+      };
+    } else { difficultyBits };
+
+    difficultyBits := newBits;
+    retargetAnchorHeight := height;
+    retargetAnchorTime := now;
+    lastRetargetAt := now;
   };
 
   func pushRecentBlock(b : Types.Block) {
@@ -305,6 +393,10 @@ actor self {
       cmcId;
       cyclesFundRatioBps;
       cyclesFundRatioLocked;
+      retargetIntervalBlocks = RETARGET_INTERVAL_BLOCKS;
+      targetBlockTimeNanos = TARGET_BLOCK_TIME_NANOS;
+      blocksUntilRetarget = retargetAnchorHeight + RETARGET_INTERVAL_BLOCKS - height;
+      lastRetargetAt;
     };
   };
 
@@ -416,6 +508,7 @@ actor self {
     };
 
     let reward = clampToSupplyCap(rewardForHeight(submittedHeight));
+    let confirmedNow = Time.now();
 
     height += 1;
     previousHash := candidateHash;
@@ -424,10 +517,11 @@ actor self {
       miner = caller;
       reward;
       hash = candidateHash;
-      timestamp = Time.now();
+      timestamp = confirmedNow;
     });
     recordMinerStats(caller, reward);
     totalMinted += reward; // reserve against the cap now, regardless of whether the transfer below succeeds
+    maybeRetarget(confirmedNow);
 
     if (reward > 0) {
       await payReward(caller, reward);
@@ -478,71 +572,45 @@ actor self {
     };
   };
 
-  // Anything that could hurt miners/holders in a single call -- making
-  // mining free (difficulty), or redirecting where the ICP fee target
-  // points -- goes through propose-now/execute-after-a-delay instead of
-  // taking effect immediately. A compromised or careless controller key can
-  // no longer drain remaining supply or redirect funds in one transaction:
-  // the change sits in getPendingAdminChanges() for the full delay before it
-  // can land, giving miners/holders a window to notice and react (or the
-  // real controller a window to call the matching cancelPending*()).
+  // Anything that could hurt miners/holders in a single call -- redirecting
+  // where the ICP fee target points, or moving the burn/cycles split --
+  // goes through propose-now/execute-after-a-delay instead of taking effect
+  // immediately. A compromised or careless controller key can no longer
+  // redirect funds in one transaction: the change sits in
+  // getPendingAdminChanges() for the full delay before it can land, giving
+  // miners/holders a window to notice and react (or the real controller a
+  // window to call the matching cancelPending*()). Difficulty itself no
+  // longer has a controller path at all -- see "Automatic difficulty
+  // retargeting" above -- so there's nothing to propose or timelock there
+  // anymore.
   //
   // The delay is a hardcoded constant, not a controller-settable var -- a
   // setter for it would let a compromised key shorten it to zero right
   // before pushing a malicious change, defeating the entire point.
   let ADMIN_TIMELOCK_NANOS : Int = 48 * 60 * 60 * 1_000_000_000; // 48h
 
+  // Dead field, kept on purpose: difficulty no longer has a propose/execute
+  // path (see "Automatic difficulty retargeting" above), but this project's
+  // own upgrade rule (README's "Upgrading mother or miner safely") is that a
+  // deployed top-level `var` can never be removed without tripping
+  // `RTS error: Memory-incompatible program upgrade` on the next upgrade --
+  // only ever add declarations. Removing this one would trap upgrading the
+  // already-deployed mainnet `mother`. Permanently null; nothing reads or
+  // writes it anymore.
   var pendingDifficulty : ?Types.PendingNatChange = null;
+
   var pendingCyclesFundRatio : ?Types.PendingNatChange = null;
   var pendingIcpFeeTarget : ?Types.PendingIcpFeeTarget = null;
 
   public query func getPendingAdminChanges() : async Types.PendingAdminChanges {
     {
-      difficulty = pendingDifficulty;
       cyclesFundRatio = pendingCyclesFundRatio;
       icpFeeTarget = pendingIcpFeeTarget;
       timelockNanos = ADMIN_TIMELOCK_NANOS;
     };
   };
 
-  // MVP simplification: difficulty is still set manually by the controller
-  // rather than an automatic retarget algorithm (see README) -- but only
-  // takes effect ADMIN_TIMELOCK_NANOS after being proposed. Bounded to
-  // [1, 256]: 0 would make every nonce a winning proof (free, unlimited
-  // minting up to the supply cap in one script), and >256 is meaningless
-  // (sha256 only has 256 bits to be zero).
-  public shared ({ caller }) func proposeDifficulty(bits : Nat) : async () {
-    requireController(caller);
-    if (bits == 0 or bits > 256) {
-      Runtime.trap("difficultyBits must be between 1 and 256");
-    };
-    pendingDifficulty := ?{ value = bits; readyAt = Time.now() + ADMIN_TIMELOCK_NANOS };
-  };
-
-  public shared ({ caller }) func cancelPendingDifficulty() : async () {
-    requireController(caller);
-    pendingDifficulty := null;
-  };
-
-  // Permissionless on purpose, like sweepTreasury() below -- the value was
-  // already fixed (and publicly visible) at proposal time, so letting
-  // anyone apply it once the timelock has elapsed just guarantees it lands
-  // on schedule even if the controller key that proposed it is unavailable
-  // by then.
-  public shared func executeDifficulty() : async () {
-    switch (pendingDifficulty) {
-      case null { Runtime.trap("no pending difficulty change") };
-      case (?p) {
-        if (Time.now() < p.readyAt) {
-          Runtime.trap("timelock has not elapsed yet");
-        };
-        difficultyBits := p.value;
-        pendingDifficulty := null;
-      };
-    };
-  };
-
-  // Not timelocked: unlike difficulty or the ICP fee target, this can only
+  // Not timelocked: unlike the ICP fee target, this can only
   // ever make mining cheaper or more expensive for everyone equally -- it
   // can't drain remaining supply (rewardForHeight doesn't depend on it) or
   // redirect funds anywhere. Lower blast radius than the two above.
@@ -849,6 +917,21 @@ actor self {
   // not on upgrade, so this is the only thing that re-arms it afterwards.
   system func postupgrade() {
     armSweepTimer<system>();
+    // Re-anchor the retarget window to the canister's real current
+    // height/time on every upgrade. Two reasons: (1) the first upgrade that
+    // ever introduces retargetAnchorHeight/retargetAnchorTime as new
+    // top-level vars runs their declared initializers (0 and the upgrade's
+    // own Time.now()) rather than anything reflecting this canister's
+    // actual, possibly-already-nonzero height -- without this, a canister
+    // upgraded in mid-chain would measure a bogus first "window" from
+    // height 0 instead of its real height, and fire an out-of-band retarget
+    // on the very next block. (2) on every later upgrade too, this avoids
+    // ever measuring a window that spans an upgrade's own (unrelated)
+    // downtime as if it were real mining time. Harmless either way: at
+    // worst this restarts the current window's clock, still bounded by the
+    // same MAX_RETARGET_STEP_BITS clamp as any other retarget.
+    retargetAnchorHeight := height;
+    retargetAnchorTime := Time.now();
   };
 
   armSweepTimer<system>();
