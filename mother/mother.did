@@ -52,6 +52,7 @@ type SubmitError =
  };
 type Stats = 
  record {
+   blocksUntilRetarget: nat;
    cmcId: principal;
    currentReward: nat;
    cyclesFundRatioBps: nat;
@@ -61,10 +62,13 @@ type Stats =
    icpBurnOwner: principal;
    icpFeeTargetLocked: bool;
    icpLedgerId: principal;
+   lastRetargetAt: Time;
    ledgerId: principal;
    maxSupply: nat;
    miningFeeE8s: nat;
    nextHalvingHeight: nat;
+   retargetIntervalBlocks: nat;
+   targetBlockTimeNanos: nat;
    totalMinted: nat;
  };
 type PendingNatChange = 
@@ -82,7 +86,6 @@ type PendingIcpFeeTarget =
 type PendingAdminChanges = 
  record {
    cyclesFundRatio: opt PendingNatChange;
-   difficulty: opt PendingNatChange;
    icpFeeTarget: opt PendingIcpFeeTarget;
    timelockNanos: int;
  };
@@ -102,12 +105,10 @@ type Block =
  };
 service : {
   cancelPendingCyclesFundRatio: () -> ();
-  cancelPendingDifficulty: () -> ();
   cancelPendingIcpFeeTarget: () -> ();
   claimPendingReward: () -> (SubmitResult);
   cyclesBalance: () -> (nat) query;
   executeCyclesFundRatioBps: () -> ();
-  executeDifficulty: () -> ();
   executeIcpFeeTarget: () -> ();
   getLeaderboard: () -> (vec LeaderboardEntry) query;
   getPendingAdminChanges: () -> (PendingAdminChanges) query;
@@ -119,11 +120,14 @@ service : {
   lockCyclesFundRatio: () -> ();
   lockIcpFeeTarget: () -> ();
   proposeCyclesFundRatioBps: (bps: nat) -> ();
-  proposeDifficulty: (bits: nat) -> ();
   proposeIcpFeeTarget: (ledgerId: principal, burnOwner: principal,
    cyclesMintingCanister: principal) -> ();
   pruneStaleAttempts: () -> (nat);
   setMiningFeeE8s: (e8s: nat) -> ();
   submitProof: (nonce: nat) -> (SubmitResult);
   sweepTreasury: () -> (SweepResult);
+  topUpProject: () -> (record {
+                         toFrontend: nat;
+                         toMiner: nat;
+                       });
 }

@@ -109,8 +109,8 @@ module {
   };
 
   /// A queued, not-yet-applied admin change -- see ADMIN_TIMELOCK_NANOS in
-  /// main.mo. readyAt is when executeDifficulty()/executeIcpFeeTarget() are
-  /// allowed to apply it.
+  /// main.mo. readyAt is when executeCyclesFundRatioBps()/executeIcpFeeTarget()
+  /// are allowed to apply it.
   public type PendingNatChange = { value : Nat; readyAt : Time.Time };
 
   public type PendingIcpFeeTarget = {
@@ -121,7 +121,6 @@ module {
   };
 
   public type PendingAdminChanges = {
-    difficulty : ?PendingNatChange;
     cyclesFundRatio : ?PendingNatChange;
     icpFeeTarget : ?PendingIcpFeeTarget;
     timelockNanos : Int;
@@ -174,5 +173,13 @@ module {
     cmcId : Principal;
     cyclesFundRatioBps : Nat;
     cyclesFundRatioLocked : Bool;
+    /// Automatic difficulty retargeting -- see main.mo. Blocks per retarget
+    /// window, the target time per block that window is aiming for, how
+    /// many blocks remain until the next retarget, and when difficulty last
+    /// changed.
+    retargetIntervalBlocks : Nat;
+    targetBlockTimeNanos : Nat;
+    blocksUntilRetarget : Nat;
+    lastRetargetAt : Time.Time;
   };
 }
