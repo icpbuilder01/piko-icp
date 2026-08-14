@@ -82,7 +82,7 @@ the same height is accepted.
 | Premine | 0 |
 | Mining fee (burned per submission) | 0.05 ICP (adjustable; kept low during the adoption phase) |
 | Anti-spam cooldown | 0.3s / principal |
-| Difficulty target | 22 bits (starting point; retargets automatically) |
+| Difficulty target | 18 bits (starting point; retargets automatically) |
 | Retarget interval | 10 blocks |
 | Target block time | 5 minutes |
 | Max retarget step | &plusmn;2 bits (4x work) per window |
