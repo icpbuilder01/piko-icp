@@ -1,73 +1,82 @@
 :root {
   color-scheme: light;
-  --page: #008080;
-  --page-pattern: rgba(255, 255, 255, 0.05);
-  --surface-1: #c0c0c0;
-  --surface-2: #ffffff;
-  --text-primary: #000000;
-  --text-secondary: #1a1a1a;
-  --text-muted: #4a4a4a;
-  --gridline: #808080;
-  --border: #808080;
-  --border-strong: #000000;
-  --bevel-hi: #ffffff;
-  --bevel-lo: #404040;
-  --titlebar-start: #000080;
-  --titlebar-end: #1084d0;
-  --titlebar-text: #ffffff;
-  --link: #0000ee;
-  --seq-400: #1084d0;
-  --seq-450: #000080;
-  --seq-600: #0a005c;
-  --accent-glow: rgba(255, 0, 255, 0.16);
-  --accent-glow-2: rgba(255, 255, 0, 0.14);
-  --status-good: #008000;
-  --status-critical: #cc0000;
-  --led-bg: #001a00;
-  --led-fg: #33ff33;
 
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.35);
-  --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.4);
-  --shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.45);
-  --ease: steps(3, end);
+  /* "Ledger paper" -- warm parchment, deep ink, gold leaf. */
+  --bg: #f2ede1;
+  --surface: #fbf8f0;
+  --surface-2: #eae2cf;
+  --border: #ddd2b3;
+  --border-strong: #c9b98a;
 
-  font-family: Tahoma, Verdana, Geneva, "MS Sans Serif", sans-serif;
+  --text: #1a1508;
+  --text-secondary: #5c5340;
+  --text-muted: #8f8468;
+
+  --accent: #a8660f;
+  --accent-strong: #874f0a;
+  --accent-soft: #f0dfb8;
+  --accent-ink: #fffaf0;
+
+  --spark: #c81856;
+  --spark-soft: #f5d7e2;
+
+  --good: #29713f;
+  --critical: #b0261c;
+
+  --rank-gold: #a8760f;
+  --rank-silver: #6b6558;
+  --rank-bronze: #9a5a28;
+
+  --mono-bg: #e9dfc4;
+  --mono-fg: #1a1508;
+
+  --shadow-sm: 0 1px 2px rgba(26, 21, 8, 0.06);
+  --shadow-md: 0 10px 26px rgba(26, 21, 8, 0.08);
+  --glow-accent: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+
+  --font-display:
+    ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", monospace;
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-display);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --page: #000000;
-    --page-pattern: rgba(51, 255, 51, 0.05);
-    --surface-1: #101410;
-    --surface-2: #000000;
-    --text-primary: #33ff33;
-    --text-secondary: #29cc29;
-    --text-muted: #1f8a1f;
-    --gridline: #1f5c1f;
-    --border: #1f5c1f;
-    --border-strong: #33ff33;
-    --bevel-hi: #2fae2f;
-    --bevel-lo: #041604;
-    --titlebar-start: #003f3f;
-    --titlebar-end: #00ffff;
-    --titlebar-text: #000000;
-    --link: #33ffff;
-    --seq-400: #00ffff;
-    --seq-450: #33ff33;
-    --seq-600: #1f8a1f;
-    --accent-glow: rgba(0, 255, 255, 0.2);
-    --accent-glow-2: rgba(255, 170, 0, 0.14);
-    --status-good: #33ff33;
-    --status-critical: #ff3333;
-    --led-bg: #000000;
-    --led-fg: #33ff33;
-    --shadow-sm: 2px 2px 0 rgba(51, 255, 51, 0.25);
-    --shadow-md: 4px 4px 0 rgba(51, 255, 51, 0.3);
-    --shadow-lg: 6px 6px 0 rgba(51, 255, 51, 0.35);
+
+    /* "Terminal" -- near-black, molten gold, electric spark. */
+    --bg: #050403;
+    --surface: #0e0c09;
+    --surface-2: #17130f;
+    --border: #2a251d;
+    --border-strong: #3d3626;
+
+    --text: #f5efdf;
+    --text-secondary: #b3a98f;
+    --text-muted: #756c58;
+
+    --accent: #f0a93b;
+    --accent-strong: #ffc266;
+    --accent-soft: #2b1f0c;
+    --accent-ink: #140d02;
+
+    --spark: #ff3d78;
+    --spark-soft: #2e0f1a;
+
+    --good: #4fbf85;
+    --critical: #ff5c4d;
+
+    --rank-gold: #ffd35c;
+    --rank-silver: #c9c9c9;
+    --rank-bronze: #d99a5b;
+
+    --mono-bg: #120f0a;
+    --mono-fg: #f5efdf;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 16px 34px rgba(0, 0, 0, 0.5);
+    --glow-accent: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 }
 
@@ -82,12 +91,12 @@ body {
 }
 
 body {
-  background: var(--page);
-  background-image:
-    linear-gradient(var(--page-pattern) 1px, transparent 1px),
-    linear-gradient(90deg, var(--page-pattern) 1px, transparent 1px);
-  background-size: 24px 24px;
-  color: var(--text-primary);
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 26px 26px;
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
@@ -95,10 +104,10 @@ body {
 }
 
 a {
-  color: var(--link);
+  color: var(--accent);
 }
 
 code,
 pre {
-  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }

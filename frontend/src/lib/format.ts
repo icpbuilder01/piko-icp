@@ -27,6 +27,12 @@ export function parseAmount(input: string): bigint | null {
   }
 }
 
+export function toHex(bytes: Uint8Array | number[]): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export function shortPrincipal(principal: string): string {
   if (principal.length <= 16) return principal;
   const parts = principal.split("-");
