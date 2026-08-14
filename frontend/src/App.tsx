@@ -261,6 +261,11 @@ function App() {
     setMining(false);
     workerRef.current?.postMessage({ type: "stop" });
     setHashrate(0);
+    // Forces the next start to always send fresh work to the worker, even
+    // if the polled header happens to be identical to whatever was last
+    // sent (see the comment on lastPostedWorkKeyRef below) -- otherwise a
+    // stop/start with no intervening poll would leave the worker idle.
+    lastPostedWorkKeyRef.current = null;
   }
 
   function handleShare() {
@@ -273,8 +278,26 @@ function App() {
     window.open(intent, "_blank", "noopener,noreferrer");
   }
 
+  // refreshDashboard() polls getWork() every POLL_MS and always calls
+  // setWork() with a freshly-parsed object, even when the chain header
+  // hasn't actually moved -- a new object reference every 5s, not a new
+  // header every 5s. This effect used to re-post "work" to the searching
+  // worker on every single one of those polls regardless, and the worker
+  // restarts its search from nonce=0 on every "work" message it receives
+  // (see miner.worker.ts). Net effect: the search never got to explore past
+  // whatever a few seconds' worth of hashing covers (a few hundred thousand
+  // nonces) before being reset back to nonce=0 against the *same* header --
+  // if the real winning nonce for that header was beyond that range, this
+  // tab could hash forever and never find it, which is exactly what a real
+  // "10 minutes, nothing found" report turned out to be. Comparing the
+  // actual header content (not the object reference) before re-posting is
+  // what lets the search keep going past one poll interval.
+  const lastPostedWorkKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!mining || !work) return;
+    const key = `${work.height}-${work.difficultyBits}-${toHex(work.previousHash)}`;
+    if (key === lastPostedWorkKeyRef.current) return;
+    lastPostedWorkKeyRef.current = key;
     const worker = ensureWorker();
     worker.postMessage({
       type: "work",
