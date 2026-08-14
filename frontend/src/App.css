@@ -272,7 +272,7 @@
 
 .button-cta {
   background: var(--spark);
-  color: #fff8fa;
+  color: #f5faff;
   font-size: 0.9rem;
   font-weight: 700;
   padding: 11px 20px;
@@ -443,7 +443,7 @@ section.block h2 {
 
 section.block h2.spark {
   background: var(--spark);
-  color: #fff8fa;
+  color: #f5faff;
 }
 
 .section-icon {
@@ -565,7 +565,7 @@ section.block > *:last-child {
   align-items: center;
   justify-content: space-between;
   background: var(--spark);
-  color: #fff8fa;
+  color: #f5faff;
   padding: 8px 16px;
   border-bottom: 2px solid var(--bevel-lo);
 }
