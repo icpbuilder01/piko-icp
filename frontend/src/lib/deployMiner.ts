@@ -8,6 +8,7 @@ import {
   CMC_CANISTER_ID,
 } from "./actors";
 import { motherCanisterId } from "./canister-env";
+import { Variant_keep_replace } from "../bindings/management/management";
 
 // Mirrors mother/src/main.mo's principalToSubaccount(): the CMC identifies
 // who a payment is "for" (the future controller of the canister-to-be) by a
@@ -248,7 +249,16 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
   const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
   const management = getManagementActorFor(canisterId, identity);
   await management.install_code({
-    mode: { __kind__: "upgrade", upgrade: {} },
+    // Enhanced orthogonal persistence (this project builds with
+    // --default-persistent-actors, see README) makes wasm_memory_persistence
+    // a *required* choice on upgrade, not merely optional the way it reads
+    // in the candid interface -- omitting it entirely gets rejected outright
+    // ("Missing upgrade option"), found by actually clicking this button
+    // rather than trusting it type-checked. "keep" is what an upgrade is
+    // supposed to mean here: preserve the canister's persisted state
+    // (mining status, PIKO/ICP/cycles balances) across the code change --
+    // "replace" would wipe it, equivalent to a reinstall.
+    mode: { __kind__: "upgrade", upgrade: { wasm_memory_persistence: Variant_keep_replace.keep } },
     canister_id: Principal.fromText(canisterId),
     wasm_module: wasmModule,
     arg: new Uint8Array(),
