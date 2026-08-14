@@ -56,6 +56,20 @@ type SubmitResult =
   | { Ok: { height: bigint; reward: bigint; hash: Uint8Array | number[] } }
   | { Err: Record<string, unknown> };
 
+// submitProof's #IcpFeeFailed wraps the ledger's TransferFromError -- most
+// variants (TemporarilyUnavailable, BadFee, ...) are transient and worth
+// retrying, but InsufficientFunds/InsufficientAllowance won't resolve on
+// their own: the miner would just keep hashing valid proofs that get
+// rejected forever until the wallet is topped up or re-approved. Detected
+// here so the caller can stop mining instead of spinning.
+function insufficientIcpReason(err: Record<string, unknown>): string | null {
+  const feeError = err.IcpFeeFailed as Record<string, unknown> | undefined;
+  if (!feeError) return null;
+  if ("InsufficientFunds" in feeError) return "insufficient ICP balance";
+  if ("InsufficientAllowance" in feeError) return "insufficient ICP allowance";
+  return null;
+}
+
 const anonymousMother = getMotherActor();
 const motherPrincipal = Principal.fromText(motherCanisterId);
 
@@ -234,6 +248,12 @@ function App() {
         refreshBalance(id);
         refreshAllowance(id);
       } else {
+        const reason = insufficientIcpReason(result.Err);
+        if (reason) {
+          handleStopMining();
+          setMiningMessage(`Mining stopped: ${reason}. Approve more ICP to keep mining.`);
+          return;
+        }
         setMiningMessage(`Not accepted: ${JSON.stringify(result.Err)}`);
       }
     } catch (err) {
