@@ -1,0 +1,104 @@
+:root {
+  color-scheme: light;
+  --page: #008080;
+  --page-pattern: rgba(255, 255, 255, 0.05);
+  --surface-1: #c0c0c0;
+  --surface-2: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #1a1a1a;
+  --text-muted: #4a4a4a;
+  --gridline: #808080;
+  --border: #808080;
+  --border-strong: #000000;
+  --bevel-hi: #ffffff;
+  --bevel-lo: #404040;
+  --titlebar-start: #000080;
+  --titlebar-end: #1084d0;
+  --titlebar-text: #ffffff;
+  --link: #0000ee;
+  --seq-400: #1084d0;
+  --seq-450: #000080;
+  --seq-600: #0a005c;
+  --accent-glow: rgba(255, 0, 255, 0.16);
+  --accent-glow-2: rgba(255, 255, 0, 0.14);
+  --status-good: #008000;
+  --status-critical: #cc0000;
+  --led-bg: #001a00;
+  --led-fg: #33ff33;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.4);
+  --shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.45);
+  --ease: steps(3, end);
+
+  font-family: Tahoma, Verdana, Geneva, "MS Sans Serif", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #000000;
+    --page-pattern: rgba(51, 255, 51, 0.05);
+    --surface-1: #101410;
+    --surface-2: #000000;
+    --text-primary: #33ff33;
+    --text-secondary: #29cc29;
+    --text-muted: #1f8a1f;
+    --gridline: #1f5c1f;
+    --border: #1f5c1f;
+    --border-strong: #33ff33;
+    --bevel-hi: #2fae2f;
+    --bevel-lo: #041604;
+    --titlebar-start: #003f3f;
+    --titlebar-end: #00ffff;
+    --titlebar-text: #000000;
+    --link: #33ffff;
+    --seq-400: #00ffff;
+    --seq-450: #33ff33;
+    --seq-600: #1f8a1f;
+    --accent-glow: rgba(0, 255, 255, 0.2);
+    --accent-glow-2: rgba(255, 170, 0, 0.14);
+    --status-good: #33ff33;
+    --status-critical: #ff3333;
+    --led-bg: #000000;
+    --led-fg: #33ff33;
+    --shadow-sm: 2px 2px 0 rgba(51, 255, 51, 0.25);
+    --shadow-md: 4px 4px 0 rgba(51, 255, 51, 0.3);
+    --shadow-lg: 6px 6px 0 rgba(51, 255, 51, 0.35);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page);
+  background-image:
+    linear-gradient(var(--page-pattern) 1px, transparent 1px),
+    linear-gradient(90deg, var(--page-pattern) 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: var(--text-primary);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--link);
+}
+
+code,
+pre {
+  font-family: "Courier New", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

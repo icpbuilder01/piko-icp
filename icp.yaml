@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v1.3.0/docs/schemas/icp-yaml-schema.json
+
+canisters:
+  - ledger
+  - mother
+  - miner
+  - frontend
+
+# Port 8000 is already used by another local icp-cli project on this
+# machine; use a distinct port for PIKO's local network.
+networks:
+  - name: local
+    mode: managed
+    gateway:
+      port: 8010
