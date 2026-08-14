@@ -402,8 +402,8 @@ function App() {
 
       <section className={`block miner-panel ${mining ? "is-mining" : ""}`}>
         <div className="miner-panel-head">
-          <h2>
-            <span className="section-icon spark">&gt;</span>Mine
+          <h2 className="spark">
+            <span className="section-icon">&gt;</span>Mine
           </h2>
           {mining && (
             <span className="live-pill">
@@ -495,8 +495,8 @@ function App() {
       </section>
 
       <section className="block chain-status">
-        <h2>
-          <span className="section-icon spark">◆</span>Chain status
+        <h2 className="spark">
+          <span className="section-icon">◆</span>Chain status
         </h2>
         {stats ? (
           <>
@@ -572,8 +572,8 @@ function App() {
 
       <section className="block">
         <div className="miner-panel-head">
-          <h2>
-            <span className="section-icon spark">▤</span>Recent blocks
+          <h2 className="spark">
+            <span className="section-icon">▤</span>Recent blocks
           </h2>
           {blocks.length > 0 && (
             <span className="live-pill">
@@ -641,8 +641,8 @@ function App() {
       </section>
 
       <section className="block miner-guide">
-        <h2>
-          <span className="section-icon spark">&raquo;</span>Advanced: run a
+        <h2 className="spark">
+          <span className="section-icon">&raquo;</span>Advanced: run a
           dedicated miner canister
         </h2>
         <p>
