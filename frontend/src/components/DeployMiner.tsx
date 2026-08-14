@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
-import { deployMiner, minIcpE8sForNewCanister, type DeployProgress } from "../lib/deployMiner";
+import { Principal } from "@icp-sdk/core/principal";
+import { deployMiner, minIcpE8sForNewCanister, DeployError, type DeployProgress } from "../lib/deployMiner";
+import { getTrackedMiners, trackMiner, untrackMiner } from "../lib/minerRegistry";
 import { parseAmount, formatAmount } from "../lib/format";
+import { MinerCard } from "./MinerCard";
 
 interface DeployMinerProps {
   identity: Identity;
@@ -36,6 +39,28 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
   const [progress, setProgress] = useState<DeployProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [canisterId, setCanisterId] = useState<string | null>(null);
+  const [trackedIds, setTrackedIds] = useState<string[]>(() => getTrackedMiners());
+  const [addId, setAddId] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+
+  function handleForget(id: string) {
+    untrackMiner(id);
+    setTrackedIds(getTrackedMiners());
+  }
+
+  function handleAddExisting() {
+    const trimmed = addId.trim();
+    try {
+      Principal.fromText(trimmed); // throws on anything that isn't a valid principal
+    } catch {
+      setAddError("That doesn't look like a valid canister id.");
+      return;
+    }
+    trackMiner(trimmed);
+    setTrackedIds(getTrackedMiners());
+    setAddId("");
+    setAddError(null);
+  }
 
   // Fill the funding field with DEFAULT_FUND_BLOCKS worth of the real,
   // live mining fee once it's known -- but only if the user hasn't typed
@@ -87,9 +112,21 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
     try {
       const result = await deployMiner(identity, cyclesAmount, fundAmount, setProgress);
       setCanisterId(result.canisterId);
+      trackMiner(result.canisterId);
+      setTrackedIds(getTrackedMiners());
     } catch (err) {
       console.error("deployMiner failed", err);
-      setError(err instanceof Error ? err.message : "Deploy failed.");
+      if (err instanceof DeployError) {
+        // The canister was created (and is already yours) even though a
+        // later step failed -- track it so it shows up in "Your miners"
+        // below with a top-up/retry button, instead of only existing as a
+        // sentence of error text.
+        trackMiner(err.canisterId);
+        setTrackedIds(getTrackedMiners());
+        setError(`${err.message} Your miner (${err.canisterId}) is listed below -- finish setup there.`);
+      } else {
+        setError(err instanceof Error ? err.message : "Deploy failed.");
+      }
     } finally {
       setRunning(false);
     }
@@ -102,6 +139,7 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
           <p>
             <strong>It's mining.</strong> Canister <code>{canisterId}</code> is now yours, running
             on its own timer -- close this tab, it keeps going until the ICP you sent it runs out.
+            It's also listed below any time you want to check on it or send it more ICP.
           </p>
         </div>
       ) : (
@@ -158,6 +196,37 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
           </p>
         </>
       )}
+
+      <div className="miner-list">
+        <h4 className="miner-list-title">Your miners</h4>
+        {trackedIds.length === 0 ? (
+          <p className="wallet-hint">
+            None tracked in this browser yet. Deploy one above, or if you already have a miner canister
+            id (e.g. from an earlier attempt), add it here.
+          </p>
+        ) : (
+          <div className="miner-list-items">
+            {trackedIds.map((id) => (
+              <MinerCard key={id} canisterId={id} identity={identity} onForget={() => handleForget(id)} />
+            ))}
+          </div>
+        )}
+        <div className="deploy-miner-row">
+          <label className="deploy-miner-field">
+            <span className="stat-label">Track an existing miner by canister id</span>
+            <input
+              className="input"
+              value={addId}
+              onChange={(e) => setAddId(e.target.value)}
+              placeholder="xxxxx-xxxxx-xxxxx-xxxxx-xxx"
+            />
+          </label>
+          <button className="button secondary" onClick={handleAddExisting}>
+            Add
+          </button>
+        </div>
+        {addError && <p className="deploy-miner-error">{addError}</p>}
+      </div>
     </div>
   );
 }
