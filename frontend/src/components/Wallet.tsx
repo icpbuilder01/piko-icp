@@ -92,11 +92,17 @@ export function Wallet({ identity }: WalletProps) {
       <h2>Wallet</h2>
       <div className="wallet-balances">
         <div className="wallet-balance-tile">
-          <div className="stat-label">PIKO</div>
+          <div className="stat-label token-label">
+            <img src="/piko-logo.svg" alt="" className="token-icon" />
+            PIKO
+          </div>
           <div className="stat-value">{pikoBalance !== null ? formatPiko(pikoBalance) : "..."}</div>
         </div>
         <div className="wallet-balance-tile">
-          <div className="stat-label">ICP</div>
+          <div className="stat-label token-label">
+            <img src="/icp-logo.svg" alt="" className="token-icon" />
+            ICP
+          </div>
           <div className="stat-value">{icpBalance !== null ? formatIcp(icpBalance) : "..."}</div>
         </div>
       </div>
@@ -120,6 +126,7 @@ export function Wallet({ identity }: WalletProps) {
             className={`token-toggle-btn ${token === "PIKO" ? "active" : ""}`}
             onClick={() => setToken("PIKO")}
           >
+            <img src="/piko-logo.svg" alt="" className="token-icon" />
             Send PIKO
           </button>
           <button
@@ -129,6 +136,7 @@ export function Wallet({ identity }: WalletProps) {
             className={`token-toggle-btn ${token === "ICP" ? "active" : ""}`}
             onClick={() => setToken("ICP")}
           >
+            <img src="/icp-logo.svg" alt="" className="token-icon" />
             Send ICP
           </button>
         </div>

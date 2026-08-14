@@ -493,7 +493,8 @@ function App() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Cost per block</div>
-                <div className="stat-value">
+                <div className="stat-value token-label">
+                  <img src="/icp-logo.svg" alt="" className="token-icon" />
                   {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
                 </div>
               </div>
@@ -568,7 +569,10 @@ function App() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Current reward</div>
-                <div className="stat-value">{formatPiko(stats.currentReward)}</div>
+                <div className="stat-value token-label">
+                  <img src="/piko-logo.svg" alt="" className="token-icon" />
+                  {formatPiko(stats.currentReward)}
+                </div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Difficulty</div>
