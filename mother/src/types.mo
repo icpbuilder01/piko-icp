@@ -181,5 +181,8 @@ module {
     targetBlockTimeNanos : Nat;
     blocksUntilRetarget : Nat;
     lastRetargetAt : Time.Time;
+    /// Cumulative ICP (e8s) actually burned to icpBurnOwner across every
+    /// sweepTreasury() call ever made -- see totalIcpBurned in main.mo.
+    totalIcpBurnedE8s : Nat;
   };
 }
