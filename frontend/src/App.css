@@ -457,6 +457,14 @@ section.block h2.spark {
   font-size: 1.55rem;
 }
 
+/* ICP-burned grows without bound as sweeps accumulate -- a smaller size
+   plus wrapping keeps a long value from overflowing its tile instead of
+   silently clipping. */
+.chain-status .stat-value-small {
+  font-size: 1rem;
+  overflow-wrap: break-word;
+}
+
 section.block > *:not(h2):not(.miner-panel-head) {
   margin-left: 18px;
   margin-right: 18px;

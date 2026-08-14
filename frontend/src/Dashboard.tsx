@@ -181,7 +181,7 @@ function Dashboard() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">ICP burned, all-time</div>
-                <div className="stat-value">{formatIcp(stats.totalIcpBurnedE8s)}</div>
+                <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)}</div>
               </div>
             </div>
 

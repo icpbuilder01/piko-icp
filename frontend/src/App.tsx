@@ -562,7 +562,7 @@ function App() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">ICP burned</div>
-                <div className="stat-value">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
+                <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
               </div>
             </div>
             <div className="meter">
