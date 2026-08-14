@@ -652,6 +652,17 @@ function App() {
           running on its own timer, on-chain, until the ICP you send it runs
           out.
         </p>
+        <p className="pull-quote">
+          Not cheaper, though — worth knowing before you fund one. A browser
+          hashes for free; a canister pays real cycles for every attempt,
+          successful or not, because it's genuine on-chain compute running
+          unattended. That's actually closer to how real proof-of-work
+          works — cost scales with hashrate, like electricity for a real
+          miner — but it does mean a somewhat higher total cost per block
+          found. What you're paying the extra for is uptime, not odds: it
+          keeps grinding while you sleep, or your laptop's closed, with no
+          one keeping a tab open.
+        </p>
         {identity ? (
           <DeployMiner identity={identity} miningFeeE8s={work?.miningFeeE8s ?? 0n} />
         ) : (
