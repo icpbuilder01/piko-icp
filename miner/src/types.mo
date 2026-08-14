@@ -35,9 +35,15 @@ module {
 
   public type SubmitResult = { #Ok : SubmitOk; #Err : SubmitError };
 
+  // Minimal subset of mother's real Stats record -- candid's structural
+  // subtyping only requires the fields this canister actually reads, not
+  // mother's full record, so this stays valid even as mother's Stats grows.
+  public type Stats = { ledgerId : Principal };
+
   public type MotherActor = actor {
     getWork : () -> async Work;
     submitProof : (Nat) -> async SubmitResult;
+    getStats : () -> async Stats;
   };
 
   /// Minimal ICRC-2 interface for the ICP ledger, used to let this canister
@@ -109,6 +115,7 @@ module {
     feeCyclesPerSubmit : Nat;
     cyclesBalance : Nat;
     icpBalanceE8s : Nat;
+    pikoBalance : Nat;
     lastError : ?Text;
   };
 }

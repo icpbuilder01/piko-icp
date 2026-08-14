@@ -294,10 +294,38 @@ actor self {
     });
   };
 
+  // A block won by this miner mints PIKO to *this canister's own*
+  // principal -- mother pays whoever called submitProof, and for a
+  // deployed miner that's this canister, not its owner. Without this,
+  // every block a deployed miner ever wins would be permanently stuck
+  // here, since the only other ICP-moving function (withdrawIcp above)
+  // only knows about icpLedgerId, not PIKO's ledger. Looks up the PIKO
+  // ledger's id live via mother.getStats() rather than caching it, so
+  // this works even for a miner that was deployed before this function
+  // (or a PUBLIC_CANISTER_ID:ledger env var) existed.
+  public shared ({ caller }) func withdrawPiko(to : Principal, amount : Nat) : async Types.TransferResult {
+    requireOwner(caller);
+    let stats = await Mother.getStats();
+    let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
+    await PikoLedger.icrc1_transfer({
+      from_subaccount = null;
+      to = { owner = to; subaccount = null };
+      amount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    });
+  };
+
   public func getStatus() : async Types.Status {
     let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
     let icpBalanceE8s = try {
       await IcpLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
+    } catch (_e) { 0 };
+    let pikoBalance = try {
+      let stats = await Mother.getStats();
+      let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
+      await PikoLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
     } catch (_e) { 0 };
     {
       mining;
@@ -311,6 +339,7 @@ actor self {
       feeCyclesPerSubmit;
       cyclesBalance = Cycles.balance();
       icpBalanceE8s;
+      pikoBalance;
       lastError;
     };
   };
