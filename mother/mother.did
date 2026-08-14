@@ -105,6 +105,7 @@ type Block =
    timestamp: Time;
  };
 service : {
+  backfillTotalIcpBurned: (amountE8s: nat) -> ();
   cancelPendingCyclesFundRatio: () -> ();
   cancelPendingIcpFeeTarget: () -> ();
   claimPendingReward: () -> (SubmitResult);

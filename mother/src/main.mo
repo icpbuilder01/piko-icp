@@ -796,6 +796,18 @@ actor self {
     );
   };
 
+  // The CMC identifies which of its several ICP-accepting operations a
+  // payment is for by this memo, not by which subaccount it landed in --
+  // an ICP transfer to notify_top_up's subaccount with no memo (or the
+  // wrong one) gets refunded rather than converted, silently, which is
+  // exactly what was happening here: this leg has never actually minted
+  // mother any cycles since sweepTreasury was written, only ever
+  // refunded. 0x50555054 ("TPUP"), little-endian -- see
+  // MEMO_TOP_UP_CANISTER in https://github.com/dfinity/ic/blob/master/rs/nns/cmc/src/lib.rs,
+  // same source used to verify the equivalent memo on the frontend's own
+  // CMC calls (deployMiner.ts).
+  let MEMO_TOP_UP_CANISTER : Blob = Blob.fromArray([0x54, 0x50, 0x55, 0x50, 0, 0, 0, 0]);
+
   public shared func sweepTreasury() : async Types.SweepResult {
     let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
     let self_ : Principal = Principal.fromActor(self);
@@ -839,7 +851,7 @@ actor self {
             to = { owner = cmcId; subaccount = ?principalToSubaccount(self_) };
             amount = cyclesAmount;
             fee = null;
-            memo = null;
+            memo = ?MEMO_TOP_UP_CANISTER;
             created_at_time = null;
           })
         );
@@ -863,6 +875,18 @@ actor self {
     };
 
     { swept = spendable; burned = burnAmount; cyclesFunded = cyclesAmount; cyclesMinted; notifyError };
+  };
+
+  // One-time correction for real burns that happened before totalIcpBurned
+  // existed to count them (sweeps this canister genuinely made, verified
+  // against the ICP ledger's own index canister's transaction history for
+  // this canister's account -- not a guess). Deliberately additive-only,
+  // never a raw setter: this can move the counter up to reflect burns
+  // that already truly happened, but can never be used to move it
+  // backward or fabricate a number disconnected from a real transfer.
+  public shared ({ caller }) func backfillTotalIcpBurned(amountE8s : Nat) : async () {
+    requireController(caller);
+    totalIcpBurned += amountE8s;
   };
 
   // Shares mother's own cycles surplus with frontend and the reference
