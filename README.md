@@ -63,8 +63,12 @@ This mirrors the design the project was inspired by, with a few explicit
   compensate, capped at &plusmn;2 bits per retarget (a 4x change in expected
   work, mirroring bitcoin's own per-adjustment clamp) so one unusually fast
   or slow window on a small sample of miners can't swing it wildly. Starts
-  from 22 bits, the same "a few minutes per block" estimate as before, and
-  from there tracks real participation on its own. `getStats()` exposes
+  from 18 bits -- benchmarked, not guessed: the browser miner's search loop
+  (one `await crypto.subtle.digest` per attempt) measured at roughly
+  20-30k attempts/sec single-tab, so 18 bits targets a first block in
+  single-digit seconds solo, fast enough to actually feel rewarding, and
+  from there tracks real (likely much higher) combined participation up
+  toward the 5-minute target on its own. `getStats()` exposes
   `retargetIntervalBlocks`, `targetBlockTimeNanos`, `blocksUntilRetarget`,
   and `lastRetargetAt` so the next adjustment is never a surprise. This is
   what makes it safe to eventually blackhole `mother` (see "Trust model"
