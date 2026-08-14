@@ -82,13 +82,22 @@ the same height is accepted.
 | Premine | 0 |
 | Mining fee (burned per submission) | 0.05 ICP (adjustable; kept low during the adoption phase) |
 | Anti-spam cooldown | 0.3s / principal |
-| Difficulty target | 22 bits (adjustable) |
+| Difficulty target | 22 bits (starting point; retargets automatically) |
+| Retarget interval | 10 blocks |
+| Target block time | 5 minutes |
+| Max retarget step | &plusmn;2 bits (4x work) per window |
 
 The reward halves every 17,500 blocks, the same shape as bitcoin's emission
 curve, converging toward the 21,000,000 cap without ever formally reaching
-it. Difficulty is not yet auto-retargeting -- it's set by the coordinator's
-controller based on observed block times, a simplification the roadmap
-(&sect;8) addresses.
+it. Difficulty retargets itself automatically, bitcoin-style: every 10
+blocks, the coordinator compares how long that window actually took against
+the 5-minute-per-block target and adjusts `difficultyBits` up or down to
+compensate, capped at &plusmn;2 bits per window so one unusually fast or
+slow window on a small sample of miners can't swing it wildly. There is no
+controller call involved -- difficulty was set by hand in an earlier
+version of this design, which worked day-to-day but would have frozen
+permanently at whatever value it last held once the coordinator is
+blackholed (&sect;8); the automatic version has no such dead end.
 
 ## 4. The burn -- and the cycles that keep the lights on
 
@@ -158,17 +167,20 @@ guarantees in this paper hold only as long as that controller chooses not
 to change them by replacing the code outright. This is disclosed here
 deliberately rather than left implicit.
 
-**Parameter changes, short of a code upgrade, are timelocked.** Difficulty
-and the ICP fee target (which ledger, which burn account, which CMC) can't
-change in a single transaction: they're proposed, visible on-chain for
-48 hours, and only take effect after that delay -- long enough for anyone
-watching to notice and react before a change lands. The burn/cycles split
-ratio gets the same treatment for a related reason: it can never move funds
-off-protocol, but an instantly-changeable ratio would make "X% of every fee
-is burned" just as unreliable a promise as an unlocked burn address. Each of
-these can also be **permanently locked** by the controller once tuned,
-turning that specific promise from "enforced by a key" into "enforced by
-code" well before the whole canister is blackholed.
+**Parameter changes, short of a code upgrade, are timelocked.** The ICP fee
+target (which ledger, which burn account, which CMC) can't change in a
+single transaction: it's proposed, visible on-chain for 48 hours, and only
+takes effect after that delay -- long enough for anyone watching to notice
+and react before a change lands. The burn/cycles split ratio gets the same
+treatment for a related reason: it can never move funds off-protocol, but
+an instantly-changeable ratio would make "X% of every fee is burned" just
+as unreliable a promise as an unlocked burn address. Each of these can also
+be **permanently locked** by the controller once tuned, turning that
+specific promise from "enforced by a key" into "enforced by code" well
+before the whole canister is blackholed. **Difficulty has no controller
+path at all** -- see &sect;3 -- it retargets itself from on-chain block
+timestamps, so there is nothing to propose, timelock, or lock for it, and
+nothing that freezes once the controller is gone.
 
 **What removes the remaining trust requirement:** *blackholing* --
 permanently removing all controllers from a canister -- makes it
@@ -195,8 +207,12 @@ the code itself is not yet immutable.
 
 ## 8. Roadmap
 
-- **Observation period.** Run in production, monitor difficulty and real
-  block times, tune the target as participation becomes clearer.
+- **Automatic difficulty retargeting.** Done -- see &sect;3. Removes the
+  one remaining reason blackholing `mother` would have permanently frozen a
+  hand-picked parameter.
+- **Observation period.** Run in production, monitor real block times
+  against the 5-minute target, confirm the retarget algorithm tracks
+  participation as intended before locking anything else.
 - **Blackhole `ledger`.** Standard DFINITY code with the lowest bug
   surface -- the earliest candidate for permanently removing its
   controller.

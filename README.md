@@ -55,13 +55,22 @@ connected to bob.fun or BOB in any way.**
 This mirrors the design the project was inspired by, with a few explicit
 **simplifications**, documented here rather than hidden:
 
-- **Difficulty is set manually** by the `mother` canister's controller
-  (`proposeDifficulty(bits)`, taking effect via `executeDifficulty()` after a
-  48h timelock -- see "Timelocked admin changes" below) instead of an
-  automatic retarget algorithm. Default is 22 bits, a rough estimate for "a
-  few minutes per block" at a handful of concurrent miners (browser hashrate
-  via Web Crypto varies a lot by device) -- watch actual block times on the
-  dashboard and adjust.
+- **Difficulty retargets itself automatically**, bitcoin-style, from
+  on-chain block timestamps alone -- no controller call involved. Every 10
+  blocks (`RETARGET_INTERVAL_BLOCKS`), `mother` compares how long that
+  window actually took to a 5-minute-per-block target
+  (`TARGET_BLOCK_TIME_NANOS`) and moves `difficultyBits` up or down to
+  compensate, capped at &plusmn;2 bits per retarget (a 4x change in expected
+  work, mirroring bitcoin's own per-adjustment clamp) so one unusually fast
+  or slow window on a small sample of miners can't swing it wildly. Starts
+  from 22 bits, the same "a few minutes per block" estimate as before, and
+  from there tracks real participation on its own. `getStats()` exposes
+  `retargetIntervalBlocks`, `targetBlockTimeNanos`, `blocksUntilRetarget`,
+  and `lastRetargetAt` so the next adjustment is never a surprise. This is
+  what makes it safe to eventually blackhole `mother` (see "Trust model"
+  below): a hand-picked difficulty that could never be revisited again would
+  either stall the chain or blow through the supply cap in days if real
+  participation ended up far from the initial guess.
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
   `miningFeeE8s` (**0.05 ICP**, admin-adjustable via `setMiningFeeE8s` -- kept
   low deliberately during the adoption phase, see "Read this before mining"
@@ -165,7 +174,7 @@ frontend URL. Useful commands once deployed:
 icp canister call mother getWork
 icp canister call mother getStats
 icp canister call mother getRecentBlocks
-icp canister call mother getPendingAdminChanges   # any queued propose*() waiting on its timelock?
+icp canister call mother getPendingAdminChanges   # any queued proposeIcpFeeTarget/proposeCyclesFundRatioBps waiting on its timelock?
 icp canister call mother getTotalPendingRewards   # unclaimed PIKO owed across all miners
 
 # Mine with the reference miner
@@ -251,12 +260,10 @@ upgrade of the deployed `mother` canister:
   requirement is **blackholing** a canister (setting its controllers to
   none), which makes it permanently unupgradable -- a serious, irreversible
   step only worth taking once the code is considered final.
-- **Timelocked admin changes.** The two admin actions that could hurt
-  miners/holders in a single call -- `proposeDifficulty` (0 would make every
-  nonce a winning proof) and `proposeIcpFeeTarget` (redirects where the burn,
-  and the CMC conversion, actually go) -- don't take effect immediately.
-  They're queued via `propose*()`, visible to anyone via
-  `getPendingAdminChanges()`, and only become live via `execute*()` after a
+- **Timelocked admin changes.** `proposeIcpFeeTarget` (redirects where the
+  burn, and the CMC conversion, actually go) doesn't take effect
+  immediately -- it's queued via `propose*()`, visible to anyone via
+  `getPendingAdminChanges()`, and only becomes live via `execute*()` after a
   **48-hour** delay (`ADMIN_TIMELOCK_NANOS`, a hardcoded constant -- not a
   controller-settable var, since a setter for it would let a compromised key
   shorten it to zero right before pushing a malicious change).
@@ -270,7 +277,9 @@ upgrade of the deployed `mother` canister:
   value was already fixed and public at proposal time, so anyone can apply
   it once the delay has passed, even if the controller key that proposed it
   is unavailable by then. `cancelPending*()` lets the controller abort a
-  queued change before it lands.
+  queued change before it lands. **Difficulty has no controller path at
+  all** -- it retargets itself automatically (see "How it works" above),
+  so there's nothing to propose, timelock, or lock for it.
 - **`icpBurnOwner`, `cmcId`, and `cyclesFundRatioBps` can be permanently
   locked.** `lockIcpFeeTarget()` and `lockCyclesFundRatio()` irreversibly
   disable their respective `propose*()` functions -- meant to be called once
@@ -302,6 +311,16 @@ upgrade of the deployed `mother` canister:
   pending at that exact upgrade, only prevent the loss from happening again
   afterward; if it's non-zero, get outstanding rewards claimed via
   `claimPendingReward()` before upgrading.
+- **Fixed: difficulty used to have no path forward after blackholing.**
+  Difficulty was originally set by the controller via a timelocked
+  `proposeDifficulty`/`executeDifficulty` pair -- workable day-to-day, but a
+  dead end for the roadmap's own end state: once `mother` is blackholed (no
+  controller left at all), a hand-picked difficulty frozen at whatever it
+  happened to be would stay that way forever, with no way to correct it if
+  real participation turned out far higher or lower than assumed. Difficulty
+  now retargets itself automatically from on-chain block timestamps (see
+  "How it works" above) with no controller in the loop, so blackholing
+  `mother` no longer freezes it.
 - **The `miner` canister has no way to move its own ICP without a
   controller/owner-only call.** `withdrawIcp(to, amount)` exists specifically
   so ICP sent to fund a miner's mining fees isn't stuck if you want to
@@ -321,9 +340,11 @@ upgrade of the deployed `mother` canister:
   the ledger, so a second submission against a now-stale header can never
   validate twice -- no separate reentrancy lock is needed for that path.
 - All mutating entry points reject the anonymous principal.
-- Admin-only calls (`proposeDifficulty`, `setMiningFeeE8s`, etc.) are gated
-  on `Principal.isController`; the two that could hurt miners/holders in one
-  call are also timelocked -- see "Timelocked admin changes" above.
+- Admin-only calls (`proposeIcpFeeTarget`, `setMiningFeeE8s`, etc.) are
+  gated on `Principal.isController`; the ones that could hurt
+  miners/holders in one call are also timelocked -- see "Timelocked admin
+  changes" above. Difficulty is not admin-settable at all anymore -- see
+  "Automatic difficulty retargeting" note below.
 - `claimPendingReward` clears the pending-reward entry *before* awaiting the
   transfer, so a second concurrent claim call can't double-pay.
 - **Supply-cap integrity:** `totalMinted` is incremented the instant a
