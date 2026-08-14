@@ -40,10 +40,25 @@ module {
   // mother's full record, so this stays valid even as mother's Stats grows.
   public type Stats = { ledgerId : Principal };
 
+  // Deliberately NOT added to MotherActor below: `Mother` (main.mo) is a
+  // top-level `let Mother : Types.MotherActor = actor (...)`, and enhanced
+  // orthogonal persistence traps an upgrade the instant an existing
+  // top-level declaration's *type* changes -- even when the value
+  // expression is untouched, even for something that looks like "just
+  // adding a method". Confirmed the hard way: adding getStats directly to
+  // MotherActor built fine and passed every review, but broke every real
+  // upgrade from code before this type existed with "RTS error:
+  // Memory-incompatible program upgrade" -- caught only by actually
+  // performing an upgrade against a canister running the old type, which
+  // `mops build`/tsc/candid-compatibility checks don't do. A separate
+  // actor type, only ever used to construct a fresh *local* reference
+  // where needed (see withdrawPiko/getStatus in main.mo), keeps `Mother`'s
+  // own declared type byte-for-byte identical to what shipped before.
+  public type MotherStatsActor = actor { getStats : () -> async Stats };
+
   public type MotherActor = actor {
     getWork : () -> async Work;
     submitProof : (Nat) -> async SubmitResult;
-    getStats : () -> async Stats;
   };
 
   /// Minimal ICRC-2 interface for the ICP ledger, used to let this canister

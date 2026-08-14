@@ -305,7 +305,11 @@ actor self {
   // (or a PUBLIC_CANISTER_ID:ledger env var) existed.
   public shared ({ caller }) func withdrawPiko(to : Principal, amount : Nat) : async Types.TransferResult {
     requireOwner(caller);
-    let stats = await Mother.getStats();
+    // Local, not the top-level `Mother` -- see MotherStatsActor's own
+    // comment in types.mo for why this can't just be added to Mother's
+    // declared type.
+    let MotherStats : Types.MotherStatsActor = actor (Principal.toText(motherId));
+    let stats = await MotherStats.getStats();
     let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
     await PikoLedger.icrc1_transfer({
       from_subaccount = null;
@@ -323,7 +327,8 @@ actor self {
       await IcpLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
     } catch (_e) { 0 };
     let pikoBalance = try {
-      let stats = await Mother.getStats();
+      let MotherStats : Types.MotherStatsActor = actor (Principal.toText(motherId));
+      let stats = await MotherStats.getStats();
       let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
       await PikoLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
     } catch (_e) { 0 };
