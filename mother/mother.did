@@ -1,0 +1,83 @@
+type Work = 
+ record {
+   difficultyBits: nat;
+   height: nat;
+   miningFeeE8s: nat;
+   previousHash: blob;
+   reward: nat;
+ };
+type TransferFromError = 
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientAllowance: record {allowance: nat;};
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type Time = int;
+type SubmitResult = 
+ variant {
+   Err: SubmitError;
+   Ok: SubmitOk;
+ };
+type SubmitOk = 
+ record {
+   hash: blob;
+   height: nat;
+   reward: nat;
+ };
+type SubmitError = 
+ variant {
+   Anonymous;
+   IcpFeeFailed: TransferFromError;
+   InvalidProof;
+   NothingToClaim;
+   StaleWork;
+   TooSoon: record {retryAfterNanos: nat;};
+ };
+type Stats = 
+ record {
+   currentReward: nat;
+   difficultyBits: nat;
+   height: nat;
+   icpLedgerId: principal;
+   ledgerId: principal;
+   maxSupply: nat;
+   miningFeeE8s: nat;
+   nextHalvingHeight: nat;
+   totalMinted: nat;
+ };
+type LeaderboardEntry = 
+ record {
+   blocksFound: nat;
+   miner: principal;
+   totalReward: nat;
+ };
+type Block = 
+ record {
+   hash: blob;
+   height: nat;
+   miner: principal;
+   reward: nat;
+   timestamp: Time;
+ };
+service : {
+  claimPendingReward: () -> (SubmitResult);
+  cyclesBalance: () -> (nat) query;
+  getLeaderboard: () -> (vec LeaderboardEntry) query;
+  getPendingReward: () -> (nat) query;
+  getRecentBlocks: () -> (vec Block) query;
+  getStats: () -> (Stats) query;
+  getWork: () -> (Work) query;
+  setDifficulty: (bits: nat) -> ();
+  setIcpFeeTarget: (ledgerId: principal, burnOwner: principal) -> ();
+  setMiningFeeE8s: (e8s: nat) -> ();
+  submitProof: (nonce: nat) -> (SubmitResult);
+}
