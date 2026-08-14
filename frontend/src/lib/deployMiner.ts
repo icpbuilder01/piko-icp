@@ -33,6 +33,44 @@ function principalToSubaccount(principal: Principal): Uint8Array {
 // https://github.com/dfinity/ic/blob/master/rs/nns/cmc/src/lib.rs.
 const MEMO_CREATE_CANISTER = Uint8Array.from([0x43, 0x52, 0x45, 0x41, 0, 0, 0, 0]); // "CREA", u64 LE
 
+// The destination subnet deducts a flat 500B-cycle fee from whatever
+// notify_create_canister receives, before this canister even exists to be
+// installed into or funded -- verified live: a payment converting to just
+// under that amount comes back #Refunded with "Creating a canister requires
+// a fee of 500_000_000_000 ... but only N cycles were received". Requiring
+// meaningfully more than the bare fee here (not just clearing it) leaves the
+// new canister with real running room afterward, matching the balance the
+// project's own mother/miner/frontend canisters actually run on day to day
+// (see README).
+const MIN_CYCLES_FOR_NEW_CANISTER = 1_200_000_000_000n; // 1.2T: 0.5T fee + 0.7T runway
+
+// Mirrors the Cycles Minting Canister's own e8s -> cycles formula exactly
+// (icp_e8s * xdr_permyriad_per_icp, verified against a real observed
+// conversion: 30_000_000 e8s at a 15864 permyriad/ICP rate produced exactly
+// 475_920_000_000 cycles) -- used to catch an ICP amount that's too small
+// *before* spending it, rather than discovering it only after CMC refunds
+// the payment. The ICP/XDR rate moves over time, so this is computed live
+// on every deploy rather than assumed from a fixed constant, which is
+// exactly the bug a hardcoded default ICP amount ran into.
+async function estimateCycles(identity: Identity, icpE8s: bigint): Promise<bigint> {
+  const cmc = getCmcActor(identity);
+  const rate = await cmc.get_icp_xdr_conversion_rate();
+  return icpE8s * rate.data.xdr_permyriad_per_icp;
+}
+
+// The live ICP amount (e8s) needed to clear MIN_CYCLES_FOR_NEW_CANISTER at
+// today's rate -- used by DeployMiner.tsx to default the "ICP -> cycles"
+// field to a value that's actually enough right now, instead of a fixed
+// guess that quietly stops being enough as the rate moves (exactly what
+// happened with the previous static "0.3 ICP" default).
+export async function minIcpE8sForNewCanister(identity: Identity): Promise<bigint> {
+  const cmc = getCmcActor(identity);
+  const rate = await cmc.get_icp_xdr_conversion_rate();
+  const perIcp = rate.data.xdr_permyriad_per_icp;
+  // ceiling division: round up so the result never undershoots the floor
+  return (MIN_CYCLES_FOR_NEW_CANISTER + perIcp - 1n) / perIcp;
+}
+
 // Candid errors routinely carry bigint fields (balances, block indices);
 // plain JSON.stringify throws on those, which would otherwise replace a
 // meaningful error ("insufficient funds") with a confusing unrelated one
@@ -90,6 +128,17 @@ export async function deployMiner(
   const me = identity.getPrincipal();
   const cmcPrincipal = Principal.fromText(CMC_CANISTER_ID);
   const icpLedger = getIcpLedgerActor(identity);
+
+  const expectedCycles = await estimateCycles(identity, icpForCyclesE8s);
+  if (expectedCycles < MIN_CYCLES_FOR_NEW_CANISTER) {
+    const neededE8s = await minIcpE8sForNewCanister(identity);
+    throw new Error(
+      `${(Number(icpForCyclesE8s) / 1e8).toFixed(4)} ICP would only convert to ` +
+        `~${(Number(expectedCycles) / 1e12).toFixed(2)}T cycles at today's rate -- not enough to cover the ` +
+        `network's 0.5T canister-creation fee plus real running room. Use at least ` +
+        `${(Number(neededE8s) / 1e8).toFixed(4)} ICP for the "ICP -> cycles" field.`,
+    );
+  }
 
   onProgress({ step: "paying", message: "Sending ICP to the Cycles Minting Canister..." });
   const transferResult = await icpLedger.icrc1_transfer({
