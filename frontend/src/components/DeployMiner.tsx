@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
-import { deployMiner, type DeployProgress } from "../lib/deployMiner";
+import { deployMiner, minIcpE8sForNewCanister, type DeployProgress } from "../lib/deployMiner";
 import { parseAmount, formatAmount } from "../lib/format";
 
 interface DeployMinerProps {
@@ -10,7 +10,6 @@ interface DeployMinerProps {
   miningFeeE8s: bigint;
 }
 
-const DEFAULT_CYCLES_ICP = "0.3";
 // How many blocks' worth of the *current* mining fee to pre-fill the
 // funding field with. A dedicated miner is meant to run unattended for a
 // while -- defaulting to "one block" (an earlier version of this
@@ -29,7 +28,8 @@ const STEP_LABELS: Record<DeployProgress["step"], string> = {
 };
 
 export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
-  const [cyclesIcp, setCyclesIcp] = useState(DEFAULT_CYCLES_ICP);
+  const [cyclesIcp, setCyclesIcp] = useState("");
+  const [cyclesTouched, setCyclesTouched] = useState(false);
   const [fundIcp, setFundIcp] = useState("");
   const [fundTouched, setFundTouched] = useState(false);
   const [running, setRunning] = useState(false);
@@ -46,6 +46,27 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
       setFundIcp(formatAmount(miningFeeE8s * DEFAULT_FUND_BLOCKS));
     }
   }, [miningFeeE8s, fundTouched]);
+
+  // Fill the cycles field with today's real minimum (queried from the
+  // Cycles Minting Canister) rather than a fixed guess -- a static default
+  // silently stops being enough to cover the network's canister-creation
+  // fee whenever the ICP/XDR rate moves, which is exactly what happened
+  // before this was made live.
+  useEffect(() => {
+    if (cyclesTouched) return;
+    let cancelled = false;
+    minIcpE8sForNewCanister(identity)
+      .then((e8s) => {
+        if (!cancelled) setCyclesIcp(formatAmount(e8s));
+      })
+      .catch(() => {
+        // leave the field blank on failure -- handleDeploy's own validation
+        // catches an empty/invalid amount before anything is spent
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [identity, cyclesTouched]);
 
   async function handleDeploy() {
     const cyclesAmount = parseAmount(cyclesIcp);
@@ -99,7 +120,10 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
               <input
                 className="input"
                 value={cyclesIcp}
-                onChange={(e) => setCyclesIcp(e.target.value)}
+                onChange={(e) => {
+                  setCyclesTouched(true);
+                  setCyclesIcp(e.target.value);
+                }}
                 inputMode="decimal"
                 disabled={running}
               />
