@@ -13,7 +13,7 @@ interface Piece {
 const COLORS = ["#3987e5", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#9085e9"];
 
 function randomBurst(seed: number): Piece[] {
-  return Array.from({ length: 46 }, (_, i) => ({
+  return Array.from({ length: 72 }, (_, i) => ({
     id: seed * 1000 + i,
     left: Math.random() * 100,
     color: COLORS[i % COLORS.length],
@@ -45,6 +45,7 @@ export function Confetti({ trigger }: { trigger: number }) {
 
   return (
     <div className="confetti-root" aria-hidden="true">
+      <div className="win-flash" key={trigger} />
       {pieces.map((p) => (
         <span
           key={p.id}

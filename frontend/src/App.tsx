@@ -4,7 +4,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { getMotherActor, getLedgerActor, getIcpLedgerActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
 import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
-import { formatPiko, formatIcp, shortPrincipal, timeAgo } from "./lib/format";
+import { formatPiko, formatIcp, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
 import { Confetti } from "./components/Confetti";
 import "./App.css";
@@ -226,13 +226,13 @@ function App() {
       if ("Ok" in result) {
         setSessionBlocks((n) => n + 1);
         setLastWinReward(result.Ok.reward);
-        setMiningMessage(`Block #${result.Ok.height} is yours -- +${formatPiko(result.Ok.reward)} PIKO!`);
+        setMiningMessage(`Block #${result.Ok.height} won — +${formatPiko(result.Ok.reward)} PIKO 🎉`);
         setConfettiTrigger((n) => n + 1);
         refreshDashboard();
         refreshBalance(id);
         refreshAllowance(id);
       } else {
-        setMiningMessage(`So close! Rejected: ${JSON.stringify(result.Err)}`);
+        setMiningMessage(`Not accepted: ${JSON.stringify(result.Err)}`);
       }
     } catch (err) {
       console.error("submitProof failed", err);
@@ -265,8 +265,8 @@ function App() {
   function handleShare() {
     const text =
       lastWinReward !== null
-        ? `I just mined ${formatPiko(lastWinReward)} PIKO -- entirely on-chain, no server, on the Internet Computer. Come mine PIKO in your browser:`
-        : "Mining PIKO entirely on-chain, no server, straight from my browser -- on the Internet Computer:";
+        ? `Just mined ${formatPiko(lastWinReward)} PIKO — entirely on-chain, no server, on the Internet Computer:`
+        : "Mining PIKO entirely on-chain, no server, straight from my browser:";
     const url = window.location.href;
     const intent = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
     window.open(intent, "_blank", "noopener,noreferrer");
@@ -305,7 +305,15 @@ function App() {
           <img src="/piko-logo.svg" alt="" className={`brand-logo ${mining ? "spin" : ""}`} />
           <div className="brand-text">
             <span className="brand-name">PIKO</span>
-            <span className="brand-ticker">proof-of-on-chain-work ⛏️</span>
+            <span className="brand-ticker">
+              {stats ? (
+                <>
+                  <span className="pulse-dot" /> Block #{stats.height.toLocaleString()} live
+                </>
+              ) : (
+                "Proof-of-work · Internet Computer"
+              )}
+            </span>
           </div>
         </div>
         <div className="wallet-box">
@@ -327,58 +335,76 @@ function App() {
         </div>
       </header>
 
-      <div className="marquee">
-        <span className="marquee-track">
-          ★彡 WELCOME TO PIKO.EXE ミ★ 100% ON-CHAIN, ZERO SERVERS ★ NO PREMINE, EVER
-          ★ 21,000,000 PIKO MAX SUPPLY ★{" "}
-          {stats ? `BLOCK #${stats.height.toString()} ★ DIFFICULTY ${stats.difficultyBits.toString()} BITS ★` : ""}{" "}
-          BEST VIEWED AT ANY RESOLUTION ★ MINE NOW, ASK QUESTIONS LATER ★
-        </span>
-      </div>
+      {work && (
+        <div className="hash-ticker">
+          <span className="hash-ticker-track">
+            <span className="hash-ticker-label">block</span>{" "}
+            <span className="hash-ticker-value">#{work.height.toLocaleString()}</span>
+            <span className="hash-ticker-sep">/</span>
+            <span className="hash-ticker-label">prev_hash</span>{" "}
+            <span className="hash-ticker-value">{toHex(work.previousHash).slice(0, 32)}…</span>
+            <span className="hash-ticker-sep">/</span>
+            <span className="hash-ticker-label">target</span>{" "}
+            <span className="hash-ticker-value">{work.difficultyBits.toString()} bits</span>
+            <span className="hash-ticker-sep">/</span>
+            <span className="hash-ticker-label">max supply</span>{" "}
+            <span className="hash-ticker-value">21,000,000 PIKO</span>
+            <span className="hash-ticker-sep">/</span>
+            <span className="hash-ticker-label">premine</span>{" "}
+            <span className="hash-ticker-value">none, ever</span>
+            <span className="hash-ticker-sep">/</span>
+            <span className="hash-ticker-label">servers</span>{" "}
+            <span className="hash-ticker-value">zero</span>
+          </span>
+        </div>
+      )}
 
       <div className="disclaimer disclaimer-strong">
-        <strong>Real ICP, really burned.</strong> Mining costs{" "}
-        {work ? formatIcp(work.miningFeeE8s) : "..."} ICP per block, permanently sent
-        to the ICP ledger's minting account -- there is no refund path for that
-        ICP once a block is accepted. PIKO is an independent, experimental,
-        no-premine token with no guaranteed value and no market yet. Only mine
-        with ICP you're fully OK never seeing again. Not affiliated with
-        bob.fun/BOB.
+        <strong>Mining costs real ICP.</strong> {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
+        per block, non-refundable the moment a proof is accepted. PIKO is
+        experimental, no-premine, and has no established market yet. Only
+        mine with ICP you can afford to lose. Not affiliated with bob.fun or
+        BOB.
       </div>
 
       <section className="hero">
+        {stats && (
+          <span className="hero-ghost">#{stats.height.toString().padStart(6, "0")}</span>
+        )}
+        <div className="tag-row">
+          <span className="tag">No premine</span>
+          <span className="tag">No VC</span>
+          <span className="tag spark">100% on-chain</span>
+        </div>
         <h1>Mine PIKO. Win the block.</h1>
         <p>
-          Hashing runs live in your browser -- no wallet software, no install.
-          First valid proof wins the block and the reward, straight to your
-          own principal. Real competition, real ICP on the line, real PIKO
-          minted on a real ledger.
+          Hashing runs in your browser. The first valid proof wins the block
+          — the reward is minted straight to your principal, verified
+          on-chain, with no server in between.
         </p>
       </section>
 
       <section className="block story-block">
-        <h2>📁 README.TXT</h2>
+        <h2>
+          <span className="section-icon">#</span>About
+        </h2>
         <p>
-          Somewhere between a caffeine spiral and a slow Tuesday afternoon,
-          someone asked: "what if mining was real, but the miner was just...
-          a browser tab?" No team allocation. No VC round. No whitepaper
-          longer than this readme. PIKO has exactly one job: let anyone with
-          a laptop and some spare ICP take a real shot at finding a number
-          first. Find it, the chain pays you. That's the whole pitch.
+          PIKO is a fixed-supply, no-premine token minted entirely through
+          proof-of-work. Every PIKO in circulation was mined by racing the
+          same difficulty target everyone else races — on infrastructure with
+          no off-chain component at all.
         </p>
-        <p>
-          Is PIKO going to make you rich? Almost certainly not -- it isn't
-          listed anywhere, there's no liquidity, and you don't get your ICP
-          back if you lose the race. Is it also a genuinely fair, no-premine,
-          100%-on-chain proof-of-work token with zero servers, zero backend,
-          and zero "trust us"? Also yes. Both things are true at the same
-          time. Number go... we'll see. ⛏️✨
+        <p className="pull-quote">
+          No team allocation, no VC round, no presale — just a browser tab
+          and the same odds as everyone else.
         </p>
       </section>
 
-      <section className="block miner-panel">
+      <section className={`block miner-panel ${mining ? "is-mining" : ""}`}>
         <div className="miner-panel-head">
-          <h2>Mine</h2>
+          <h2>
+            <span className="section-icon spark">&gt;</span>Mine
+          </h2>
           {mining && (
             <span className="live-pill">
               <span className="live-dot" /> mining live
@@ -387,15 +413,16 @@ function App() {
         </div>
         {!identity ? (
           <p className="empty-state">
-            Log in with Internet Identity above to mine -- found blocks are
-            minted to your own principal.
+            Log in to mine — blocks mint straight to your own principal.
           </p>
         ) : (
           <>
             <div className="stat-grid">
               <div className="stat-tile">
                 <div className="stat-label">Hashrate</div>
-                <div className="stat-value">{hashrate.toLocaleString()} H/s</div>
+                <div className={`stat-value ${mining ? "hot" : ""}`}>
+                  {hashrate.toLocaleString()} H/s
+                </div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Attempts this session</div>
@@ -441,9 +468,8 @@ function App() {
             </div>
             {!feeApproved && (
               <p className="wallet-hint">
-                Mining burns {work ? formatIcp(work.miningFeeE8s) : "..."} ICP per
-                block, forever, win or lose the race. Approve once to cover ~
-                {APPROVE_BLOCKS} attempts.
+                Costs {work ? formatIcp(work.miningFeeE8s) : "..."} ICP per block, win
+                or lose. Approve once to cover ~{APPROVE_BLOCKS} attempts.
               </p>
             )}
           </>
@@ -453,11 +479,12 @@ function App() {
       {identity && <Wallet identity={identity} />}
 
       <section className="block">
-        <h2>Add PIKO to your wallet</h2>
+        <h2>
+          <span className="section-icon">$</span>Add PIKO to your wallet
+        </h2>
         <p className="section-intro">
-          PIKO is a standard ICRC-1 token -- add the ledger canister ID below
-          to the NNS dapp (or any other ICRC-1-aware wallet) to see and manage
-          your balance there too.
+          PIKO is a standard ICRC-1 token — add this ledger ID to the NNS
+          dapp, or any other ICRC-1-aware wallet.
         </p>
         <div className="wallet-address-row">
           <code className="wallet-address">{ledgerCanisterId}</code>
@@ -467,8 +494,10 @@ function App() {
         </div>
       </section>
 
-      <section className="block">
-        <h2>Chain status</h2>
+      <section className="block chain-status">
+        <h2>
+          <span className="section-icon spark">◆</span>Chain status
+        </h2>
         {stats ? (
           <>
             <div className="stat-grid">
@@ -510,7 +539,9 @@ function App() {
       </section>
 
       <section className="block">
-        <h2>🏆 Top miners</h2>
+        <h2>
+          <span className="section-icon">★</span>Top miners
+        </h2>
         {leaderboard.length > 0 ? (
           <table className="blocks">
             <thead>
@@ -524,7 +555,7 @@ function App() {
             <tbody>
               {leaderboard.map((entry, i) => (
                 <tr key={entry.miner.toText()}>
-                  <td>{i + 1}</td>
+                  <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
                   <td className="mono">{shortPrincipal(entry.miner.toText())}</td>
                   <td>{entry.blocksFound.toString()}</td>
                   <td>{formatPiko(entry.totalReward)}</td>
@@ -534,13 +565,22 @@ function App() {
           </table>
         ) : (
           <div className="empty-state">
-            No one's on the board yet -- mine a block and claim the top spot.
+            No one's on the board yet — mine a block and claim the top spot.
           </div>
         )}
       </section>
 
       <section className="block">
-        <h2>Recent blocks</h2>
+        <div className="miner-panel-head">
+          <h2>
+            <span className="section-icon spark">▤</span>Recent blocks
+          </h2>
+          {blocks.length > 0 && (
+            <span className="live-pill">
+              <span className="live-dot" /> live feed
+            </span>
+          )}
+        </div>
         {blocks.length > 0 ? (
           <table className="blocks">
             <thead>
@@ -564,56 +604,51 @@ function App() {
           </table>
         ) : (
           <div className="empty-state">
-            No blocks mined yet -- be the first, see "Mine" above.
+            No blocks mined yet — be the first, see "Mine" above.
           </div>
         )}
       </section>
 
       <section className="block tech-block">
-        <h2>🔧 THE_TECH.SYS</h2>
+        <h2>
+          <span className="section-icon">?</span>How it works
+        </h2>
         <p className="section-intro">
-          Unlike most things claiming "utility," PIKO's mining is real code
-          you can go read (see the repo link in the footer). No cron job on
-          someone's server quietly pretending to be decentralized:
+          Every step below is enforced on-chain — nothing here is simulated
+          off-chain.
         </p>
         <ul className="tech-list">
           <li>
-            Every hash attempt happens <strong>in your browser</strong>, via
-            the Web Crypto API (<code>crypto.subtle.digest</code>) -- an
-            actual SHA-256, computed on your device, right now.
+            Hashing runs <strong>in your browser</strong> via the Web Crypto
+            API (<code>crypto.subtle.digest</code>) — real SHA-256, computed
+            on your device.
           </li>
           <li>
-            The <code>mother</code> canister -- a smart contract, not a
-            server -- independently re-computes and verifies every submitted
-            proof itself. It never trusts what your browser tells it.
+            The <code>mother</code> canister independently re-verifies every
+            submitted proof; it never trusts a client-supplied hash.
           </li>
           <li>
             PIKO's ledger is the official, DFINITY-maintained ICRC-1 ledger
-            canister -- the same code other real ICP tokens run, not a
-            custom contract you have to take on faith.
+            canister — the same code other ICP tokens run.
           </li>
           <li>
-            The 0.5 ICP mining fee is a genuine on-chain transfer straight to
-            the ICP ledger's minting account. That's a real burn, verifiable
-            by anyone, forever, on-chain.
+            Most of the mining fee is burned on-chain to the ICP ledger's
+            minting account; a small share funds the protocol's own compute.
+            Both happen automatically, in batches, verifiable on-chain.
           </li>
-          <li>
-            There is no backend and no database. If every AWS/GCP server on
-            Earth vanished tomorrow, this site and this token would keep
-            running exactly the same, because none of it is hosted --
-            it's canisters, on the Internet Computer.
-          </li>
+          <li>No backend, no database — everything here is a canister.</li>
         </ul>
       </section>
 
       <section className="block miner-guide">
-        <h2>Advanced: run a dedicated miner canister</h2>
+        <h2>
+          <span className="section-icon spark">&raquo;</span>Advanced: run a
+          dedicated miner canister
+        </h2>
         <p>
-          In-browser mining stops when you close the tab. For continuous
-          mining, deploy your own <code>miner</code> canister and keep it
-          topped up with cycles -- it mines around the clock on a timer, same
-          hashing, same rewards (it also needs an ICP approval for the mining
-          fee, done the same way from its owning identity):
+          In-browser mining stops when you close the tab. Deploy your own{" "}
+          <code>miner</code> canister for continuous mining — same hashing,
+          same rewards, running on a timer instead of a tab:
         </p>
         <ol>
           <li>Clone the PIKO repository and open the project directory.</li>
@@ -637,12 +672,19 @@ function App() {
         </ol>
       </section>
 
+      <div className="badge-row">
+        <span className="badge">NO PREMINE</span>
+        <span className="badge spark">SHA-256 VERIFIED</span>
+        <span className="badge">100% ON-CHAIN</span>
+        <span className="badge spark">ZERO SERVERS</span>
+        <span className="badge">21M MAX SUPPLY</span>
+      </div>
+
       <footer className="footer">
         <p>
-          PIKO is open-source, no-premine, and entirely hosted on the Internet
-          Computer -- the ledger, the mining coordinator, the reference miner,
-          and this site are all canisters. See the project README for the full
-          architecture and the mainnet canister IDs.
+          PIKO is open-source and entirely hosted on the Internet Computer —
+          no servers, no database. See the README for the full architecture
+          and mainnet canister IDs.
         </p>
       </footer>
     </main>
