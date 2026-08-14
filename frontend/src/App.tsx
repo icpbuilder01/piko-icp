@@ -377,7 +377,7 @@ function App() {
           <span className="tag">No VC</span>
           <span className="tag spark">100% on-chain</span>
         </div>
-        <h1>Mine PIKO. Win the block.</h1>
+        <h1>Mine PIKO. ⛏️ Win the block.</h1>
         <p>
           Hashing runs in your browser. The first valid proof wins the block
           — the reward is minted straight to your principal, verified
