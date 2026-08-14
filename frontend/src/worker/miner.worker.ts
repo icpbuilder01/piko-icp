@@ -50,6 +50,15 @@ function leadingZeroBits(hash: Uint8Array): number {
   return count;
 }
 
+function reportProgress(attempts: number, elapsedMs: number) {
+  if (attempts <= 0) return;
+  self.postMessage({
+    type: "progress",
+    attempts,
+    hashrate: elapsedMs > 0 ? Math.round((attempts / elapsedMs) * 1000) : 0,
+  });
+}
+
 async function search(myGeneration: number, previousHash: Uint8Array, height: bigint, difficultyBits: number) {
   const header = new Uint8Array(previousHash.length + 8);
   header.set(previousHash, 0);
@@ -78,15 +87,25 @@ async function search(myGeneration: number, previousHash: Uint8Array, height: bi
 
     const now = performance.now();
     if (now - lastReport > 400) {
-      self.postMessage({
-        type: "progress",
-        attempts: attemptsSinceReport,
-        hashrate: Math.round((attemptsSinceReport / (now - lastReport)) * 1000),
-      });
+      reportProgress(attemptsSinceReport, now - lastReport);
       attemptsSinceReport = 0;
       lastReport = now;
     }
   }
+
+  // Preempted by a new header (someone -- possibly this same user's own
+  // canister miner -- won the block this loop was searching for) before
+  // the next scheduled 400ms report. Reported live: the displayed attempt
+  // count appeared to permanently freeze around the same number every
+  // time, even without the browser itself finding anything -- caused by
+  // exactly this: headers changing faster than the report interval means
+  // a report is never reached, so whatever was searched in that final
+  // fragment silently vanishes instead of being counted. Flushing
+  // whatever was accumulated here, however small, keeps the displayed
+  // count honest under frequent header changes -- which will only get
+  // more common as more people (or this user's own always-on canister
+  // miner) mine, not less.
+  reportProgress(attemptsSinceReport, performance.now() - lastReport);
 }
 
 self.onmessage = (event: MessageEvent<InboundMessage>) => {
