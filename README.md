@@ -56,30 +56,46 @@ This mirrors the design the project was inspired by, with a few explicit
 **simplifications**, documented here rather than hidden:
 
 - **Difficulty is set manually** by the `mother` canister's controller
-  (`setDifficulty(bits)`) instead of an automatic retarget algorithm. Default
-  is 22 bits, a rough estimate for "a few minutes per block" at a handful of
-  concurrent miners (browser hashrate via Web Crypto varies a lot by device)
-  -- watch actual block times on the dashboard and adjust.
-- **Mining is pay-to-play, not play-to-win.** Every *submitted* proof burns
+  (`proposeDifficulty(bits)`, taking effect via `executeDifficulty()` after a
+  48h timelock -- see "Timelocked admin changes" below) instead of an
+  automatic retarget algorithm. Default is 22 bits, a rough estimate for "a
+  few minutes per block" at a handful of concurrent miners (browser hashrate
+  via Web Crypto varies a lot by device) -- watch actual block times on the
+  dashboard and adjust.
+- **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
   `miningFeeE8s` (**0.5 ICP**, admin-adjustable via `setMiningFeeE8s`) from
-  the submitter's own ICP balance via `icrc2_transfer_from`, sent straight to
-  the ICP ledger's minting account -- a genuine, permanent, immediate burn,
-  whether or not this particular submission goes on to win the block. You
-  must `icrc2_approve` the `mother` canister on the ICP ledger before mining
-  (the site's "Mine" panel does this for you). There's also a per-principal
-  cooldown (`MIN_SUBMIT_INTERVAL_NANOS`, 0.3s) as a cheap first filter before
-  the ICP check runs.
-  - **No refund if you lose the race.** If another submission's fee burn
-    happens to land first while this one is also awaiting its own burn, this
-    one still loses its ICP -- same as real proof-of-work, where compute (or
+  the submitter's own ICP balance via `icrc2_transfer_from`, into `mother`'s
+  own ICP balance -- non-refundable and out of the submitter's control from
+  that instant, whether or not this particular submission goes on to win the
+  block. You must `icrc2_approve` the `mother` canister on the ICP ledger
+  before mining (the site's "Mine" panel does this for you). There's also a
+  per-principal cooldown (`MIN_SUBMIT_INTERVAL_NANOS`, 0.3s) as a cheap first
+  filter before the ICP check runs.
+  - **The fee is burned in batches, not per-block.** `mother` doesn't forward
+    the fee straight to the ICP ledger's minting account on every single
+    submission -- that would mean paying the ICP ledger's ~10,000 e8s
+    transfer fee twice per block just for bookkeeping. Instead, `sweepTreasury()`
+    -- called automatically on an hourly timer, and callable by anyone,
+    anytime, as a manual fallback -- splits whatever ICP balance `mother`
+    is actually holding right now: `cyclesFundRatioBps` of it (default 20%,
+    timelocked and lockable exactly like the burn destination -- see below)
+    is converted to cycles via the Cycles Minting Canister to help fund
+    `mother`'s own upkeep, and the rest is burned exactly as every block's
+    fee always was. It's stateless by design: every sweep re-reads the real
+    ICP balance rather than trusting a running counter, so a failed leg
+    (a transfer that traps, a `notify_top_up` that errors) just leaves its
+    share of the balance for the next sweep to retry.
+  - **No refund if you lose the race.** If another submission's fee pull
+    happens to land first while this one is also awaiting its own, this one
+    still loses its ICP -- same as real proof-of-work, where compute (or
     electricity) spent on a block someone else found first is never
     reimbursed. That real, unrecoverable cost is what makes mining an actual
     competition instead of a free-roll ("pay only when you're about to win").
     Verified with two miners racing for the same block concurrently: the
     winner is minted the reward, the loser's fee is gone and they get
     nothing -- there is exactly one winner per block, never more (`mother`
-    re-checks the chain height right after the burn, before ever minting, so
-    a losing submission can never mutate state or double-pay).
+    re-checks the chain height right after the fee pull, before ever
+    minting, so a losing submission can never mutate state or double-pay).
   - **Read this before mining**: at 0.5 ICP/block with no PIKO market yet,
     mining is a real-money cost for a token with no established, liquid
     value, and you can lose that cost even with a genuinely valid proof if
@@ -146,6 +162,8 @@ frontend URL. Useful commands once deployed:
 icp canister call mother getWork
 icp canister call mother getStats
 icp canister call mother getRecentBlocks
+icp canister call mother getPendingAdminChanges   # any queued propose*() waiting on its timelock?
+icp canister call mother getTotalPendingRewards   # unclaimed PIKO owed across all miners
 
 # Mine with the reference miner
 icp canister call miner start
@@ -218,25 +236,69 @@ upgrade of the deployed `mother` canister:
   logic.** `mother`, `ledger`, `miner`, and `frontend` are all currently
   controlled by a single identity (the deployer's). That controller could, in
   principle, push a new `mother` build that ignores the 21,000,000 supply
-  cap, or a new `ledger` build that mints itself PIKO directly, or redirect
-  the mining-fee burn target via `setIcpFeeTarget` to their own principal
-  instead of the real ICP minting account. None of PIKO's "fixed supply" or
-  "real burn" claims are enforced by anything *other than* the currently
-  deployed code -- they hold only as long as you trust the controller not to
-  replace it. This is true of most early-stage IC projects, not specific to
+  cap, or a new `ledger` build that mints itself PIKO directly. None of
+  PIKO's "fixed supply" or "real burn" claims are enforced by anything
+  *other than* the currently deployed code -- they hold only as long as you
+  trust the controller not to replace it. **A code upgrade is not covered by
+  the timelock described below** -- that only slows down *parameter*
+  changes within the current code, not a wholesale replacement of the code
+  itself. This is true of most early-stage IC projects, not specific to
   PIKO, but it's the single most important thing to understand before
   treating PIKO as trustless. The standard way projects remove this trust
   requirement is **blackholing** a canister (setting its controllers to
   none), which makes it permanently unupgradable -- a serious, irreversible
   step only worth taking once the code is considered final.
+- **Timelocked admin changes.** The two admin actions that could hurt
+  miners/holders in a single call -- `proposeDifficulty` (0 would make every
+  nonce a winning proof) and `proposeIcpFeeTarget` (redirects where the burn,
+  and the CMC conversion, actually go) -- don't take effect immediately.
+  They're queued via `propose*()`, visible to anyone via
+  `getPendingAdminChanges()`, and only become live via `execute*()` after a
+  **48-hour** delay (`ADMIN_TIMELOCK_NANOS`, a hardcoded constant -- not a
+  controller-settable var, since a setter for it would let a compromised key
+  shorten it to zero right before pushing a malicious change).
+  `cyclesFundRatioBps` gets the same treatment for a different reason: it
+  can't redirect funds anywhere off-protocol, but an instantly-changeable
+  burn/cycles split would make "X% of every fee is burned" just as
+  unreliable a promise as an unlocked burn address. `setMiningFeeE8s` is the
+  one setter left immediate -- it can only make mining cheaper or more
+  expensive for everyone equally, never drain supply or redirect funds.
+  `execute*()` is deliberately permissionless (like `sweepTreasury()`): the
+  value was already fixed and public at proposal time, so anyone can apply
+  it once the delay has passed, even if the controller key that proposed it
+  is unavailable by then. `cancelPending*()` lets the controller abort a
+  queued change before it lands.
+- **`icpBurnOwner`, `cmcId`, and `cyclesFundRatioBps` can be permanently
+  locked.** `lockIcpFeeTarget()` and `lockCyclesFundRatio()` irreversibly
+  disable their respective `propose*()` functions -- meant to be called once
+  local-testing/tuning needs are done, so these specific promises become
+  "enforced by code" rather than "enforced by a key," even before the whole
+  canister is blackholed.
 - **`mother`'s per-caller `lastAttempt` map (and, less so, cycle balance) can
   be grown/drained cheaply.** Any real (non-anonymous) principal can call
   `submitProof` -- Internet Identity sessions and self-authenticating
   principals are free and effectively unlimited to create -- and even a call
   that fails instantly (bad hash) still adds an entry and costs `mother` a
   little compute. This is a general property of public IC canisters (callers
-  don't pay for the canister's own cycles), not unique to PIKO; `mother`'s
-  own cycle balance should be monitored and topped up periodically.
+  don't pay for the canister's own cycles), not unique to PIKO.
+  `pruneStaleAttempts()` -- permissionless, meant to be called periodically
+  by a keeper/cron -- removes entries whose cooldown has already
+  provably expired, bounding how large the map can get between prunes;
+  `mother`'s own cycle balance should still be monitored and topped up
+  periodically.
+- **Fixed: `pendingRewards` used to be `transient`.** A reward that's been
+  earned but not yet successfully transferred (e.g. the ledger call trapped)
+  is real PIKO owed to a specific miner. Marking that map `transient` -- as
+  an earlier version of `mother` did -- meant it silently reset to empty on
+  *every* canister upgrade, with no trap and no error: any miner with an
+  unclaimed pending reward at upgrade time would just lose it. It's now
+  persisted like `minerBlocks`/`minerRewards`. **If you're upgrading an
+  already-deployed `mother` from before this fix, check
+  `getTotalPendingRewards()` first** -- this specific transition (from
+  transient to persisted) can't retroactively rescue whatever's already
+  pending at that exact upgrade, only prevent the loss from happening again
+  afterward; if it's non-zero, get outstanding rewards claimed via
+  `claimPendingReward()` before upgrading.
 - **The `miner` canister has no way to move its own ICP without a
   controller/owner-only call.** `withdrawIcp(to, amount)` exists specifically
   so ICP sent to fund a miner's mining fees isn't stuck if you want to
@@ -256,7 +318,23 @@ upgrade of the deployed `mother` canister:
   the ledger, so a second submission against a now-stale header can never
   validate twice -- no separate reentrancy lock is needed for that path.
 - All mutating entry points reject the anonymous principal.
-- Admin-only calls (`setDifficulty`) are gated on `Principal.isController`.
+- Admin-only calls (`proposeDifficulty`, `setMiningFeeE8s`, etc.) are gated
+  on `Principal.isController`; the two that could hurt miners/holders in one
+  call are also timelocked -- see "Timelocked admin changes" above.
+- `claimPendingReward` clears the pending-reward entry *before* awaiting the
+  transfer, so a second concurrent claim call can't double-pay.
+- **Supply-cap integrity:** `totalMinted` is incremented the instant a
+  block's reward is decided (in `submitProof`, when height advances) --
+  *not* when the ICRC transfer to the miner actually succeeds. Fixed from an
+  earlier version where it was only incremented on transfer success:
+  clamping every new block's reward against a `totalMinted` that only counts
+  *confirmed* payouts means a sustained ledger outage (transfers trapping
+  while mining keeps going) could mint blocks whose rewards were never
+  counted against the cap at the time, only added to `pendingRewards` --
+  letting the eventual sum of claimed pending rewards land past
+  21,000,000 PIKO once the ledger recovered. Counting the reward against the
+  cap the moment it's decided, regardless of whether the transfer itself
+  succeeds yet, closes that gap.
 
 ## Non-affiliation
 
