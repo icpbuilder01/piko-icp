@@ -18,6 +18,30 @@ interface Status {
 const STATUS_POLL_MS = 10000;
 const PIKO_LEDGER_FEE = 10_000n; // matches ledger/icrc1_ledger_init.args -- same magnitude as the ICP ledger's, unrelated value
 
+// lastError comes straight from the miner canister, whose wording targets a
+// CLI audience ("call approveIcpFee() again") -- accurate, but reads like a
+// crash to someone using the site, not the normal "you ran out of
+// pre-approved ICP, here's the button" state it actually is. Rewritten only
+// for the two expected, self-resolving stop conditions (out of ICP,
+// allowance exhausted); anything else is shown as the canister reported it,
+// since an unrecognized message is exactly when the raw detail matters
+// most.
+function friendlyMinerError(raw: string): { text: string; expected: boolean } {
+  if (raw.includes("ICP allowance for mother exhausted")) {
+    return {
+      text: 'Paused: it ran out of approved ICP for mining fees. Click "Approve + start" below to resume.',
+      expected: true,
+    };
+  }
+  if (raw.includes("out of ICP for the mining fee")) {
+    return {
+      text: 'Paused: it ran out of ICP. Send it more above, then click "Approve + start".',
+      expected: true,
+    };
+  }
+  return { text: raw, expected: false };
+}
+
 interface MinerCardProps {
   canisterId: string;
   identity: Identity;
@@ -257,7 +281,11 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
           <span>{(Number(status.cyclesBalance) / 1e12).toFixed(2)}T cycles</span>
         </div>
       )}
-      {status?.lastError && <p className="deploy-miner-error">{status.lastError}</p>}
+      {status?.lastError &&
+        (() => {
+          const { text, expected } = friendlyMinerError(status.lastError);
+          return <p className={expected ? "deploy-miner-status" : "deploy-miner-error"}>{text}</p>;
+        })()}
 
       <div className="deploy-miner-row">
         <label className="deploy-miner-field">
