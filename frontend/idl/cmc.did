@@ -42,6 +42,15 @@ type NotifyError = variant {
 
 type NotifyCreateCanisterResult = variant { Ok : principal; Err : NotifyError };
 
+// Used by deployMiner.ts to work out how many cycles a given ICP amount
+// will actually yield *before* spending it -- the canister-creation fee
+// (500B cycles, charged by the destination subnet, not this canister) is
+// deducted from whatever notify_create_canister receives, so a naive fixed
+// ICP default silently stops covering it whenever the ICP/XDR rate moves.
+type IcpXdrConversionRate = record { xdr_permyriad_per_icp : nat64; timestamp_seconds : nat64 };
+type IcpXdrConversionRateResponse = record { data : IcpXdrConversionRate; hash_tree : blob; certificate : blob };
+
 service : {
   notify_create_canister : (NotifyCreateCanisterArg) -> (NotifyCreateCanisterResult);
+  get_icp_xdr_conversion_rate : () -> (IcpXdrConversionRateResponse) query;
 }
