@@ -125,11 +125,19 @@ actor self {
   );
   var height : Nat = 0;
   // Leading zero bits required in sha256(previousHash # height # nonce).
-  // 22 bits is a starting estimate for "a few minutes per block" at a small
-  // number of concurrent miners (browser + canister) -- from here on it's
-  // retargeted automatically (see "Automatic difficulty retargeting"
-  // below), never hand-set again.
-  var difficultyBits : Nat = 22;
+  // 18 bits: measured against the real per-attempt cost of the browser
+  // miner's search loop (miner.worker.ts does one `await
+  // crypto.subtle.digest` per nonce, no batching -- roughly 20-30k
+  // attempts/sec single-tab, benchmarked directly rather than guessed),
+  // this targets on the order of single-digit seconds to a first block for
+  // one solo miner: fast enough to feel rewarding immediately, not so fast
+  // it stops looking like real work. (An earlier 22-bit starting point,
+  // picked before any real hashrate data existed, averaged well over a
+  // minute solo -- technically not a bug, just a bad first impression.)
+  // From here on it's retargeted automatically (see "Automatic difficulty
+  // retargeting" below) as real, possibly-much-higher combined
+  // participation shows up -- never hand-set again.
+  var difficultyBits : Nat = 18;
   // Total reward reserved against MAX_SUPPLY -- incremented the instant a
   // block's reward is decided (in submitProof, right when height advances),
   // *not* when the ICRC transfer to the miner actually succeeds. A reward
@@ -226,11 +234,12 @@ actor self {
   // blow through the supply cap in days (too easy), and there would be
   // no way to fix either outcome once no controller remains.
   //
-  // 5 minutes is the same "a few minutes per block" target the initial
-  // 22-bit guess above was aiming for -- retargeting just keeps hitting
-  // it automatically as real participation moves difficultyBits away
-  // from that guess, instead of requiring someone to notice and call
-  // setDifficulty() by hand.
+  // 5 minutes is the steady-state target once real participation is
+  // underway -- the 18-bit starting point above is deliberately tuned for
+  // a fast first block instead, and retargeting is what carries difficulty
+  // from that low starting point up to wherever real combined hashrate
+  // actually puts a 5-minute block, automatically, instead of requiring
+  // someone to notice and call setDifficulty() by hand.
   let TARGET_BLOCK_TIME_NANOS : Nat = 5 * 60 * 1_000_000_000; // 5 minutes
   // Short window (10 blocks) rather than bitcoin's ~2016: PIKO is early
   // and low-height, so reacting quickly to real participation matters
