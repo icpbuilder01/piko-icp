@@ -205,7 +205,7 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
     setActionMessage(null);
     try {
       await updateMinerCode(identity, canisterId);
-      setActionMessage("Code updated -- state (balances, mining status) preserved.");
+      setActionMessage("Code updated -- balances preserved. Paused; click Resume to keep mining.");
       await refreshStatus();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Updating code failed.");
