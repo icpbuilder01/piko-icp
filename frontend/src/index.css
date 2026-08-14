@@ -12,9 +12,9 @@
   --text-secondary: #5c5340;
   --text-muted: #8f8468;
 
-  --accent: #a8660f;
-  --accent-strong: #874f0a;
-  --accent-soft: #f0dfb8;
+  --accent: #b1550f;
+  --accent-strong: #8a4310;
+  --accent-soft: #f5ddc4;
   --accent-ink: #fffaf0;
 
   --spark: #1a56b8;
@@ -49,7 +49,7 @@
   :root {
     color-scheme: dark;
 
-    /* "Terminal" -- near-black, molten gold, electric blue spark. */
+    /* "Terminal" -- near-black, molten orange, electric blue spark. */
     --bg: #050403;
     --surface: #0e0c09;
     --surface-2: #17130f;
@@ -60,9 +60,9 @@
     --text-secondary: #b3a98f;
     --text-muted: #756c58;
 
-    --accent: #f0a93b;
-    --accent-strong: #ffc266;
-    --accent-soft: #2b1f0c;
+    --accent: #f2803a;
+    --accent-strong: #ffa156;
+    --accent-soft: #3a2410;
     --accent-ink: #140d02;
 
     --spark: #3d9bff;
