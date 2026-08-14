@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { getMinerActorAt } from "../lib/actors";
-import { fundMinerIcp, finishMinerSetup, updateMinerCode } from "../lib/deployMiner";
+import { fundMinerIcp, finishMinerSetup, updateMinerCode, topUpMinerCycles } from "../lib/deployMiner";
 import { formatAmount, parseAmount, shortPrincipal } from "../lib/format";
 
 interface Status {
@@ -24,7 +24,7 @@ interface MinerCardProps {
   onForget: () => void;
 }
 
-type Busy = "topup" | "finish" | "stop" | "withdraw" | "update" | null;
+type Busy = "topup" | "topupCycles" | "finish" | "stop" | "withdraw" | "update" | null;
 
 // One tracked miner's live status, plus the actions a deployed miner
 // actually needs from here: top up ICP, (re-)finish approveIcpFee()+start(),
@@ -38,6 +38,7 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
   const [status, setStatus] = useState<Status | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [topUpAmount, setTopUpAmount] = useState("0.1");
+  const [topUpCyclesAmount, setTopUpCyclesAmount] = useState("0.2");
   const [withdrawTo, setWithdrawTo] = useState(() => identity.getPrincipal().toText());
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [busy, setBusy] = useState<Busy>(null);
@@ -91,6 +92,26 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
       await refreshStatus();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Sending ICP failed.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleTopUpCycles() {
+    const amount = parseAmount(topUpCyclesAmount);
+    if (amount === null || amount <= 0n) {
+      setActionError("Enter a valid ICP amount.");
+      return;
+    }
+    setBusy("topupCycles");
+    setActionError(null);
+    setActionMessage(null);
+    try {
+      await topUpMinerCycles(identity, canisterId, amount);
+      setActionMessage(`Converted ${formatAmount(amount)} ICP to cycles.`);
+      await refreshStatus();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Topping up cycles failed.");
     } finally {
       setBusy(null);
     }
@@ -230,6 +251,22 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
             {busy === "finish" ? "Starting..." : "Approve + start"}
           </button>
         )}
+      </div>
+
+      <div className="deploy-miner-row">
+        <label className="deploy-miner-field">
+          <span className="stat-label">ICP &rarr; cycles (compute budget, e.g. for "Update code")</span>
+          <input
+            className="input"
+            value={topUpCyclesAmount}
+            onChange={(e) => setTopUpCyclesAmount(e.target.value)}
+            inputMode="decimal"
+            disabled={busy !== null}
+          />
+        </label>
+        <button className="button secondary" onClick={handleTopUpCycles} disabled={busy !== null}>
+          {busy === "topupCycles" ? "Converting..." : "Top up cycles"}
+        </button>
       </div>
 
       {status && status.pikoBalance > 0n && (

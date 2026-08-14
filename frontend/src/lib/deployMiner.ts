@@ -33,6 +33,9 @@ function principalToSubaccount(principal: Principal): Uint8Array {
 // guess at differently elsewhere -- see MEMO_CREATE_CANISTER in
 // https://github.com/dfinity/ic/blob/master/rs/nns/cmc/src/lib.rs.
 const MEMO_CREATE_CANISTER = Uint8Array.from([0x43, 0x52, 0x45, 0x41, 0, 0, 0, 0]); // "CREA", u64 LE
+// Same protocol as MEMO_CREATE_CANISTER, different operation -- see
+// MEMO_TOP_UP_CANISTER in the same dfinity/ic source file.
+const MEMO_TOP_UP_CANISTER = Uint8Array.from([0x54, 0x50, 0x55, 0x50, 0, 0, 0, 0]); // "TPUP", u64 LE
 
 // The destination subnet deducts a flat 500B-cycle fee from whatever
 // notify_create_canister receives, before this canister even exists to be
@@ -277,6 +280,37 @@ export async function fundMinerIcp(identity: Identity, canisterId: string, amoun
   });
   if (result.__kind__ !== "Ok") {
     throw new Error(`Sending ICP failed: ${describeError(result.Err)}`);
+  }
+}
+
+// Converts ICP into *cycles* for an already-deployed miner -- unrelated to
+// fundMinerIcp above (that sends ICP the miner spends on mining fees; this
+// pays the CMC to top up the miner's own compute budget). Needed for
+// updateMinerCode() above in particular: install_code costs real cycles on
+// top of the canister's ordinary running costs, and a miner that's been
+// running a while on whatever cycles it was created with can run short --
+// reported live: "please top up the canister with at least N additional
+// cycles" from a real upgrade attempt. Subaccount is principalToSubaccount
+// of the *target canister*, not the payer -- the opposite of
+// MEMO_CREATE_CANISTER's subaccount above, since there's no new controller
+// to record, only an existing canister to credit. Mirrors mother's own
+// sweepTreasury(), which does the same thing to fund itself.
+export async function topUpMinerCycles(identity: Identity, canisterId: string, icpE8s: bigint): Promise<void> {
+  const cmcPrincipal = Principal.fromText(CMC_CANISTER_ID);
+  const target = Principal.fromText(canisterId);
+  const icpLedger = getIcpLedgerActor(identity);
+  const transferResult = await icpLedger.icrc1_transfer({
+    to: { owner: cmcPrincipal, subaccount: principalToSubaccount(target) },
+    memo: MEMO_TOP_UP_CANISTER,
+    amount: icpE8s,
+  });
+  if (transferResult.__kind__ !== "Ok") {
+    throw new Error(`ICP transfer to the CMC failed: ${describeError(transferResult.Err)}`);
+  }
+  const cmc = getCmcActor(identity);
+  const notifyResult = await cmc.notify_top_up({ block_index: transferResult.Ok, canister_id: target });
+  if (notifyResult.__kind__ !== "Ok") {
+    throw new Error(`notify_top_up failed: ${describeError(notifyResult.Err)}`);
   }
 }
 
