@@ -85,9 +85,17 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
         </div>
       ) : (
         <>
+          <p className="section-intro">
+            Two unrelated things, both paid in ICP up front: one becomes{" "}
+            <strong>cycles</strong> — the canister's own electricity bill, nothing to do
+            with mining. The other stays <strong>ICP</strong>, sitting in the canister's
+            own wallet, spent exactly like your wallet would be:{" "}
+            {miningFeeE8s > 0n ? `${formatAmount(miningFeeE8s)} ICP` : "the fee"} per
+            submission, win or lose.
+          </p>
           <div className="deploy-miner-row">
             <label className="deploy-miner-field">
-              <span className="stat-label">ICP for cycles (creation + compute)</span>
+              <span className="stat-label">ICP &rarr; cycles (runs the canister)</span>
               <input
                 className="input"
                 value={cyclesIcp}
@@ -97,7 +105,7 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
               />
             </label>
             <label className="deploy-miner-field">
-              <span className="stat-label">ICP to fund mining fees</span>
+              <span className="stat-label">ICP &rarr; mining fees (stays as ICP)</span>
               <input
                 className="input"
                 value={fundIcp}
@@ -120,12 +128,9 @@ export function DeployMiner({ identity, miningFeeE8s }: DeployMinerProps) {
           )}
           {error && <p className="deploy-miner-error">{error}</p>}
           <p className="wallet-hint">
-            This sends real ICP: some is converted to cycles to create and run the canister, the
-            rest funds its mining fees directly (
-            {miningFeeE8s > 0n
-              ? `${DEFAULT_FUND_BLOCKS} blocks at the current ${formatAmount(miningFeeE8s)} ICP fee, by default`
-              : "sized to the current per-block fee once it loads"}
-            ). You'll be its sole controller.
+            The mining-fee field defaults to {DEFAULT_FUND_BLOCKS} submissions' worth at
+            the current fee. This sends real ICP right away -- you'll be the new
+            canister's sole controller.
           </p>
         </>
       )}
