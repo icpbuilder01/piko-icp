@@ -30,6 +30,10 @@
   --mono-bg: #e9dfc4;
   --mono-fg: #1a1508;
 
+  --bevel-hi: #fffdf7;
+  --bevel-lo: #a8975f;
+  --hard-shadow: rgba(26, 21, 8, 0.4);
+
   --shadow-sm: 0 1px 2px rgba(26, 21, 8, 0.06);
   --shadow-md: 0 10px 26px rgba(26, 21, 8, 0.08);
   --glow-accent: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
@@ -73,6 +77,10 @@
 
     --mono-bg: #120f0a;
     --mono-fg: #f5efdf;
+
+    --bevel-hi: #56492c;
+    --bevel-lo: #000000;
+    --hard-shadow: rgba(0, 0, 0, 0.6);
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-md: 0 16px 34px rgba(0, 0, 0, 0.5);
