@@ -457,16 +457,17 @@ section.block h2.spark {
   font-size: 1.55rem;
 }
 
-/* ICP-burned grows without bound as sweeps accumulate -- still overflowed
-   a single grid cell even at the smaller size, so it also gets double the
-   width (see .stat-tile-wide) rather than relying on font size alone. */
+/* ICP-burned grows without bound as sweeps accumulate -- kept overflowing
+   even at double width, so the tile now spans the full row (see
+   .stat-tile-wide) instead of a fixed column count, on top of the smaller
+   font size. */
 .chain-status .stat-value-small {
   font-size: 1rem;
   overflow-wrap: break-word;
 }
 
 .stat-tile-wide {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 section.block > *:not(h2):not(.miner-panel-head) {
