@@ -135,11 +135,11 @@ queue.
 
 ## 5. PIKO Dice
 
-PIKO Dice is a companion game, giving PIKO (and, in principle, ICP) somewhere
-to actually be spent rather than only mined and held. It's deliberately a
-separate pair of canisters and a separate site from mining (&sect;6) --
-opting into the game is a distinct choice from opting into mining, not a
-bundled default.
+PIKO Dice is a companion game, giving PIKO somewhere to actually be spent
+rather than only mined and held. It's deliberately a separate pair of
+canisters and a separate site from mining (&sect;6) -- opting into the game
+is a distinct choice from opting into mining, not a bundled default. Bets
+are PIKO-only (see below).
 
 The mechanics are the standard "roll under" crypto-dice formula used across
 the space: pick a target in `[2, 98]`, a fresh on-chain random roll in
