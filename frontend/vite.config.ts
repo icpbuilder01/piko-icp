@@ -43,7 +43,8 @@ export default defineConfig(({ command }) => {
   // Two static pages in one canister: the main site (index.html) and the
   // read-only monitoring dashboard (dashboard.html) -- Rollup needs every
   // HTML entry listed explicitly, unlike vite's dev server which serves any
-  // .html file by path with no config.
+  // .html file by path with no config. PIKO Dice is a deliberately separate
+  // site/canister (see casino-frontend/), not a third page here.
   const build = {
     rollupOptions: {
       input: {
@@ -62,8 +63,9 @@ export default defineConfig(({ command }) => {
   // canister ids for both canisters the frontend talks to directly.
   const environment = process.env.ICP_ENVIRONMENT || "local";
   // "miner" added for Dashboard.tsx, which reads the reference miner
-  // instance's status alongside mother/ledger.
-  const CANISTER_NAMES = ["mother", "ledger", "miner"];
+  // instance's status alongside mother/ledger. "casino-frontend" purely so
+  // canister-env.ts can build a link to the (separately hosted) dice site.
+  const CANISTER_NAMES = ["mother", "ledger", "miner", "casino-frontend"];
 
   const networkStatus = JSON.parse(
     execSync(`icp network status -e ${environment} --json`, { encoding: "utf-8" })

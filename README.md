@@ -15,9 +15,17 @@ off-chain server, no off-chain database.
 | miner (reference instance) | `5qcnl-6yaaa-aaaaj-qseea-cai` | https://5qcnl-6yaaa-aaaaj-qseea-cai.icp.net/ |
 | ledger | `56aad-fiaaa-aaaaj-qsefa-cai` | https://56aad-fiaaa-aaaaj-qsefa-cai.icp.net/ |
 
-The mainnet canisters currently hold modest cycle balances (~0.5T each for
-mother/miner/frontend, ~3.7T for the ledger) -- enough to run for a good
-while at low traffic, but top up before relying on them long-term:
+**PIKO Dice**, a companion on-chain dice game, is deliberately hosted on its
+own two canisters rather than folded into the site above:
+
+| Canister | ID | URL |
+|---|---|---|
+| casino-frontend | `77zu2-baaaa-aaaaj-qseiq-cai` | https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ |
+| casino | `7yyso-myaaa-aaaaj-qseia-cai` | https://7yyso-myaaa-aaaaj-qseia-cai.icp.net/ |
+
+The mainnet canisters currently hold modest cycle balances (~0.5T-0.8T each,
+~3.7T for the ledger) -- enough to run for a good while at low traffic, but
+top up before relying on them long-term:
 `icp canister top-up <name> --amount <cycles> -e ic`.
 
 **Independent project.** PIKO is inspired by the publicly described
@@ -76,9 +84,10 @@ This mirrors the design the project was inspired by, with a few explicit
   either stall the chain or blow through the supply cap in days if real
   participation ended up far from the initial guess.
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
-  `miningFeeE8s` (**0.05 ICP**, admin-adjustable via `setMiningFeeE8s` -- kept
-  low deliberately during the adoption phase, see "Read this before mining"
-  below) from
+  `miningFeeE8s` (**0.15 ICP** as of the public launch -- started at 0.05 ICP
+  during early solo testing, admin-adjustable via `setMiningFeeE8s`; check
+  `getStats()` for the live value rather than trusting this number to stay
+  current, see "Read this before mining" below) from
   the submitter's own ICP balance via `icrc2_transfer_from`, into `mother`'s
   own ICP balance -- non-refundable and out of the submitter's control from
   that instant, whether or not this particular submission goes on to win the
@@ -111,7 +120,8 @@ This mirrors the design the project was inspired by, with a few explicit
     nothing -- there is exactly one winner per block, never more (`mother`
     re-checks the chain height right after the fee pull, before ever
     minting, so a losing submission can never mutate state or double-pay).
-  - **Read this before mining**: even at a deliberately low 0.05 ICP/block
+  - **Read this before mining**: even at 0.15 ICP/block (check `getStats()`
+    for the current live value)
     with no PIKO market yet, mining is a real-money cost for a token with no
     established, liquid value, and you can lose that cost even with a
     genuinely valid proof if someone else's lands first. There is no way to
@@ -289,7 +299,11 @@ upgrade of the deployed `mother` canister:
   disable their respective `propose*()` functions -- meant to be called once
   local-testing/tuning needs are done, so these specific promises become
   "enforced by code" rather than "enforced by a key," even before the whole
-  canister is blackholed.
+  canister is blackholed. **Both are now locked** (verify yourself via
+  `getStats()`'s `icpFeeTargetLocked`/`cyclesFundRatioLocked` fields -- no
+  need to take this README's word for it): the burn destination, the CMC,
+  and the burn/cycles split can no longer be changed by anyone, including
+  the controller, short of a full code upgrade.
 - **`mother`'s per-caller `lastAttempt` map (and, less so, cycle balance) can
   be grown/drained cheaply.** Any real (non-anonymous) principal can call
   `submitProof` -- Internet Identity sessions and self-authenticating
