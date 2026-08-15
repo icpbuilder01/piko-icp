@@ -7,18 +7,15 @@ export default defineConfig(({ command }) => {
   const plugins = [
     react(),
     icpBindgen({
-      didFile: "../mother/mother.did",
-      outDir: "./src/bindings/mother",
+      // The on-chain dice game -- see ../casino/src/main.mo.
+      didFile: "../casino/casino.did",
+      outDir: "./src/bindings/casino",
     }),
     icpBindgen({
+      // PIKO's own ledger -- bets and payouts denominated in PIKO go
+      // through this.
       didFile: "../ledger/ledger.did",
       outDir: "./src/bindings/ledger",
-    }),
-    icpBindgen({
-      // The reference miner's own interface -- used by DeployMiner.tsx to
-      // call approveIcpFee()/start() on a freshly deployed instance.
-      didFile: "../miner/miner.did",
-      outDir: "./src/bindings/miner",
     }),
     icpBindgen({
       // Hand-written subset of the real mainnet ICP ledger's interface --
@@ -26,46 +23,18 @@ export default defineConfig(({ command }) => {
       didFile: "./idl/icp_ledger.did",
       outDir: "./src/bindings/icp_ledger",
     }),
-    icpBindgen({
-      // Hand-written subset of the real Cycles Minting Canister's interface
-      // -- see idl/cmc.did. Used by DeployMiner.tsx.
-      didFile: "./idl/cmc.did",
-      outDir: "./src/bindings/cmc",
-    }),
-    icpBindgen({
-      // Hand-written subset of the IC management canister's interface --
-      // see idl/management.did. Used by DeployMiner.tsx.
-      didFile: "./idl/management.did",
-      outDir: "./src/bindings/management",
-    }),
   ];
-
-  // Two static pages in one canister: the main site (index.html) and the
-  // read-only monitoring dashboard (dashboard.html) -- Rollup needs every
-  // HTML entry listed explicitly, unlike vite's dev server which serves any
-  // .html file by path with no config. PIKO Dice is a deliberately separate
-  // site/canister (see casino-frontend/), not a third page here.
-  const build = {
-    rollupOptions: {
-      input: {
-        main: "index.html",
-        dashboard: "dashboard.html",
-      },
-    },
-  };
 
   // If we're only building this is enough
   if (command !== "serve") {
-    return { plugins, build };
+    return { plugins };
   }
 
   // Local dev server: look up the local network's root key and the
-  // canister ids for both canisters the frontend talks to directly.
+  // canister ids this frontend talks to directly, plus the sibling
+  // `frontend` canister's id (only used to link back to the mining site).
   const environment = process.env.ICP_ENVIRONMENT || "local";
-  // "miner" added for Dashboard.tsx, which reads the reference miner
-  // instance's status alongside mother/ledger. "casino-frontend" purely so
-  // canister-env.ts can build a link to the (separately hosted) dice site.
-  const CANISTER_NAMES = ["mother", "ledger", "miner", "casino-frontend"];
+  const CANISTER_NAMES = ["casino", "ledger", "frontend"];
 
   const networkStatus = JSON.parse(
     execSync(`icp network status -e ${environment} --json`, { encoding: "utf-8" })
@@ -105,8 +74,5 @@ export default defineConfig(({ command }) => {
     },
   };
 
-  return {
-    plugins,
-    server,
-  };
+  return { plugins, server };
 });

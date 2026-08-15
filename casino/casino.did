@@ -1,0 +1,151 @@
+type TokenKind =
+ variant {
+   ICP;
+   PIKO;
+ };
+type TransferFromError =
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientAllowance: record {allowance: nat;};
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type TransferError =
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type TransferResult =
+ variant {
+   Ok: nat;
+   Err: TransferError;
+ };
+type BetOk =
+ record {
+   roll: nat;
+   won: bool;
+   payoutAmount: nat;
+ };
+type BetError =
+ variant {
+   Anonymous;
+   InvalidTarget;
+   InvalidAmount;
+   BetInProgress;
+   BetTooLarge: record {maxPayout: nat;};
+   TransferFailed: TransferFromError;
+   RandomnessFailed;
+ };
+type BetResult =
+ variant {
+   Ok: BetOk;
+   Err: BetError;
+ };
+type RecentBet =
+ record {
+   player: principal;
+   token: TokenKind;
+   amount: nat;
+   target: nat;
+   roll: nat;
+   won: bool;
+   payoutAmount: nat;
+   timestamp: int;
+ };
+type LeaderboardEntry =
+ record {
+   player: principal;
+   wageredIcpE8s: nat;
+   wageredPiko: nat;
+ };
+type RiskConfig =
+ record {
+   maxPayoutBps: nat;
+   icpBankrollFloorE8s: nat;
+   cyclesFundRatioBps: nat;
+ };
+type PendingRiskConfig =
+ record {
+   value: RiskConfig;
+   readyAt: int;
+ };
+type PendingWithdrawal =
+ record {
+   token: TokenKind;
+   to: principal;
+   amount: nat;
+   readyAt: int;
+ };
+type PendingAdminChanges =
+ record {
+   riskConfig: opt PendingRiskConfig;
+   withdrawal: opt PendingWithdrawal;
+   timelockNanos: int;
+ };
+type Config =
+ record {
+   minTarget: nat;
+   maxTarget: nat;
+   payoutNumerator: nat;
+   maxPayoutBps: nat;
+   icpBankrollFloorE8s: nat;
+   cyclesFundRatioBps: nat;
+   withdrawalsLocked: bool;
+   icpLedgerId: principal;
+   pikoLedgerId: principal;
+ };
+type Stats =
+ record {
+   betsPlaced: nat;
+   betsWon: nat;
+   totalWageredIcpE8s: nat;
+   totalWageredPiko: nat;
+   totalPaidOutIcpE8s: nat;
+   totalPaidOutPiko: nat;
+   icpBankrollE8s: nat;
+   pikoBankroll: nat;
+   cyclesBalance: nat;
+ };
+type SweepResult =
+ record {
+   profit: nat;
+   cyclesFunded: nat;
+   cyclesMinted: opt nat;
+   notifyError: opt text;
+ };
+service : {
+  cancelPendingRiskConfig: () -> ();
+  cancelPendingWithdrawal: () -> ();
+  claimPendingPayout: (token: TokenKind) -> (BetResult);
+  executeRiskConfig: () -> ();
+  executeWithdrawal: () -> (TransferResult);
+  getConfig: () -> (Config) query;
+  getLeaderboard: () -> (vec LeaderboardEntry) query;
+  getPendingAdminChanges: () -> (PendingAdminChanges) query;
+  getPendingPayout: (token: TokenKind) -> (nat) query;
+  getRecentBets: () -> (vec RecentBet) query;
+  getStats: () -> (Stats);
+  lockRiskConfig: () -> ();
+  lockWithdrawals: () -> ();
+  placeBet: (token: TokenKind, amountE8s: nat, target: nat) -> (BetResult);
+  proposeRiskConfig: (value: RiskConfig) -> ();
+  proposeWithdrawal: (token: TokenKind, to: principal, amount: nat) -> ();
+  sweepIcpProfit: () -> (SweepResult);
+}
