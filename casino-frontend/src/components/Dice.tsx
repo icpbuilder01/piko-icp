@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
-import { getCasinoActor, getIcpLedgerActor, getLedgerActor } from "../lib/actors";
+import { getCasinoActor, getLedgerActor } from "../lib/actors";
 import { casinoCanisterId } from "../lib/canister-env";
-import { formatIcp, formatPiko, parseAmount } from "../lib/format";
+import { formatPiko, parseAmount } from "../lib/format";
 import { TokenKind, type Config, type BetResult, type BetError } from "../bindings/casino/casino";
 import { Confetti } from "./Confetti";
 
 interface DiceProps {
   identity: Identity | null;
 }
+
+// This site only ever bets PIKO -- the `casino` canister itself still
+// understands ICP too (see casino/src/main.mo), but there's no ICP wallet
+// UI here at all (see Wallet.tsx), so TokenKind.PIKO is the only value ever
+// sent to placeBet().
+const TOKEN = TokenKind.PIKO;
 
 // How many bets' worth of allowance to approve at once -- same idea as
 // APPROVE_BLOCKS in the mining site's mining flow: big enough that a
@@ -26,15 +32,7 @@ const TICK_MS = 70;
 
 const casinoPrincipal = Principal.fromText(casinoCanisterId);
 
-function ledgerActorFor(token: TokenKind, identity?: Identity) {
-  return token === TokenKind.PIKO ? getLedgerActor(identity) : getIcpLedgerActor(identity);
-}
-
-function formatToken(token: TokenKind, amount: bigint): string {
-  return token === TokenKind.PIKO ? formatPiko(amount) : formatIcp(amount);
-}
-
-function betErrorMessage(err: BetError, token: TokenKind): string {
+function betErrorMessage(err: BetError): string {
   switch (err.__kind__) {
     case "Anonymous":
       return "Log in to play.";
@@ -47,11 +45,11 @@ function betErrorMessage(err: BetError, token: TokenKind): string {
     case "RandomnessFailed":
       return "Couldn't draw a fair result -- your stake was refunded, claim it below.";
     case "BetTooLarge":
-      return `Bet too large for the current bankroll -- max payout right now is ${formatToken(token, err.BetTooLarge.maxPayout)} ${token}. Try a smaller amount or a higher target.`;
+      return `Bet too large for the current bankroll -- max payout right now is ${formatPiko(err.BetTooLarge.maxPayout)} PIKO. Try a smaller amount or a higher target.`;
     case "TransferFailed": {
       const inner = err.TransferFailed;
       if (inner.__kind__ === "InsufficientAllowance") return "Approve more first.";
-      if (inner.__kind__ === "InsufficientFunds") return "Not enough balance to cover that bet.";
+      if (inner.__kind__ === "InsufficientFunds") return "Not enough PIKO balance to cover that bet.";
       return "Transfer failed -- try again.";
     }
     default:
@@ -61,7 +59,6 @@ function betErrorMessage(err: BetError, token: TokenKind): string {
 
 export function Dice({ identity }: DiceProps) {
   const [config, setConfig] = useState<Config | null>(null);
-  const [token, setToken] = useState<TokenKind>(TokenKind.PIKO);
   const [amountInput, setAmountInput] = useState("");
   const [target, setTarget] = useState(50);
   const [allowance, setAllowance] = useState<bigint | null>(null);
@@ -81,30 +78,26 @@ export function Dice({ identity }: DiceProps) {
       .catch((err) => console.error("Failed to load dice config", err));
   }, []);
 
-  const refreshAllowance = useCallback(
-    async (id: Identity, forToken: TokenKind) => {
-      try {
-        const ledger = ledgerActorFor(forToken, id);
-        const result = await ledger.icrc2_allowance({
-          account: { owner: id.getPrincipal() },
-          spender: { owner: casinoPrincipal },
-        });
-        setAllowance((result as { allowance: bigint }).allowance);
-      } catch (err) {
-        console.error("Failed to fetch dice allowance", err);
-      }
-    },
-    [],
-  );
+  const refreshAllowance = useCallback(async (id: Identity) => {
+    try {
+      const result = await getLedgerActor(id).icrc2_allowance({
+        account: { owner: id.getPrincipal() },
+        spender: { owner: casinoPrincipal },
+      });
+      setAllowance((result as { allowance: bigint }).allowance);
+    } catch (err) {
+      console.error("Failed to fetch dice allowance", err);
+    }
+  }, []);
 
   useEffect(() => {
     if (identity) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing with the ledger, not derived state
-      refreshAllowance(identity, token);
+      refreshAllowance(identity);
     } else {
       setAllowance(null);
     }
-  }, [identity, token, refreshAllowance]);
+  }, [identity, refreshAllowance]);
 
   useEffect(() => {
     return () => {
@@ -134,14 +127,13 @@ export function Dice({ identity }: DiceProps) {
     if (!identity || amount === null) return;
     setApproving(true);
     try {
-      const ledger = ledgerActorFor(token, identity);
       const approveAmount = amount * BigInt(APPROVE_ROLLS);
-      const result = await ledger.icrc2_approve({
+      const result = await getLedgerActor(identity).icrc2_approve({
         spender: { owner: casinoPrincipal },
         amount: approveAmount,
       });
       if ("Ok" in (result as object)) {
-        refreshAllowance(identity, token);
+        refreshAllowance(identity);
       } else {
         setMessage(`Approval failed: ${JSON.stringify((result as { Err: unknown }).Err)}`);
       }
@@ -175,7 +167,7 @@ export function Dice({ identity }: DiceProps) {
     startTicking();
     try {
       const casinoAsUser = getCasinoActor(identity);
-      const result = (await casinoAsUser.placeBet(token, amount, BigInt(target))) as BetResult;
+      const result = (await casinoAsUser.placeBet(TOKEN, amount, BigInt(target))) as BetResult;
       stopTicking();
       if (result.__kind__ === "Ok") {
         const { roll, won, payoutAmount } = result.Ok;
@@ -183,14 +175,14 @@ export function Dice({ identity }: DiceProps) {
         setLastWon(won);
         setMessage(
           won
-            ? `${Number(roll)} -- under ${target}, you won +${formatToken(token, payoutAmount)} ${token}!`
+            ? `${Number(roll)} -- under ${target}, you won +${formatPiko(payoutAmount)} PIKO!`
             : `${Number(roll)} -- not under ${target}, stake lost.`,
         );
         if (won) setConfettiTrigger((n) => n + 1);
-        refreshAllowance(identity, token);
+        refreshAllowance(identity);
       } else {
         setDisplayRoll(null);
-        setMessage(betErrorMessage(result.Err, token));
+        setMessage(betErrorMessage(result.Err));
       }
     } catch (err) {
       stopTicking();
@@ -225,31 +217,6 @@ export function Dice({ identity }: DiceProps) {
         <p className="empty-state">Log in to play -- winnings pay out straight to your own principal.</p>
       ) : (
         <>
-          <div className="token-toggle" role="tablist" aria-label="Token">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={token === TokenKind.PIKO}
-              className={`token-toggle-btn ${token === TokenKind.PIKO ? "active" : ""}`}
-              onClick={() => setToken(TokenKind.PIKO)}
-              disabled={rolling}
-            >
-              <img src="/piko-logo.svg" alt="" className="token-icon" />
-              PIKO
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={token === TokenKind.ICP}
-              className={`token-toggle-btn ${token === TokenKind.ICP ? "active" : ""}`}
-              onClick={() => setToken(TokenKind.ICP)}
-              disabled={rolling}
-            >
-              <img src="/icp-logo.svg" alt="" className="token-icon" />
-              ICP
-            </button>
-          </div>
-
           <div className="dice-track-wrap">
             <div className="dice-track" style={{ background: `linear-gradient(to right, var(--good) 0%, var(--good) ${zonePct}%, var(--critical) ${zonePct}%, var(--critical) 100%)` }}>
               {markerPct !== null && (
@@ -283,7 +250,7 @@ export function Dice({ identity }: DiceProps) {
             <div className="wallet-send-row">
               <input
                 className="input"
-                placeholder={`Bet amount (${token})`}
+                placeholder="Bet amount (PIKO)"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 inputMode="decimal"
@@ -291,7 +258,7 @@ export function Dice({ identity }: DiceProps) {
               />
               {!feeApproved ? (
                 <button className="button" onClick={handleApprove} disabled={approving || amount === null || rolling}>
-                  {approving ? "Approving..." : `Approve ${token}`}
+                  {approving ? "Approving..." : "Approve PIKO"}
                 </button>
               ) : (
                 <button className="button button-cta" onClick={handleRoll} disabled={rolling || amount === null || amount <= 0n}>
@@ -302,8 +269,8 @@ export function Dice({ identity }: DiceProps) {
 
             {potentialPayout !== null && (
               <p className="wallet-hint">
-                If you win: +{formatToken(token, potentialPayout)} {token}. If you lose: -{formatToken(token, amount ?? 0n)}{" "}
-                {token}, non-refundable, same as mining's fee -- see the disclaimer at the top of the site.
+                If you win: +{formatPiko(potentialPayout)} PIKO. If you lose: -{formatPiko(amount ?? 0n)} PIKO,
+                non-refundable, same as mining's fee -- see the disclaimer at the top of the site.
               </p>
             )}
             {message && <p className={`mining-message ${lastWon === true ? "good" : lastWon === false ? "critical" : ""}`}>{message}</p>}

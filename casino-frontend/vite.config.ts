@@ -12,16 +12,11 @@ export default defineConfig(({ command }) => {
       outDir: "./src/bindings/casino",
     }),
     icpBindgen({
-      // PIKO's own ledger -- bets and payouts denominated in PIKO go
-      // through this.
+      // PIKO's own ledger -- this site only ever bets PIKO (see
+      // Dice.tsx/Wallet.tsx), so unlike the mining site's frontend/, there's
+      // no need for the real ICP ledger's interface here at all.
       didFile: "../ledger/ledger.did",
       outDir: "./src/bindings/ledger",
-    }),
-    icpBindgen({
-      // Hand-written subset of the real mainnet ICP ledger's interface --
-      // it's not a canister this project builds/deploys, see idl/icp_ledger.did.
-      didFile: "./idl/icp_ledger.did",
-      outDir: "./src/bindings/icp_ledger",
     }),
   ];
 

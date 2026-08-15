@@ -825,8 +825,11 @@ function App() {
           and mainnet canister IDs.
         </p>
         <p className="footer-links">
-          <a href="/dashboard.html">Live chain dashboard</a> &nbsp;&middot;&nbsp;{" "}
-          <a href={casinoFrontendUrl} target="_blank" rel="noopener noreferrer">
+          <a className="footer-link-dashboard" href="/dashboard.html">
+            Live chain dashboard
+          </a>{" "}
+          &nbsp;&middot;&nbsp;{" "}
+          <a className="footer-link-dice" href={casinoFrontendUrl} target="_blank" rel="noopener noreferrer">
             Play PIKO Dice
           </a>
         </p>

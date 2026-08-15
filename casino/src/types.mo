@@ -119,8 +119,10 @@ module {
   // Wagered volume, kept per-token rather than summed into one figure --
   // PIKO has no established market value (see README) so adding it to ICP
   // wagered would produce a number that means nothing economically. Sorted
-  // by ICP volume (see getLeaderboard() in main.mo), the token that
-  // actually costs something real.
+  // by PIKO volume (see getLeaderboard() in main.mo) -- the casino-frontend/
+  // site only ever offers PIKO bets, so that's the only volume that's
+  // actually meaningful to rank players by; wageredIcpE8s is still tracked
+  // for whoever bets ICP directly against the canister.
   public type LeaderboardEntry = { player : Principal; wageredIcpE8s : Nat; wageredPiko : Nat };
 
   /// Timelocked like mother's cyclesFundRatio/icpFeeTarget: everything here
