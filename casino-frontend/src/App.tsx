@@ -167,7 +167,7 @@ function App() {
               <div className="stat-label">Bets won</div>
               <div className="stat-value">{stats.betsWon.toString()}</div>
             </div>
-            <div className="stat-tile">
+            <div className="stat-tile stat-tile-wide">
               <div className="stat-label token-label">
                 <img src="/piko-logo.svg" alt="" className="token-icon" />
                 PIKO bankroll
