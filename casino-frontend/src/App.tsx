@@ -122,7 +122,7 @@ function App() {
 
       <section className="block story-block">
         <h2>
-          <span className="section-icon">?</span>How it works
+          <span className="section-icon">⚙️</span>How it works
         </h2>
         <ul className="tech-list">
           <li>
@@ -155,7 +155,7 @@ function App() {
 
       <section className="block">
         <h2 className="spark">
-          <span className="section-icon">$</span>Bankroll &amp; stats
+          <span className="section-icon">💰</span>Bankroll &amp; stats
         </h2>
         {stats ? (
           <div className="stat-grid">
@@ -186,7 +186,7 @@ function App() {
 
       <section className="block">
         <h2>
-          <span className="section-icon">★</span>Top players
+          <span className="section-icon">🏆</span>Top players
         </h2>
         {leaderboard.length > 0 ? (
           <table className="blocks">
@@ -215,7 +215,7 @@ function App() {
       <section className="block">
         <div className="miner-panel-head">
           <h2 className="spark">
-            <span className="section-icon">&#9638;</span>Recent rolls
+            <span className="section-icon">🎲</span>Recent rolls
           </h2>
           {recentBets.length > 0 && (
             <span className="live-pill">
