@@ -583,8 +583,8 @@ function App() {
         </h2>
         <p>
           <strong>PIKO Dice</strong> is a companion game -- provably fair, 1% house edge, fully
-          on-chain, resolved by the Internet Computer's own randomness. Bet PIKO or ICP, roll under
-          your target, win instantly.
+          on-chain, resolved by the Internet Computer's own randomness. Bet PIKO, roll under your
+          target, win instantly.
         </p>
         <a className="button button-cta" href={casinoFrontendUrl} target="_blank" rel="noopener noreferrer">
           Play PIKO Dice &rarr;
