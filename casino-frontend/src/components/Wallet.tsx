@@ -85,7 +85,7 @@ export function Wallet({ identity }: WalletProps) {
   return (
     <section className="block wallet-panel">
       <h2>
-        <span className="section-icon">👛</span>PIKO wallet
+        PIKO wallet <span className="section-icon">🪙</span>
       </h2>
       <div className="wallet-balances">
         <div className="wallet-balance-tile">

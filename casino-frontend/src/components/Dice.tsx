@@ -109,7 +109,7 @@ export function Dice({ identity }: DiceProps) {
     return (
       <section className="block dice-panel">
         <h2 className="spark">
-          <span className="section-icon">&#127922;</span>Dice
+          Dice <span className="section-icon">&#127922;</span>
         </h2>
         <div className="empty-state">Loading table...</div>
       </section>
@@ -202,7 +202,7 @@ export function Dice({ identity }: DiceProps) {
       <Confetti trigger={confettiTrigger} />
       <div className="miner-panel-head">
         <h2 className="spark">
-          <span className={`section-icon dice-icon ${rolling ? "spin" : ""}`}>&#127922;</span>Dice
+          Dice <span className={`section-icon dice-icon ${rolling ? "spin" : ""}`}>&#127922;</span>
         </h2>
         <span className="dice-edge-pill">1% house edge, same odds as any provably-fair dice site</span>
       </div>
