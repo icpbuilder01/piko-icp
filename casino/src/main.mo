@@ -289,6 +289,16 @@ actor self {
     if (Map.get(pendingBets, Principal.compare, caller) != null) {
       return #Err(#BetInProgress);
     };
+    // Locked here, synchronously, before the first await below -- not
+    // after it. A caller's synchronous prefix (including this check) can
+    // otherwise interleave with another in-flight call of theirs across an
+    // await boundary: if the lock were only written post-await, a burst of
+    // concurrent placeBet calls from the same principal would each read
+    // the same not-yet-locked, not-yet-drawn-down bankroll and each get
+    // independently approved against maxPayoutBps, so the aggregate
+    // approved exposure across the burst would scale with the number of
+    // concurrent calls instead of staying capped at a single bet's share.
+    Map.add(pendingBets, Principal.compare, caller, true);
 
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
     let bankroll = try {
@@ -298,10 +308,9 @@ actor self {
     let payoutAmount = amountE8s * PAYOUT_NUMERATOR / target;
     let maxPayoutAllowed = bankroll * riskConfig.maxPayoutBps / 10_000;
     if (payoutAmount > maxPayoutAllowed) {
+      Map.remove(pendingBets, Principal.compare, caller);
       return #Err(#BetTooLarge({ maxPayout = maxPayoutAllowed }));
     };
-
-    Map.add(pendingBets, Principal.compare, caller, true);
 
     let pullOutcome = try {
       ?(
