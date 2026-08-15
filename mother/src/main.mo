@@ -261,7 +261,36 @@ actor self {
   // easy to get with only a handful of miners -- from swinging
   // difficulty wildly on a small sample.
   let MAX_RETARGET_STEP_BITS : Nat = 2;
+  // Floor matches the deliberately-calibrated 18-bit starting point above
+  // (~single-digit seconds solo at the benchmarked 20-30k attempts/sec
+  // single-tab rate), not an arbitrary low number. A floor of 1 (the
+  // original value) let long idle gaps between mining sessions -- read by
+  // maybeRetarget as "blocks came slower than target" purely from wall-clock
+  // time, with no way to tell "nobody was hashing" apart from "everybody
+  // hashed and failed" -- ratchet difficulty down toward zero over
+  // successive quiet windows, so the next active session would find blocks
+  // near-instantly and blow through a browser's pre-approved ICP allowance
+  // in a couple of submissions. This floor stops that ratchet at the
+  // original "still feels like real work" difficulty; retargeting can
+  // freely move difficulty *up* from here, unbounded, as real combined
+  // hashrate shows up and pushes block times toward the 5-minute target.
+  //
+  // Dead field, kept on purpose (see "Upgrading mother or miner safely" in
+  // the README): a plain top-level `let` is implicitly stable under this
+  // project's --default-persistent-actors setting, so its *value* silently
+  // keeps whatever was compiled in at first install across an upgrade --
+  // editing this literal alone would never actually change the running
+  // floor. Flipping it to `transient` doesn't work either: that changes its
+  // persistence category, which traps the upgrade outright with `RTS error:
+  // Memory-incompatible program upgrade`. MIN_DIFFICULTY_BITS_LIVE below,
+  // a *new* transient declaration, is the real, effective floor.
   let MIN_DIFFICULTY_BITS : Nat = 1;
+  // The actual floor maybeRetarget() and postupgrade() use. transient, so
+  // it's recomputed from this literal on every upgrade instead of freezing
+  // at whatever value was compiled in the first time this declaration
+  // existed -- same reason lastAttempt/pendingBets/sweepTimerId elsewhere
+  // in this project are transient.
+  transient let MIN_DIFFICULTY_BITS_LIVE : Nat = 18;
   let MAX_DIFFICULTY_BITS : Nat = 256;
 
   // When the current retarget window started: the wall-clock time and
@@ -311,8 +340,8 @@ actor self {
     } else if (actualNanos > RETARGET_TARGET_WINDOW_NANOS) {
       // blocks came slower than target -> easier
       let steps = log2FloorClamped(actualNanos, RETARGET_TARGET_WINDOW_NANOS, MAX_RETARGET_STEP_BITS);
-      if (steps >= difficultyBits) { MIN_DIFFICULTY_BITS } else {
-        Nat.max(difficultyBits - steps, MIN_DIFFICULTY_BITS);
+      if (steps >= difficultyBits) { MIN_DIFFICULTY_BITS_LIVE } else {
+        Nat.max(difficultyBits - steps, MIN_DIFFICULTY_BITS_LIVE);
       };
     } else { difficultyBits };
 
@@ -979,6 +1008,20 @@ actor self {
     // same MAX_RETARGET_STEP_BITS clamp as any other retarget.
     retargetAnchorHeight := height;
     retargetAnchorTime := Time.now();
+
+    // One-time correction for this specific upgrade: difficultyBits had
+    // already ratcheted down to 16 under the old MIN_DIFFICULTY_BITS = 1
+    // floor (see that constant's comment) before real participation ever
+    // showed up -- purely from idle time between test sessions, not from
+    // anyone actually failing to find blocks fast enough. Bumping it back
+    // up to the new floor here takes effect immediately instead of waiting
+    // on whatever the next maybeRetarget() window happens to measure.
+    // Harmless to leave in on every future upgrade too: a no-op once
+    // difficultyBits is at or above the floor, which it always will be from
+    // here on (maybeRetarget's own clamp keeps it there).
+    if (difficultyBits < MIN_DIFFICULTY_BITS_LIVE) {
+      difficultyBits := MIN_DIFFICULTY_BITS_LIVE;
+    };
   };
 
   armSweepTimer<system>();

@@ -83,7 +83,7 @@ the same height is accepted.
 | Premine | 0 |
 | Mining fee (burned per submission) | 0.05 ICP (adjustable; kept low during the adoption phase) |
 | Anti-spam cooldown | 0.3s / principal |
-| Difficulty target | 18 bits (starting point; retargets automatically) |
+| Difficulty target | 18 bits (starting point and floor; retargets automatically) |
 | Retarget interval | 10 blocks |
 | Target block time | 5 minutes |
 | Max retarget step | &plusmn;2 bits (4x work) per window |
@@ -94,7 +94,13 @@ it. Difficulty retargets itself automatically, bitcoin-style: every 10
 blocks, the coordinator compares how long that window actually took against
 the 5-minute-per-block target and adjusts `difficultyBits` up or down to
 compensate, capped at &plusmn;2 bits per window so one unusually fast or
-slow window on a small sample of miners can't swing it wildly. There is no
+slow window on a small sample of miners can't swing it wildly, and never
+drops below the 18-bit starting point -- a floor that only matters when
+long idle gaps between mining sessions (not slow real hashing) would
+otherwise read as "blocks came slowly" and ratchet difficulty toward
+near-zero, at which point the next active session would find blocks
+near-instantly. Retargeting can still move difficulty arbitrarily far
+*above* that floor, unbounded, as real participation grows. There is no
 controller call involved -- difficulty was set by hand in an earlier
 version of this design, which worked day-to-day but would have frozen
 permanently at whatever value it last held once the coordinator is
