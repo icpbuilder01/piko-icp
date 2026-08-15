@@ -78,45 +78,6 @@
   );
 }
 
-/* ---- Status pill: mining / stopped on the reference miner. Color is
-   never the only signal -- always paired with the "mining"/"stopped"
-   label, per the good/critical status tokens' intended use. ---- */
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  padding: 3px 9px;
-  background: rgba(0, 0, 0, 0.18);
-  color: inherit;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.status-good {
-  color: #d7f5e2;
-}
-
-.status-critical {
-  color: #ffd9d3;
-}
-
-.miner-error-note {
-  margin: 14px 18px 0;
-  color: var(--critical);
-  font-size: 0.82rem;
-  line-height: 1.5;
-}
-
 .dashboard-footnote {
   color: var(--text-muted);
   font-size: 0.76rem;
