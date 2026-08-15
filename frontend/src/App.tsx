@@ -471,7 +471,7 @@ function App() {
 
       <section className="block story-block">
         <h2>
-          <span className="section-icon">#</span>About
+          <span className="section-icon">ℹ️</span>About
         </h2>
         <p>
           PIKO is a fixed-supply, no-premine token minted entirely through
@@ -488,7 +488,7 @@ function App() {
       <section className={`block miner-panel ${mining ? "is-mining" : ""}`}>
         <div className="miner-panel-head">
           <h2 className="spark">
-            <span className="section-icon">&gt;</span>Mine
+            <span className="section-icon">⛏️</span>Mine
           </h2>
           {mining && (
             <span className="live-pill">
@@ -593,7 +593,7 @@ function App() {
 
       <section className="block">
         <h2>
-          <span className="section-icon">$</span>Add PIKO to your wallet
+          <span className="section-icon">💰</span>Add PIKO to your wallet
         </h2>
         <p className="section-intro">
           PIKO is a standard ICRC-1 token — add this ledger ID to the NNS
@@ -609,7 +609,7 @@ function App() {
 
       <section className="block chain-status">
         <h2 className="spark">
-          <span className="section-icon">◆</span>Chain status
+          <span className="section-icon">⛓️</span>Chain status
         </h2>
         {stats ? (
           <>
@@ -660,7 +660,7 @@ function App() {
 
       <section className="block">
         <h2>
-          <span className="section-icon">★</span>Top miners
+          <span className="section-icon">🏆</span>Top miners
         </h2>
         {leaderboard.length > 0 ? (
           <table className="blocks">
@@ -693,7 +693,7 @@ function App() {
       <section className="block">
         <div className="miner-panel-head">
           <h2 className="spark">
-            <span className="section-icon">▤</span>Recent blocks
+            <span className="section-icon">🧱</span>Recent blocks
           </h2>
           {blocks.length > 0 && (
             <span className="live-pill">
@@ -731,7 +731,7 @@ function App() {
 
       <section className="block tech-block">
         <h2>
-          <span className="section-icon">?</span>How it works
+          <span className="section-icon">⚙️</span>How it works
         </h2>
         <p className="section-intro">
           Every step below is enforced on-chain — nothing here is simulated
@@ -762,7 +762,7 @@ function App() {
 
       <section className="block miner-guide">
         <h2 className="spark">
-          <span className="section-icon">&raquo;</span>Advanced: run a
+          <span className="section-icon">🤖</span>Advanced: run a
           dedicated miner canister
         </h2>
         <p>
