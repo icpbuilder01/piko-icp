@@ -1168,12 +1168,23 @@ p.pull-quote {
 }
 
 .footer-links a {
-  color: var(--text-muted);
+  font-weight: 700;
   text-decoration: none;
-  border-bottom: 1px dotted var(--text-muted);
+  border-bottom: 1px solid currentColor;
 }
 
-.footer-links a:hover {
-  color: var(--text-secondary);
-  border-bottom-color: var(--text-secondary);
+.footer-link-dashboard {
+  color: var(--accent);
+}
+
+.footer-link-dashboard:hover {
+  color: var(--accent-strong);
+}
+
+.footer-link-dice {
+  color: var(--spark);
+}
+
+.footer-link-dice:hover {
+  color: color-mix(in srgb, var(--spark) 80%, black);
 }

@@ -3,9 +3,10 @@ import type { Identity } from "@icp-sdk/core/agent";
 import { getCasinoActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
 import { frontendUrl } from "./lib/canister-env";
-import { formatPiko, formatIcp, shortPrincipal } from "./lib/format";
+import { formatPiko, shortPrincipal } from "./lib/format";
 import { Dice } from "./components/Dice";
-import { TokenKind, type Stats, type RecentBet, type LeaderboardEntry } from "./bindings/casino/casino";
+import { Wallet } from "./components/Wallet";
+import type { Stats, RecentBet, LeaderboardEntry } from "./bindings/casino/casino";
 import "./App.css";
 
 const POLL_MS = 5000;
@@ -13,10 +14,6 @@ const POLL_MS = 5000;
 function formatCycles(raw: bigint): string {
   const t = Number(raw) / 1e12;
   return `${t.toFixed(2)}T`;
-}
-
-function formatBetAmount(token: TokenKind, amount: bigint): string {
-  return token === TokenKind.PIKO ? formatPiko(amount) : formatIcp(amount);
 }
 
 function App() {
@@ -95,16 +92,16 @@ function App() {
       </header>
 
       <div className="disclaimer disclaimer-strong">
-        <strong>This is a betting game, not an investment.</strong> Every losing roll's stake is burned
-        into the bankroll, non-refundable, the same way PIKO's mining fee is. There's no PIKO market yet
-        (no DEX listing) and cashing out ICP winnings is the only real-value outcome here -- PIKO
-        winnings are still just PIKO. Only play with what you're fully fine losing.
+        <strong>This is a betting game, not an investment.</strong> Bets are PIKO-only. Every losing
+        roll's stake is burned into the bankroll, non-refundable, the same way PIKO's mining fee is.
+        There's no PIKO market yet (no DEX listing), so winnings are still just PIKO -- only play with
+        what you're fully fine losing.
       </div>
 
       <section className="hero">
         <div className="tag-row">
           <span className="tag">Provably fair</span>
-          <span className="tag">No fiat, ever</span>
+          <span className="tag">PIKO only</span>
           <span className="tag spark">100% on-chain</span>
         </div>
         <h1>Roll the dice. &#127922; Win instantly.</h1>
@@ -113,11 +110,13 @@ function App() {
           <a href={frontendUrl} target="_blank" rel="noopener noreferrer">
             PIKO mining
           </a>{" "}
-          -- somewhere for PIKO (and ICP) to actually be used, not just mined and held. Same
-          non-affiliation note as the rest of the project: an independent build, not affiliated with any
-          other dice or mining site.
+          -- somewhere for PIKO to actually be used, not just mined and held. Same non-affiliation note
+          as the rest of the project: an independent build, not affiliated with any other dice or mining
+          site.
         </p>
       </section>
+
+      {identity && <Wallet identity={identity} />}
 
       <Dice identity={identity} />
 
@@ -147,9 +146,8 @@ function App() {
             accepted and risked.
           </li>
           <li>
-            A slice of realized ICP profit (never the protected bankroll floor) is periodically converted
-            to cycles to keep this canister funded -- same self-funding pattern as PIKO's own mining
-            coordinator.
+            This canister funds its own cycles the same self-funding pattern as PIKO's own mining
+            coordinator -- no off-chain top-ups needed to keep it running.
           </li>
           <li>No backend, no database, nothing off-chain -- same as the rest of PIKO.</li>
         </ul>
@@ -176,13 +174,6 @@ function App() {
               </div>
               <div className="stat-value">{formatPiko(stats.pikoBankroll)}</div>
             </div>
-            <div className="stat-tile">
-              <div className="stat-label token-label">
-                <img src="/icp-logo.svg" alt="" className="token-icon" />
-                ICP bankroll
-              </div>
-              <div className="stat-value">{formatIcp(stats.icpBankrollE8s)}</div>
-            </div>
             <div className="stat-tile stat-tile-wide">
               <div className="stat-label">Cycles</div>
               <div className="stat-value stat-value-small">{formatCycles(stats.cyclesBalance)}</div>
@@ -203,7 +194,6 @@ function App() {
               <tr>
                 <th>#</th>
                 <th>Player</th>
-                <th>ICP wagered</th>
                 <th>PIKO wagered</th>
               </tr>
             </thead>
@@ -212,7 +202,6 @@ function App() {
                 <tr key={entry.player.toText()}>
                   <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
                   <td className="mono">{shortPrincipal(entry.player.toText())}</td>
-                  <td>{formatIcp(entry.wageredIcpE8s)}</td>
                   <td>{formatPiko(entry.wageredPiko)}</td>
                 </tr>
               ))}
@@ -251,7 +240,7 @@ function App() {
                   <td>{b.target.toString()}</td>
                   <td>{b.roll.toString()}</td>
                   <td className={b.won ? "good" : ""}>
-                    {b.won ? `+${formatBetAmount(b.token, b.payoutAmount)} ${b.token}` : "lost"}
+                    {b.won ? `+${formatPiko(b.payoutAmount)} PIKO` : "lost"}
                   </td>
                 </tr>
               ))}

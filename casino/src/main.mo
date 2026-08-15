@@ -222,10 +222,13 @@ actor self {
 
   public query func getRecentBets() : async [Types.RecentBet] { recentBets };
 
-  // Ranked by ICP wagered -- see LeaderboardEntry in types.mo for why PIKO
-  // and ICP volume are never summed. Built from the union of both maps'
-  // keys, since a player who has only ever bet PIKO (or only ICP) must
-  // still show up with a real 0 on the other side, not be left out.
+  // Ranked by PIKO wagered -- the casino-frontend/ site only ever offers
+  // PIKO bets (see its Dice.tsx), so ICP volume is not a meaningful sort
+  // key even though it's still tracked (see LeaderboardEntry in types.mo
+  // for why PIKO and ICP volume are never summed). Built from the union of
+  // both maps' keys, since a player who has only ever bet PIKO (or only
+  // ICP) must still show up with a real 0 on the other side, not be left
+  // out.
   public query func getLeaderboard() : async [Types.LeaderboardEntry] {
     let seen : Map.Map<Principal, Bool> = Map.empty<Principal, Bool>();
     for (p in Map.keys(playerWageredIcp)) { Map.add(seen, Principal.compare, p, true) };
@@ -245,7 +248,7 @@ actor self {
         { player = p; wageredIcpE8s; wageredPiko };
       },
     );
-    let sorted = Array.sort<Types.LeaderboardEntry>(entries, func(a, b) { Nat.compare(b.wageredIcpE8s, a.wageredIcpE8s) });
+    let sorted = Array.sort<Types.LeaderboardEntry>(entries, func(a, b) { Nat.compare(b.wageredPiko, a.wageredPiko) });
     if (sorted.size() > 10) {
       Array.tabulate<Types.LeaderboardEntry>(10, func(i) { sorted[i] });
     } else { sorted };
