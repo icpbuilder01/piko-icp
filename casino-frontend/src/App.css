@@ -529,6 +529,7 @@ section.block > *:last-child {
   color: var(--text);
   letter-spacing: -0.01em;
   transition: color 0.2s ease;
+  overflow-wrap: break-word;
 }
 
 .stat-value.hot {

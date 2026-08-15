@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/piko-logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server." />
+  <title>PIKO</title>
+  <style>
+    :root {
+      color-scheme: light;
+
+      /* "Ledger paper" -- warm parchment, deep ink, gold leaf. Same palette
+         as mining/frontend and casino-frontend, so the three sites read as
+         one ecosystem. */
+      --bg: #f2ede1;
+      --surface: #fbf8f0;
+      --surface-2: #eae2cf;
+      --border: #ddd2b3;
+      --border-strong: #c9b98a;
+
+      --text: #1a1508;
+      --text-secondary: #5c5340;
+      --text-muted: #8f8468;
+
+      --accent: #b1550f;
+      --accent-strong: #8a4310;
+      --accent-soft: #f5ddc4;
+
+      --spark: #1a56b8;
+
+      --bevel-hi: #fffdf7;
+      --bevel-lo: #a8975f;
+      --hard-shadow: rgba(26, 21, 8, 0.4);
+
+      --font-display: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+
+        /* "Terminal" -- near-black, molten orange, electric blue spark. */
+        --bg: #050403;
+        --surface: #0e0c09;
+        --surface-2: #17130f;
+        --border: #2a251d;
+        --border-strong: #3d3626;
+
+        --text: #f5efdf;
+        --text-secondary: #b3a98f;
+        --text-muted: #756c58;
+
+        --accent: #f2803a;
+        --accent-strong: #ffa156;
+        --accent-soft: #3a2410;
+
+        --spark: #3d9bff;
+
+        --bevel-hi: #56492c;
+        --bevel-lo: #000000;
+        --hard-shadow: rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image: radial-gradient(var(--border) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--accent);
+    }
+
+    main {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 56px 20px 40px;
+    }
+
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .hero img {
+      width: 56px;
+      height: 56px;
+      display: block;
+      margin: 0 auto 16px;
+    }
+
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      letter-spacing: 0.02em;
+      margin: 0 0 10px;
+    }
+
+    .hero p {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .tag-row {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 18px 0 0;
+    }
+
+    .tag {
+      font-family: var(--font-display);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      padding: 4px 9px;
+    }
+
+    .tag.spark {
+      color: var(--spark);
+      border-color: color-mix(in srgb, var(--spark) 45%, var(--border-strong));
+    }
+
+    .about {
+      background: var(--surface);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 20px 22px;
+      margin-bottom: 28px;
+      box-shadow: 3px 3px 0 var(--hard-shadow);
+    }
+
+    .about p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.65;
+      margin: 0;
+    }
+
+    .about p + p {
+      margin-top: 12px;
+    }
+
+    .about strong {
+      color: var(--text);
+    }
+
+    h2.section-label {
+      font-family: var(--font-display);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin: 0 0 12px 2px;
+    }
+
+    .links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .link-card {
+      display: block;
+      background: var(--surface);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 14px 16px;
+      text-decoration: none;
+      color: var(--text);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      box-shadow: 2px 2px 0 var(--hard-shadow);
+    }
+
+    .link-card:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 4px 4px 0 var(--hard-shadow);
+    }
+
+    .link-card .link-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .link-card .link-title .icon {
+      font-size: 1.1rem;
+    }
+
+    .link-card .link-desc {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+
+    .link-card.cta .link-title {
+      color: var(--accent);
+    }
+
+    .link-card.dice .link-title {
+      color: var(--spark);
+    }
+
+    footer {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      line-height: 1.7;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    footer a {
+      color: var(--text-muted);
+      text-decoration: underline;
+    }
+
+    footer a:hover {
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+    <section class="hero">
+      <img src="/piko-logo.svg" alt="" />
+      <h1>PIKO</h1>
+      <p>
+        A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the
+        Internet Computer. No team allocation, no presale, no off-chain server -- the only way any
+        PIKO comes into existence is by paying the same on-chain cost everyone else pays.
+      </p>
+      <div class="tag-row">
+        <span class="tag">Fixed supply, 21M</span>
+        <span class="tag">No premine</span>
+        <span class="tag spark">100% on-chain</span>
+      </div>
+    </section>
+
+    <div class="about">
+      <p>
+        <strong>Mine it</strong> right in your browser -- no wallet software or CLI, just Internet
+        Identity -- or run a self-owned canister that mines around the clock. Every accepted proof
+        costs a small, non-refundable ICP fee: mostly burned permanently, a share converted to
+        cycles to keep the protocol's own canisters funded.
+      </p>
+      <p>
+        <strong>PIKO Dice</strong> is a companion game, deliberately hosted on its own separate
+        site: a provably-fair, 1% house edge dice game, resolved by the Internet Computer's own
+        on-chain randomness, giving mined PIKO somewhere to actually be spent.
+      </p>
+      <p>
+        Independent project. Mining is inspired by the publicly described "proof-of-on-chain-work"
+        mechanics of bob.fun, but this is an original codebase, token, and brand --
+        <strong>not affiliated with, endorsed by, or connected to bob.fun or BOB in any way.</strong>
+      </p>
+    </div>
+
+    <h2 class="section-label">Get started</h2>
+    <div class="links">
+      <a class="link-card cta" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#9935;&#65039;</span>Mine PIKO</div>
+        <div class="link-desc">Start mining in your browser -- log in with Internet Identity.</div>
+      </a>
+      <a class="link-card dice" href="https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#127922;</span>Play PIKO Dice</div>
+        <div class="link-desc">Provably-fair, 1% house edge, PIKO-only on-chain dice.</div>
+      </a>
+      <a class="link-card" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/dashboard.html" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#9638;</span>Live chain dashboard</div>
+        <div class="link-desc">Real-time supply, difficulty, and burn stats, read straight from the chain.</div>
+      </a>
+    </div>
+
+    <h2 class="section-label">Read &amp; verify</h2>
+    <div class="links">
+      <a class="link-card" href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#128220;</span>Whitepaper</div>
+        <div class="link-desc">Tokenomics, mining mechanics, trust model, and risk disclosure.</div>
+      </a>
+      <a class="link-card" href="https://github.com/icpbuilder01/piko-icp" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&lt;/&gt;</span>Source code</div>
+        <div class="link-desc">Every canister's code, open-source on GitHub.</div>
+      </a>
+    </div>
+
+    <footer>
+      PIKO is an independent, non-affiliated project. Not investment advice -- mine and bet only
+      with what you're fully prepared to lose. See the whitepaper's canister reference for every
+      deployed principal.
+    </footer>
+  </main>
+</body>
+
+</html>
