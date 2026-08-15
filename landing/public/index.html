@@ -237,6 +237,69 @@
       color: var(--spark);
     }
 
+    .ledger-box {
+      background: var(--surface);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 16px 18px;
+      margin-bottom: 28px;
+      box-shadow: 2px 2px 0 var(--hard-shadow);
+    }
+
+    .ledger-label {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .ledger-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ledger-id {
+      font-family: var(--font-display);
+      font-size: 0.88rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border-strong);
+      padding: 6px 10px;
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .copy-btn {
+      font-family: var(--font-sans);
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text);
+      background: var(--surface-2);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      background: var(--accent-soft);
+    }
+
+    .ledger-hint {
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      margin: 10px 0 0;
+    }
+
     footer {
       text-align: center;
       color: var(--text-muted);
@@ -309,6 +372,19 @@
       </a>
     </div>
 
+    <h2 class="section-label">Add PIKO to your wallet</h2>
+    <div class="ledger-box">
+      <div class="ledger-label">PIKO's ICRC-1 ledger canister ID -- add it to the NNS dapp or any ICRC-1-aware wallet (Plug, etc.) to track your balance:</div>
+      <div class="ledger-row">
+        <code class="ledger-id" id="ledger-id">56aad-fiaaa-aaaaj-qsefa-cai</code>
+        <button type="button" class="copy-btn" id="copy-ledger">Copy</button>
+      </div>
+      <p class="ledger-hint">
+        This is the same canister the mining and dice sites transfer PIKO through -- verify it
+        yourself against the whitepaper's canister reference before trusting it.
+      </p>
+    </div>
+
     <h2 class="section-label">Read &amp; verify</h2>
     <div class="links">
       <a class="link-card" href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">
@@ -327,6 +403,20 @@
       deployed principal.
     </footer>
   </main>
+  <script>
+    document.getElementById("copy-ledger").addEventListener("click", async function () {
+      var btn = this;
+      var text = document.getElementById("ledger-id").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        var original = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(function () { btn.textContent = original; }, 1500);
+      } catch (err) {
+        console.error("Copy failed", err);
+      }
+    });
+  </script>
 </body>
 
 </html>
