@@ -3,7 +3,7 @@ import type { Identity } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { getMotherActor, getLedgerActor, getIcpLedgerActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
-import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
+import { motherCanisterId, ledgerCanisterId, casinoFrontendUrl } from "./lib/canister-env";
 import { formatPiko, formatIcp, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
 import { DeployMiner } from "./components/DeployMiner";
@@ -577,6 +577,20 @@ function App() {
 
       {identity && <Wallet identity={identity} />}
 
+      <section className="block dice-teaser">
+        <h2 className="spark">
+          <span className="section-icon">&#127922;</span>Something to do with your PIKO
+        </h2>
+        <p>
+          <strong>PIKO Dice</strong> is a companion game -- provably fair, 1% house edge, fully
+          on-chain, resolved by the Internet Computer's own randomness. Bet PIKO or ICP, roll under
+          your target, win instantly.
+        </p>
+        <a className="button button-cta" href={casinoFrontendUrl} target="_blank" rel="noopener noreferrer">
+          Play PIKO Dice &rarr;
+        </a>
+      </section>
+
       <section className="block">
         <h2>
           <span className="section-icon">$</span>Add PIKO to your wallet
@@ -811,7 +825,10 @@ function App() {
           and mainnet canister IDs.
         </p>
         <p className="footer-links">
-          <a href="/dashboard.html">Live chain dashboard</a>
+          <a href="/dashboard.html">Live chain dashboard</a> &nbsp;&middot;&nbsp;{" "}
+          <a href={casinoFrontendUrl} target="_blank" rel="noopener noreferrer">
+            Play PIKO Dice
+          </a>
         </p>
       </footer>
     </main>

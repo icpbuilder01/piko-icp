@@ -44,10 +44,12 @@ icp canister create ledger -q 2>/dev/null || true
 icp build ledger
 icp canister install ledger --mode reinstall --args-file ledger/icrc1_ledger_init.args -y
 
-echo "==> Deploying mother, miner, frontend..."
-icp deploy mother miner frontend -y
+echo "==> Deploying mother, miner, casino, frontend, casino-frontend..."
+icp deploy mother miner casino frontend casino-frontend -y
 
 FRONTEND_ID=$(icp canister status frontend -i)
+CASINO_FRONTEND_ID=$(icp canister status casino-frontend -i)
 echo ""
-echo "==> Done. Open the site at:"
-echo "    http://${FRONTEND_ID}.localhost:8010/"
+echo "==> Done. Open the sites at:"
+echo "    mining (frontend):  http://${FRONTEND_ID}.localhost:8010/"
+echo "    casino-frontend:    http://${CASINO_FRONTEND_ID}.localhost:8010/"

@@ -4,6 +4,8 @@ canisters:
   - ledger
   - mother
   - miner
+  - casino
+  - casino-frontend
   - frontend
 
 # Port 8000 is already used by another local icp-cli project on this
