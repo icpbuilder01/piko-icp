@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getMotherActor, getMinerActorAt } from "./lib/actors";
-import { referenceMinerCanisterId } from "./lib/canister-env";
+import { getMotherActor } from "./lib/actors";
 import { formatPiko, formatIcp, shortPrincipal, timeAgo } from "./lib/format";
 import "./Dashboard.css";
 
@@ -28,17 +27,7 @@ interface Block {
   timestamp: bigint;
 }
 
-interface MinerStatus {
-  mining: boolean;
-  attempts: bigint;
-  blocksFound: bigint;
-  cyclesBalance: bigint;
-  icpBalanceE8s: bigint;
-  lastError?: string;
-}
-
 const mother = getMotherActor();
-const referenceMiner = referenceMinerCanisterId ? getMinerActorAt(referenceMinerCanisterId) : null;
 
 function formatCycles(raw: bigint): string {
   const t = Number(raw) / 1e12;
@@ -64,8 +53,6 @@ function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [motherCycles, setMotherCycles] = useState<bigint | null>(null);
-  const [minerStatus, setMinerStatus] = useState<MinerStatus | null>(null);
-  const [minerError, setMinerError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
@@ -80,17 +67,6 @@ function Dashboard() {
       setMotherCycles(c);
     } catch (err) {
       console.error("Failed to refresh mother stats", err);
-    }
-
-    if (referenceMiner) {
-      try {
-        const status = await referenceMiner.getStatus();
-        setMinerStatus(status as unknown as MinerStatus);
-        setMinerError(null);
-      } catch (err) {
-        console.error("Failed to refresh reference miner status", err);
-        setMinerError("Reference miner is unreachable right now.");
-      }
     }
 
     setLastUpdated(Date.now());
@@ -138,8 +114,8 @@ function Dashboard() {
         </h2>
         <p className="section-intro">
           Everything on this page comes straight from permissionless query calls to
-          `mother` and the reference `miner` -- no login, nothing cached server-side, nothing
-          you couldn't verify yourself with <code>icp canister call</code>.
+          `mother` -- no login, nothing cached server-side, nothing you couldn't verify
+          yourself with <code>icp canister call</code>.
         </p>
         {stats ? (
           <>
@@ -213,53 +189,6 @@ function Dashboard() {
       <section className="block">
         <div className="miner-panel-head">
           <h2 className="spark">
-            <span className="section-icon">&#9878;</span>Reference miner
-          </h2>
-          {minerStatus && (
-            <span className={`status-pill ${minerStatus.mining ? "status-good" : "status-critical"}`}>
-              <span className="status-dot" />
-              {minerStatus.mining ? "mining" : "stopped"}
-            </span>
-          )}
-        </div>
-        {referenceMinerCanisterId ? (
-          minerStatus ? (
-            <>
-              <div className="stat-grid">
-                <div className="stat-tile">
-                  <div className="stat-label">Attempts (this run)</div>
-                  <div className="stat-value">{minerStatus.attempts.toLocaleString()}</div>
-                </div>
-                <div className="stat-tile">
-                  <div className="stat-label">Blocks found</div>
-                  <div className="stat-value">{minerStatus.blocksFound.toString()}</div>
-                </div>
-                <div className="stat-tile">
-                  <div className="stat-label">Cycles</div>
-                  <div className="stat-value">{formatCycles(minerStatus.cyclesBalance)}</div>
-                </div>
-                <div className="stat-tile">
-                  <div className="stat-label">ICP balance</div>
-                  <div className="stat-value">{formatIcp(minerStatus.icpBalanceE8s)}</div>
-                </div>
-              </div>
-              {minerStatus.lastError && (
-                <p className="miner-error-note">&#9888; {minerStatus.lastError}</p>
-              )}
-            </>
-          ) : (
-            <div className="empty-state">{minerError ?? "Loading reference miner status..."}</div>
-          )
-        ) : (
-          <div className="empty-state">
-            No reference miner is configured for this deployment.
-          </div>
-        )}
-      </section>
-
-      <section className="block">
-        <div className="miner-panel-head">
-          <h2 className="spark">
             <span className="section-icon">&#9638;</span>Recent blocks
           </h2>
           {blocks.length > 0 && (
@@ -295,8 +224,9 @@ function Dashboard() {
       </section>
 
       <p className="dashboard-footnote">
-        Not shown: `frontend` and `ledger` canisters' own cycles balances -- neither
-        exposes a permissionless query for that, so this page doesn't guess.
+        Not shown: any individual miner's status (including the reference instance), or
+        `frontend` and `ledger`'s own cycles balances -- the latter two don't expose a
+        permissionless query for that, so this page doesn't guess.
         {lastUpdated !== null && <> Last updated {timeAgo(BigInt(lastUpdated) * 1_000_000n)}.</>}
       </p>
     </main>
