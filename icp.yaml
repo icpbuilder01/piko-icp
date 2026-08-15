@@ -7,6 +7,7 @@ canisters:
   - casino
   - casino-frontend
   - frontend
+  - landing
 
 # Port 8000 is already used by another local icp-cli project on this
 # machine; use a distinct port for PIKO's local network.

@@ -1,8 +1,9 @@
-# PIKO Protocol Paper (v1.0)
+# PIKO Protocol Paper (v1.1)
 
 *A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the Internet Computer.*
 
-Live site: https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/
+Live sites: https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/ (mining) &middot;
+https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ (PIKO Dice, &sect;5)
 
 ## 0. Abstract
 
@@ -97,7 +98,7 @@ slow window on a small sample of miners can't swing it wildly. There is no
 controller call involved -- difficulty was set by hand in an earlier
 version of this design, which worked day-to-day but would have frozen
 permanently at whatever value it last held once the coordinator is
-blackholed (&sect;8); the automatic version has no such dead end.
+blackholed (&sect;9); the automatic version has no such dead end.
 
 ## 4. The burn -- and the cycles that keep the lights on
 
@@ -123,7 +124,7 @@ automatically on an hourly timer, so the fee doesn't pay a second ICP ledger
 transfer fee on every single block just to be moved along. The split ratio
 itself is disclosed live via `getStats()`, and -- like the burn destination
 itself -- can be locked permanently by the controller once tuned, so it
-becomes a promise enforced by code rather than by a key (&sect;6).
+becomes a promise enforced by code rather than by a key (&sect;7).
 
 **Pay-to-play, not play-to-win.** Paying the fee does not guarantee a
 reward. If another submission's fee lands first for the same block, this
@@ -132,10 +133,53 @@ spent on a block someone else found first is never reimbursed -- and it's
 the actual reason mining here functions as a competition rather than a
 queue.
 
-## 5. Architecture
+## 5. PIKO Dice
+
+PIKO Dice is a companion game, giving PIKO (and, in principle, ICP) somewhere
+to actually be spent rather than only mined and held. It's deliberately a
+separate pair of canisters and a separate site from mining (&sect;6) --
+opting into the game is a distinct choice from opting into mining, not a
+bundled default.
+
+The mechanics are the standard "roll under" crypto-dice formula used across
+the space: pick a target in `[2, 98]`, a fresh on-chain random roll in
+`[0, 99]` (drawn from the subnet's own threshold randomness via `raw_rand`)
+decides the outcome, and rolling strictly under the target wins
+`stake * 99 / target`. The `99` (not `100`) numerator is what encodes a
+fixed **1% house edge** -- expected return over many rolls is 99% -- and it
+is a compile-time constant, never admin-adjustable.
+
+**Ordering, not commit-reveal, is what makes this fair.** The stake is
+pulled from the player via `icrc2_transfer_from` *before* `raw_rand` is ever
+called -- so there is no point in the sequence where the outcome is known
+and either side (player or canister) can still back out. If randomness
+genuinely can't be drawn, the stake is refunded through the same
+pending-payout recovery path a failed win payout uses, rather than stranded.
+
+**Every bet is sized against the game's real, live bankroll**, recomputed
+from the ledger's actual balance on every single bet -- never a cached
+figure. A bet whose potential payout would exceed `maxPayoutBps` (1% at
+launch) of that live bankroll is rejected outright, before any stake moves,
+so the game can never accept a bet it couldn't cover if it lost.
+
+**PIKO-only, by site policy.** The `casino` canister's contract itself
+still understands both PIKO and ICP as bettable tokens, but
+`casino-frontend` -- the only sanctioned way to play -- offers PIKO bets
+exclusively. An ICP bet is also economically inert in practice: the ICP
+bankroll starts, and stays, at zero unless someone deliberately funds it, and
+a zero bankroll means `maxPayoutAllowed` is zero, so any ICP bet is rejected
+as too large before a single e8 moves.
+
+Risk parameters (`maxPayoutBps`, the protected bankroll floor, the
+cycles-funding split) are timelocked and lockable exactly like `mother`'s
+own admin-settable fields -- see &sect;7 for what that means in practice.
+The same hourly-sweep, ICP-profit-to-cycles self-funding pattern as
+`mother` keeps the canister running without manual cycle top-ups.
+
+## 6. Architecture
 
 PIKO has no servers, no database, and no off-chain component of any kind.
-Four canisters, all on the Internet Computer, do the entire job:
+Six canisters, all on the Internet Computer, do the entire job:
 
 - **`ledger`** -- the unmodified, DFINITY-maintained ICRC-1/ICRC-2 ledger
   canister, the same code other ICP tokens run, not a bespoke contract.
@@ -147,12 +191,17 @@ Four canisters, all on the Internet Computer, do the entire job:
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
   in-browser miner (a Web Worker calling `crypto.subtle.digest`) all ship
   from here.
+- **`casino`** -- the PIKO Dice game logic (&sect;5): bet resolution,
+  bankroll accounting, and its own timelocked risk config.
+- **`casino-frontend`** -- a second, separate static asset canister for
+  PIKO Dice, intentionally not folded into `frontend` so mining and betting
+  stay two distinct sites.
 
 If every conventional server DFINITY or anyone else operates vanished
 tomorrow, this system would keep running exactly as it does today --
 nothing about it is hosted in the traditional sense.
 
-## 6. Trust model & security
+## 7. Trust model & security
 
 Every on-chain rule described in this paper -- the supply cap, the burn,
 one winner per block -- is enforced by the code currently installed in
@@ -161,11 +210,12 @@ been tested against concurrent, competing submissions to confirm exactly
 one winner is ever paid per block.
 
 What it cannot yet claim is trustlessness in the strict sense. `mother`,
-`ledger`, `miner`, and `frontend` currently share a single controller. A
-canister controller can install new code at any time, which means the
-guarantees in this paper hold only as long as that controller chooses not
-to change them by replacing the code outright. This is disclosed here
-deliberately rather than left implicit.
+`ledger`, `miner`, `frontend`, `casino`, and `casino-frontend` currently
+share a single controller. A canister controller can install new code at
+any time, which means the guarantees in this paper hold only as long as
+that controller chooses not to change them by replacing the code outright.
+This is disclosed here deliberately rather than left implicit -- it applies
+to `casino`'s bankroll exactly as it applies to `mother`'s supply cap.
 
 **Parameter changes, short of a code upgrade, are timelocked.** The ICP fee
 target (which ledger, which burn account, which CMC) can't change in a
@@ -180,18 +230,20 @@ specific promise from "enforced by a key" into "enforced by code" well
 before the whole canister is blackholed. **Difficulty has no controller
 path at all** -- see &sect;3 -- it retargets itself from on-chain block
 timestamps, so there is nothing to propose, timelock, or lock for it, and
-nothing that freezes once the controller is gone.
+nothing that freezes once the controller is gone. `casino`'s own risk
+parameters (&sect;5) go through the identical
+propose/48h-wait/execute/cancel/lock machinery, independent of `mother`'s.
 
 **What removes the remaining trust requirement:** *blackholing* --
 permanently removing all controllers from a canister -- makes it
 unupgradable by anyone, forever, closing the one door the timelock
-deliberately doesn't cover. The roadmap (&sect;8) covers blackholing
+deliberately doesn't cover. The roadmap (&sect;9) covers blackholing
 `ledger` and `mother` once the mechanism has run long enough, in
 production, without a code change. Until then, PIKO's rules are open-source
 and verifiable, and the parameters within them move on a public delay, but
 the code itself is not yet immutable.
 
-## 7. Risk disclosure
+## 8. Risk disclosure
 
 - PIKO has no liquidity and no listed market at the time of writing. There
   is currently no way to convert PIKO back into ICP or any other asset.
@@ -202,10 +254,14 @@ the code itself is not yet immutable.
 - This document is not investment advice, and PIKO is not a security, a
   share, or a promise of future value. Mine only with ICP you are fully
   prepared to never see again.
+- **PIKO Dice (&sect;5) is a betting game, not an investment.** A losing
+  roll's stake is burned into the bankroll, non-refundable, the same way
+  the mining fee is. With no PIKO market yet, winnings are still just
+  PIKO -- only bet what you're fully fine losing.
 - PIKO is an independent project. It is not affiliated with, endorsed by,
   or connected to bob.fun or BOB.
 
-## 8. Roadmap
+## 9. Roadmap
 
 - **Automatic difficulty retargeting.** Done -- see &sect;3. Removes the
   one remaining reason blackholing `mother` would have permanently frozen a
@@ -235,7 +291,9 @@ the code itself is not yet immutable.
 | `mother` | `45mjf-rqaaa-aaaaj-qsedq-cai` | Coordinator |
 | `ledger` | `56aad-fiaaa-aaaaj-qsefa-cai` | PIKO ICRC-1 ledger |
 | `miner` | `5qcnl-6yaaa-aaaaj-qseea-cai` | Reference miner |
-| `frontend` | `5xdl7-taaaa-aaaaj-qseeq-cai` | Site & dashboard |
+| `frontend` | `5xdl7-taaaa-aaaaj-qseeq-cai` | Mining site & dashboard |
+| `casino` | `7yyso-myaaa-aaaaj-qseia-cai` | PIKO Dice game logic |
+| `casino-frontend` | `77zu2-baaaa-aaaaj-qseiq-cai` | PIKO Dice site |
 | ICP ledger | `ryjl3-tyaaa-aaaaa-aaaba-cai` | Mainnet ICP (external) |
 
 Add the `ledger` principal above to the NNS dapp or any ICRC-1-aware wallet
@@ -243,4 +301,4 @@ to track your PIKO balance outside this site.
 
 ---
 
-*PIKO Protocol Paper v1.0 -- independent, non-affiliated project -- source code published alongside this paper.*
+*PIKO Protocol Paper v1.1 -- independent, non-affiliated project -- source code published alongside this paper.*

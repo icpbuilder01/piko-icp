@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v1.3.0/docs/schemas/canister-yaml-schema.json
+
+name: landing
+
+recipe:
+  # https://github.com/dfinity/icp-cli-recipes/blob/main/recipes/static-site/README.md
+  # A hand-written, single-file HTML/CSS site (no framework, no bindgen --
+  # it never calls a canister, just links out to the ones that do), so
+  # there's nothing to build: `dir` already holds the final assets.
+  type: "@dfinity/static-site@v0.3.3"
+  configuration:
+    build: []
+    dir: public
