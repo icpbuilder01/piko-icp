@@ -110,7 +110,7 @@ function Dashboard() {
 
       <section className="block">
         <h2>
-          <span className="section-icon">⛓️</span>Chain
+          Chain <span className="section-icon">⛓️</span>
         </h2>
         <p className="section-intro">
           Everything on this page comes straight from permissionless query calls to
@@ -189,7 +189,7 @@ function Dashboard() {
       <section className="block">
         <div className="miner-panel-head">
           <h2 className="spark">
-            <span className="section-icon">🧱</span>Recent blocks
+            Recent blocks <span className="section-icon">🧱</span>
           </h2>
           {blocks.length > 0 && (
             <span className="live-pill">

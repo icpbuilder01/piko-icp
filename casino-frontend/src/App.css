@@ -450,7 +450,7 @@ section.block h2.spark {
   display: inline-block;
   color: inherit;
   opacity: 0.8;
-  margin-right: 8px;
+  margin-left: 8px;
 }
 
 .chain-status .stat-value {
