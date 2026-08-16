@@ -97,6 +97,7 @@ function App() {
   const [hashrate, setHashrate] = useState(0);
   const [sessionAttempts, setSessionAttempts] = useState(0);
   const [sessionBlocks, setSessionBlocks] = useState(0);
+  const [totalBlocksWon, setTotalBlocksWon] = useState<bigint | null>(null);
   const [miningMessage, setMiningMessage] = useState<string | null>(null);
   const [lastWinReward, setLastWinReward] = useState<bigint | null>(null);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
@@ -165,6 +166,29 @@ function App() {
       setBalance(null);
     }
   }, [identity, refreshBalance]);
+
+  // Lifetime blocks won across every session, not just this tab's --
+  // getMinerStats() is a plain query keyed by principal (public info, same
+  // as a getLeaderboard() row), so this works the same whether the win
+  // happened just now, in an earlier session, or via the CLI/a canister
+  // miner under the same principal.
+  const refreshMinerStats = useCallback(async (id: Identity) => {
+    try {
+      const stats = await anonymousMother.getMinerStats(id.getPrincipal());
+      setTotalBlocksWon((stats as unknown as LeaderboardEntry).blocksFound);
+    } catch (err) {
+      console.error("Failed to fetch lifetime blocks won", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (identity) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing with mother, not derived state
+      refreshMinerStats(identity);
+    } else {
+      setTotalBlocksWon(null);
+    }
+  }, [identity, refreshMinerStats]);
 
   const refreshIcpBalance = useCallback(async (id: Identity) => {
     try {
@@ -285,6 +309,7 @@ function App() {
         refreshBalance(id);
         refreshIcpBalance(id);
         refreshAllowance(id);
+        refreshMinerStats(id);
       } else {
         const reason = insufficientIcpReason(result.Err);
         if (reason) {
@@ -533,6 +558,12 @@ function App() {
               <div className="stat-tile">
                 <div className="stat-label">Blocks won this session</div>
                 <div className="stat-value">{sessionBlocks}</div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-label">Blocks won in total</div>
+                <div className="stat-value">
+                  {totalBlocksWon !== null ? totalBlocksWon.toString() : "..."}
+                </div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Cost per block</div>

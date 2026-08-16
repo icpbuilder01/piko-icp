@@ -598,6 +598,25 @@ actor self {
     } else { sorted };
   };
 
+  // A single miner's lifetime totals -- getLeaderboard() only ever returns
+  // the top 10 by reward, so anyone outside that isn't in it at all. Takes
+  // the principal as an argument rather than reading `caller` so the
+  // frontend can query it as an anonymous query call (no signing needed,
+  // same as getStats()/getLeaderboard()) for whichever principal is
+  // currently logged in -- this is public information anyway, identical to
+  // what's already exposed per-entry in getLeaderboard().
+  public query func getMinerStats(p : Principal) : async Types.LeaderboardEntry {
+    let blocksFound = switch (Map.get(minerBlocks, Principal.compare, p)) {
+      case (?v) { v };
+      case null { 0 };
+    };
+    let totalReward = switch (Map.get(minerRewards, Principal.compare, p)) {
+      case (?v) { v };
+      case null { 0 };
+    };
+    { miner = p; blocksFound; totalReward };
+  };
+
   public shared ({ caller }) func claimPendingReward<system>() : async Types.SubmitResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
     let owed = switch (Map.get(pendingRewards, Principal.compare, caller)) {
