@@ -985,6 +985,24 @@ actor self {
     totalIcpBurned += amountE8s;
   };
 
+  // Same idea, for totalIcpConvertedToCycles: it started at 0 rather than
+  // backfilled (see its own declaration comment) because there was no
+  // record to reconcile against *at the time it was added*. There is a
+  // verifiable one, though: with mother's real ICP balance sitting at
+  // essentially zero (nothing meaningfully unswept), every e8 previously
+  // collected that isn't accounted for by totalIcpBurned had nowhere else
+  // to go except this leg -- that's not a guess, it's the two other
+  // tracked numbers (both independently verified against real transfers)
+  // plus mother's own current balance leaving no other explanation.
+  // Deliberately additive-only and controller-gated, same as
+  // backfillTotalIcpBurned, for the same reason: moves the counter up to
+  // reflect conversions that already truly happened, never backward, never
+  // fabricated.
+  public shared ({ caller }) func backfillTotalIcpConvertedToCycles(amountE8s : Nat) : async () {
+    requireController(caller);
+    totalIcpConvertedToCycles += amountE8s;
+  };
+
   // Shares mother's own cycles surplus with ledger, frontend, and the
   // reference miner -- none of the three has any way to earn cycles on its
   // own, unlike mother (which self-funds via sweepTreasury above), so all
