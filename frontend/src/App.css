@@ -535,6 +535,12 @@ section.block > *:last-child {
   color: var(--spark);
 }
 
+.stat-value-suffix {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 /* ---- Meter (chunky retro progress bar) ---- */
 
 .meter-track {
