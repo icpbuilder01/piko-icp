@@ -19,6 +19,7 @@ interface Stats {
   lastRetargetAt: bigint;
   totalIcpBurnedE8s: bigint;
   totalIcpFeesCollectedE8s: bigint;
+  totalIcpConvertedToCyclesE8s: bigint;
 }
 
 interface Block {
@@ -163,6 +164,12 @@ function Dashboard() {
               <div className="stat-tile stat-tile-wide">
                 <div className="stat-label">ICP burned, all-time (confirmed, updates every sweep)</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)}</div>
+              </div>
+              <div className="stat-tile stat-tile-wide">
+                <div className="stat-label">ICP converted to cycles, all-time (funds this project, not a bug)</div>
+                <div className="stat-value stat-value-small">
+                  {formatIcp(stats.totalIcpConvertedToCyclesE8s)}
+                </div>
               </div>
             </div>
 

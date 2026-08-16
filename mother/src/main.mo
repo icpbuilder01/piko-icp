@@ -193,6 +193,19 @@ actor self {
   // much have miners spent so far", visible immediately instead of lagging
   // behind by up to a sweep interval.
   var totalIcpFeesCollected : Nat = 0;
+  // Cumulative ICP (e8s) converted to cycles via the CMC, across every
+  // sweepTreasury() call ever made -- incremented only once that leg's
+  // notify_top_up is confirmed #Ok, same "only count what genuinely
+  // happened" rule as totalIcpBurned. Exists specifically so
+  // totalIcpFeesCollectedE8s minus totalIcpBurnedE8s has a visible,
+  // accounted-for answer instead of looking like burned tracking is broken
+  // or lagging -- the gap is real and permanent (cyclesFundRatioBps's
+  // share is never burned, by design), not a bug or a delay. Starts at 0
+  // rather than backfilled like totalIcpBurned was: there's no verified
+  // historical record of past conversions to floor it against, only ever
+  // a guess, and this project's rule for these counters is real transfers
+  // only, never an estimate.
+  var totalIcpConvertedToCycles : Nat = 0;
 
   var recentBlocks : [Types.Block] = [];
   // Persisted, not transient: this is real, specific PIKO owed to specific
@@ -476,6 +489,7 @@ actor self {
       lastRetargetAt;
       totalIcpBurnedE8s = totalIcpBurned;
       totalIcpFeesCollectedE8s = totalIcpFeesCollected;
+      totalIcpConvertedToCyclesE8s = totalIcpConvertedToCycles;
     };
   };
 
@@ -943,7 +957,10 @@ actor self {
             ?(await Cmc.notify_top_up({ block_index = Nat64.fromNat(blockIndex); canister_id = self_ }));
           } catch (_e) { null };
           switch (notifyOutcome) {
-            case (? #Ok(cycles)) { cyclesMinted := ?cycles };
+            case (? #Ok(cycles)) {
+              cyclesMinted := ?cycles;
+              totalIcpConvertedToCycles += cyclesAmount;
+            };
             case (? #Err(e)) { notifyError := ?debug_show (e) };
             case null { notifyError := ?"notify_top_up call failed" };
           };
