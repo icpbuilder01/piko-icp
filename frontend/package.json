@@ -4,10 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "sync-miner-wasm": "cp ../miner/.mops/.build/miner.wasm public/miner.wasm",
-    "predev": "npm run sync-miner-wasm",
     "dev": "vite",
-    "prebuild": "npm run sync-miner-wasm",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
