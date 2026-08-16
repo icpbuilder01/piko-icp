@@ -11,11 +11,11 @@ import { Confetti } from "./components/Confetti";
 import "./App.css";
 
 const POLL_MS = 5000;
-// How many blocks' worth of mining fee to approve at once. Kept small (a
-// couple blocks) now that the fee is a meaningful amount of real ICP --
-// approving 50 blocks' worth at once would mean committing a lot of money
-// in one popup.
-const APPROVE_BLOCKS = 3;
+// Default for the user-editable "how many blocks to approve at once" input
+// (see the approveBlocks state below) -- kept small (a couple blocks) so
+// logging in for the first time doesn't default to committing a lot of real
+// ICP in one popup; the player can raise it themselves for a longer session.
+const APPROVE_BLOCKS_DEFAULT = 3;
 
 interface Stats {
   height: bigint;
@@ -93,6 +93,11 @@ function App() {
 
   const [allowance, setAllowance] = useState<bigint | null>(null);
   const [approving, setApproving] = useState(false);
+  // How many blocks' worth of mining fee to approve at once -- user-editable
+  // (see APPROVE_BLOCKS_DEFAULT) rather than fixed, so a session that keeps
+  // getting interrupted by "insufficient ICP allowance" can approve a bigger
+  // batch instead of clicking Approve every few blocks.
+  const [approveBlocks, setApproveBlocks] = useState(APPROVE_BLOCKS_DEFAULT);
 
   const workerRef = useRef<Worker | null>(null);
   const identityRef = useRef<Identity | null>(null);
@@ -207,7 +212,8 @@ function App() {
     setApproving(true);
     try {
       const icpLedger = getIcpLedgerActor(identity);
-      const amount = work.miningFeeE8s * BigInt(APPROVE_BLOCKS);
+      const blocks = Math.max(1, Math.trunc(approveBlocks) || 1);
+      const amount = work.miningFeeE8s * BigInt(blocks);
       const result = await icpLedger.icrc2_approve({
         spender: { owner: motherPrincipal },
         amount,
@@ -527,11 +533,26 @@ function App() {
             </div>
             <div className="miner-controls">
               {!feeApproved ? (
-                <button className="button" onClick={handleApprove} disabled={approving || !work}>
-                  {approving
-                    ? "Approving..."
-                    : `Approve ${work ? formatIcp(work.miningFeeE8s * BigInt(APPROVE_BLOCKS)) : "..."} ICP to mine`}
-                </button>
+                <div className="approve-row">
+                  <label className="approve-blocks-label">
+                    Approve for
+                    <input
+                      className="input approve-blocks-input"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={approveBlocks}
+                      onChange={(e) => setApproveBlocks(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
+                      disabled={approving}
+                    />
+                    block{approveBlocks === 1 ? "" : "s"}
+                  </label>
+                  <button className="button" onClick={handleApprove} disabled={approving || !work}>
+                    {approving
+                      ? "Approving..."
+                      : `Approve ${work ? formatIcp(work.miningFeeE8s * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP to mine`}
+                  </button>
+                </div>
               ) : mining ? (
                 <button className="button secondary" onClick={handleStopMining}>
                   Stop mining
@@ -567,8 +588,10 @@ function App() {
               <p className="wallet-hint">
                 Hashing itself is free (it's your own CPU) — the{" "}
                 {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee is only charged each
-                time you <em>submit</em> a valid proof, win or lose. This approval covers
-                about {APPROVE_BLOCKS} submissions before you'll need to approve again.
+                time you <em>submit</em> a valid proof, win or lose. Pick how many blocks'
+                worth to approve above -- a longer mining session means more submissions, so a
+                bigger batch means fewer "insufficient ICP allowance" interruptions, at the
+                cost of authorizing more ICP in one popup.
               </p>
             )}
           </>
