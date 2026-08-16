@@ -40,9 +40,14 @@ connected to bob.fun or BOB in any way.**
     candidate nonces locally with the Web Crypto API against the current
     block header. Requires being logged in with Internet Identity (rewards go
     to your principal); stops when you close the tab.
-  - **A dedicated `miner` canister** you deploy and keep topped up with
-    cycles, for continuous/unattended mining -- same hashing, same rewards,
-    driven by a timer instead of your browser tab.
+  - **A dedicated `miner` canister**, for continuous/unattended mining --
+    same hashing, same rewards, driven by a timer instead of your browser
+    tab. No longer a site feature (it was, and got pulled after repeated
+    real-world breakage -- see "Upgrading `mother` or `miner` safely" and
+    the git history for `frontend/src/components/DeployMiner.tsx` if you're
+    curious what it looked like): deploying and running one is now a CLI-only
+    path, `git clone` + `icp deploy miner` + `icp canister call miner start`,
+    see "Run it locally" below.
   - Both search for a nonce such that `sha256(previousHash # height # nonce)`
     has enough leading zero bits to clear the current difficulty.
 - The first to find a valid proof submits it to the **`mother`**
@@ -149,7 +154,7 @@ piko-icp/
     icrc1_ledger_init.args.template  init args template (minting_account is filled in at deploy time)
   mother/                           Motoko -- mining coordinator ("mother node")
   miner/                            Motoko -- reference miner canister (deploy your own copy)
-  frontend/                         React/Vite site -- dashboard, Internet Identity login, miner guide
+  frontend/                         React/Vite site -- dashboard, Internet Identity login, in-browser miner
   scripts/deploy-local.sh           deploys everything to the local network
 ```
 
