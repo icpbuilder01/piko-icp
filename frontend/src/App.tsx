@@ -16,6 +16,18 @@ const POLL_MS = 5000;
 // logging in for the first time doesn't default to committing a lot of real
 // ICP in one popup; the player can raise it themselves for a longer session.
 const APPROVE_BLOCKS_DEFAULT = 3;
+// Every icrc2_transfer_from pull -- which is how mother collects the mining
+// fee -- also deducts the ICP ledger's own transfer fee from the caller's
+// allowance, on top of the amount actually transferred. Approving only
+// `miningFeeE8s * N` therefore falls short of N real submissions by
+// `ICP_LEDGER_FEE_E8S * N`, leaving a remainder just under one block's fee
+// that reads as "allowance left" but can't actually cover another
+// submission. Budgeting the fee into both the approval amount and the
+// "can I submit" check keeps what's displayed honest. Real mainnet ICP
+// ledger fee, fetched live via icrc1_fee -- hardcoded here because it's
+// been fixed at this value for the ledger's entire history and isn't
+// expected to change.
+const ICP_LEDGER_FEE_E8S = 10_000n;
 
 interface Stats {
   height: bigint;
@@ -213,7 +225,7 @@ function App() {
     try {
       const icpLedger = getIcpLedgerActor(identity);
       const blocks = Math.max(1, Math.trunc(approveBlocks) || 1);
-      const amount = work.miningFeeE8s * BigInt(blocks);
+      const amount = (work.miningFeeE8s + ICP_LEDGER_FEE_E8S) * BigInt(blocks);
       const result = await icpLedger.icrc2_approve({
         spender: { owner: motherPrincipal },
         amount,
@@ -381,7 +393,7 @@ function App() {
     ? Number((stats.totalMinted * 10000n) / (stats.maxSupply || 1n)) / 100
     : 0;
 
-  const feeApproved = work ? (allowance ?? 0n) >= work.miningFeeE8s : false;
+  const feeApproved = work ? (allowance ?? 0n) >= work.miningFeeE8s + ICP_LEDGER_FEE_E8S : false;
   // icpBalance is only known once fetched (post-login) -- treat "not loaded
   // yet" as "not insufficient" so the button isn't wrongly blocked while
   // still loading.
@@ -537,8 +549,11 @@ function App() {
                 </div>
                 <div className="stat-value">
                   {allowance !== null ? formatIcp(allowance) : "..."}
-                  {work && allowance !== null && work.miningFeeE8s > 0n && (
-                    <span className="stat-value-suffix"> (~{(allowance / work.miningFeeE8s).toString()} blocks)</span>
+                  {work && allowance !== null && (
+                    <span className="stat-value-suffix">
+                      {" "}
+                      (~{(allowance / (work.miningFeeE8s + ICP_LEDGER_FEE_E8S)).toString()} blocks)
+                    </span>
                   )}
                 </div>
               </div>
@@ -561,7 +576,7 @@ function App() {
                 <button className="button secondary small" onClick={handleApprove} disabled={approving || !work}>
                   {approving
                     ? "Approving..."
-                    : `Approve ${work ? formatIcp(work.miningFeeE8s * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP`}
+                    : `Approve ${work ? formatIcp((work.miningFeeE8s + ICP_LEDGER_FEE_E8S) * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP`}
                 </button>
               </div>
               {mining ? (
@@ -597,11 +612,14 @@ function App() {
             )}
             <p className="wallet-hint">
               Hashing itself is free (it's your own CPU) — the{" "}
-              {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee is only charged each time
-              you <em>submit</em> a valid proof, win or lose. The "ICP allowance" tile above
-              shows exactly how much you have left; pick how many blocks' worth to approve and
-              hit Approve any time, even before it hits zero, to avoid "insufficient ICP
-              allowance" interrupting a mining session.
+              {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee (plus the ICP ledger's own{" "}
+              {formatIcp(ICP_LEDGER_FEE_E8S)} ICP transfer fee) is only charged each time you{" "}
+              <em>submit</em> a valid proof, win or lose. The "ICP allowance" tile above shows
+              exactly how much you have left; pick how many blocks' worth to approve and hit
+              Approve any time, even before it hits zero, to avoid "insufficient ICP allowance"
+              interrupting a mining session. Approving always sets a fresh total rather than
+              adding to what's left, so any small leftover isn't stuck or wasted -- it's simply
+              replaced by whatever you approve next.
             </p>
           </>
         )}
