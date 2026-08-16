@@ -250,13 +250,20 @@ export async function deployMiner(
 // "install".
 export async function updateMinerCode(identity: Identity, canisterId: string): Promise<void> {
   const miner = getMinerActorAt(canisterId, identity);
+  const management = getManagementActorFor(canisterId, identity);
+  const targetPrincipal = Principal.fromText(canisterId);
 
   // Reported live: "canister_pre_upgrade attempted with outstanding message
   // callbacks (try stopping the canister before upgrade)". A mining miner's
   // timer fires every tickIntervalSeconds and each tick awaits an
   // inter-canister call to mother (getWork/submitProof) -- an upgrade that
   // lands while one of those is in flight traps outright, and a mining
-  // miner is *always* at risk of exactly that, every few seconds.
+  // miner is *always* at risk of exactly that, every few seconds. A miner
+  // that had been stuck retrying a failed getWork() every tick (see
+  // miner/src/main.mo's `ticking` guard, added after this exact symptom was
+  // reported) could have *several* such calls genuinely in flight at once,
+  // not just one -- a fixed sleep here previously guessed 5 seconds was
+  // enough to outlast "one already in progress" and, live, it wasn't.
   //
   // Always stop first -- safe and idempotent even if it's already stopped
   // -- rather than checking getStatus().mining first (an earlier version
@@ -268,15 +275,18 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
   // stopped afterward on purpose -- resuming is the separate, explicit
   // Resume action, not something this function should decide on its own.
   await miner.stop();
-  // stop() cancels *future* ticks immediately, but a tick already in-flight
-  // (mid-await on a call to mother) keeps running to completion regardless
-  // -- that's the actual "outstanding callback" the trap above is about.
-  // tickIntervalSeconds defaults to a few seconds; this comfortably
-  // outlasts one already in progress before attempting the upgrade.
-  await new Promise((resolve) => setTimeout(resolve, 5000));
+  // miner.stop() only cancels *future* ticks (an app-level flag) -- it
+  // can't wait out whatever's already in flight, which is exactly what the
+  // trap above needs. management.stop_canister() is the actual fix: an
+  // IC-protocol-level stop that doesn't return until every outstanding
+  // inter-canister call this canister has sent has genuinely resolved, no
+  // matter how many or how long that takes -- no guessed sleep duration
+  // required. Safe to call even if nothing is outstanding (returns
+  // immediately) and even though the canister is about to be stopped again
+  // as a side effect of install_code's own upgrade semantics.
+  await management.stop_canister({ canister_id: targetPrincipal });
 
   const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
-  const management = getManagementActorFor(canisterId, identity);
   await management.install_code({
     // Enhanced orthogonal persistence (this project builds with
     // --default-persistent-actors, see README) makes wasm_memory_persistence
@@ -288,10 +298,17 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
     // (mining status, PIKO/ICP/cycles balances) across the code change --
     // "replace" would wipe it, equivalent to a reinstall.
     mode: { __kind__: "upgrade", upgrade: { wasm_memory_persistence: Variant_keep_replace.keep } },
-    canister_id: Principal.fromText(canisterId),
+    canister_id: targetPrincipal,
     wasm_module: wasmModule,
     arg: new Uint8Array(),
   });
+
+  // A canister the IC considers "Stopped" rejects every call -- including
+  // plain queries like getStatus() -- so this has to bring it back to
+  // "Running" before returning, even though the *app-level* mining flag
+  // (already false from miner.stop() above, and untouched by any of this)
+  // stays exactly as intentionally left: idle until an explicit Resume.
+  await management.start_canister({ canister_id: targetPrincipal });
 }
 
 // Sends more ICP straight to an already-deployed miner canister's own
