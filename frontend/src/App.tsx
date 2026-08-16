@@ -379,6 +379,12 @@ function App() {
     lastPostedWorkKeyRef.current = null;
   }
 
+  function stopMiningInsufficient(reason: string) {
+    handleStopMining();
+    setMiningMessageKind("critical");
+    setMiningMessage(`Mining stopped: ${reason}. Approve more ICP to keep mining.`);
+  }
+
   function handleShare() {
     const text =
       lastWinReward !== null
@@ -434,6 +440,25 @@ function App() {
   // yet" as "not insufficient" so the button isn't wrongly blocked while
   // still loading.
   const insufficientIcpBalance = work && icpBalance !== null ? icpBalance < work.miningFeeE8s : false;
+
+  // Proactively stops mining the moment balance/allowance state syncs as
+  // insufficient, rather than waiting for the *next* submitProof to fail
+  // first (see handleFound's own stop-on-InsufficientAllowance/Funds path,
+  // which stays as a backstop for whatever's already mid-submit when this
+  // fires). Hashing itself never costs ICP either way, so nothing was ever
+  // wasted by the delay -- this is purely about not showing "still mining"
+  // for a few seconds after it's already certain the next submission would
+  // be rejected.
+  useEffect(() => {
+    if (!mining) return;
+    if (insufficientIcpBalance) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the ICP ledger balance syncing as insufficient (an external system), not derived local state
+      stopMiningInsufficient("insufficient ICP balance");
+    } else if (!feeApproved) {
+      stopMiningInsufficient("insufficient ICP allowance");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stopMiningInsufficient closes over stable setters/refs only, intentionally omitted to avoid re-running this effect on every render
+  }, [mining, feeApproved, insufficientIcpBalance]);
 
   return (
     <main className="page">
