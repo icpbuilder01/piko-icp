@@ -18,6 +18,7 @@ interface Stats {
   blocksUntilRetarget: bigint;
   lastRetargetAt: bigint;
   totalIcpBurnedE8s: bigint;
+  totalIcpFeesCollectedE8s: bigint;
 }
 
 interface Block {
@@ -156,7 +157,11 @@ function Dashboard() {
                 <div className="stat-value">{motherCycles !== null ? formatCycles(motherCycles) : "..."}</div>
               </div>
               <div className="stat-tile stat-tile-wide">
-                <div className="stat-label">ICP burned, all-time</div>
+                <div className="stat-label">ICP spent mining, all-time (real-time)</div>
+                <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpFeesCollectedE8s)}</div>
+              </div>
+              <div className="stat-tile stat-tile-wide">
+                <div className="stat-label">ICP burned, all-time (confirmed, updates every sweep)</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)}</div>
               </div>
             </div>

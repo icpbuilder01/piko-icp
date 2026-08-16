@@ -39,6 +39,7 @@ interface Stats {
   miningFeeE8s: bigint;
   icpLedgerId: { toText(): string };
   totalIcpBurnedE8s: bigint;
+  totalIcpFeesCollectedE8s: bigint;
 }
 
 interface Block {
@@ -739,7 +740,13 @@ function App() {
                 </div>
               </div>
               <div className="stat-tile stat-tile-wide">
-                <div className="stat-label">ICP burned</div>
+                <div className="stat-label">ICP spent mining (real-time)</div>
+                <div className="stat-value stat-value-small">
+                  {formatIcp(stats.totalIcpFeesCollectedE8s)} ICP
+                </div>
+              </div>
+              <div className="stat-tile stat-tile-wide">
+                <div className="stat-label">ICP burned (confirmed, updates every sweep)</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
               </div>
             </div>

@@ -100,13 +100,32 @@ actor self {
   // not PIKO's own ledger fee (set separately in icrc1_ledger_init.args) --
   // the two happen to share the same value today, but are unrelated.
   let ICP_LEDGER_FEE_E8S : Nat = 10_000;
+  // Dead field, kept on purpose (see "Upgrading mother or miner safely" in
+  // the README -- same reason MIN_DIFFICULTY_BITS below has a matching
+  // _LIVE sibling): a plain top-level `let`'s *value* is implicitly stable
+  // under this project's --default-persistent-actors setting, so editing
+  // this literal alone would never actually change the running interval on
+  // an already-upgraded canister. SWEEP_INTERVAL_SECONDS_LIVE is the real,
+  // effective one.
+  let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h
   // How often sweepTreasury() runs automatically (see armSweepTimer below).
   // Keeps the ICP balance sitting in this canister's own account -- the
   // "treasury" between fee collection and the actual burn/cycles-conversion
   // -- small at any given moment, rather than depending on a keeper/cron to
   // remember to call sweepTreasury() manually. Manual calls still work too
   // (e.g. to sweep immediately rather than waiting for the next tick).
-  let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h
+  // Lowered from 1h to 15 minutes: with real mining volume (potentially
+  // thousands of miners), leaving a full hour of accumulated, not-yet-burned
+  // fees sitting in this canister's own balance is a bigger single point of
+  // exposure than it needs to be, and the public "ICP burned" counter
+  // (getStats().totalIcpBurnedE8s) only ever advances when a sweep actually
+  // runs -- a shorter interval means it reflects real burns sooner. Still
+  // guarded by sweepTreasury()'s own balance <= feesNeeded check, so a
+  // sweep that would net nothing (too little accumulated to clear the ICP
+  // ledger's own transfer fees) is skipped rather than firing needlessly
+  // every 15 minutes regardless of volume. transient, not plain `let`, for
+  // the same reason as MIN_DIFFICULTY_BITS_LIVE below.
+  transient let SWEEP_INTERVAL_SECONDS_LIVE : Nat = 900; // 15 minutes
   transient var sweepTimerId : ?Timer.TimerId = null;
 
   // Never share cycles below this floor -- mother keeps whatever it needs
@@ -163,6 +182,17 @@ actor self {
   // public answer to "how much real ICP has mining PIKO destroyed so
   // far" -- see getStats().
   var totalIcpBurned : Nat = 0;
+  // Cumulative ICP (e8s) collected as mining fees, full stop -- incremented
+  // the instant each submitProof()'s icrc2_transfer_from succeeds, whether
+  // that submission goes on to win or lose, and well before the next
+  // sweepTreasury() actually burns it (sweeps now run at most every
+  // SWEEP_INTERVAL_SECONDS_LIVE, not per block -- see its own comment).
+  // totalIcpBurned only advances once ICP has genuinely left this canister
+  // for the burn address, which stays the honest answer to "how much has
+  // really been destroyed so far"; this field is the honest answer to "how
+  // much have miners spent so far", visible immediately instead of lagging
+  // behind by up to a sweep interval.
+  var totalIcpFeesCollected : Nat = 0;
 
   var recentBlocks : [Types.Block] = [];
   // Persisted, not transient: this is real, specific PIKO owed to specific
@@ -445,6 +475,7 @@ actor self {
       blocksUntilRetarget = retargetAnchorHeight + RETARGET_INTERVAL_BLOCKS - height;
       lastRetargetAt;
       totalIcpBurnedE8s = totalIcpBurned;
+      totalIcpFeesCollectedE8s = totalIcpFeesCollected;
     };
   };
 
@@ -539,7 +570,7 @@ actor self {
       } catch (_e) { null };
 
       switch (feeOutcome) {
-        case (? #Ok(_)) {};
+        case (? #Ok(_)) { totalIcpFeesCollected += miningFeeE8s };
         case (? #Err(e)) { return #Err(#IcpFeeFailed(e)) };
         case null {
           return #Err(#IcpFeeFailed(#TemporarilyUnavailable));
@@ -988,7 +1019,7 @@ actor self {
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
   // on an external keeper/cron remembering to call them: the ICP balance
   // sitting in this canister's own account never grows past roughly
-  // SWEEP_INTERVAL_SECONDS worth of fees, and any cycles surplus gets
+  // SWEEP_INTERVAL_SECONDS_LIVE worth of fees, and any cycles surplus gets
   // shared with frontend/miner on the same cadence. Errors inside either
   // are already swallowed internally (each leg just retries next time), so
   // nothing further to handle here.
@@ -998,7 +1029,7 @@ actor self {
       case null {};
     };
     sweepTimerId := ?Timer.recurringTimer<system>(
-      #seconds SWEEP_INTERVAL_SECONDS,
+      #seconds SWEEP_INTERVAL_SECONDS_LIVE,
       func() : async () {
         ignore (await sweepTreasury());
         ignore (await topUpProject());
@@ -1040,6 +1071,19 @@ actor self {
     // here on (maybeRetarget's own clamp keeps it there).
     if (difficultyBits < MIN_DIFFICULTY_BITS_LIVE) {
       difficultyBits := MIN_DIFFICULTY_BITS_LIVE;
+    };
+
+    // One-time floor for this specific upgrade: totalIcpFeesCollected is a
+    // brand new field, starting at its declared 0, but real fees were
+    // already collected (and some already burned) before it existed to
+    // count them. It can never be honestly reconstructed to the exact e8s
+    // -- the fee itself changed value more than once over that history, see
+    // setMiningFeeE8s's call sites -- but it must never display as *less*
+    // than totalIcpBurned, which is already a proven lower bound on it
+    // (fees are always collected before they're burned). This is a no-op
+    // once real post-upgrade activity has pushed it past that floor anyway.
+    if (totalIcpFeesCollected < totalIcpBurned) {
+      totalIcpFeesCollected := totalIcpBurned;
     };
   };
 
