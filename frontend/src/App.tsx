@@ -530,30 +530,41 @@ function App() {
                   {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
                 </div>
               </div>
+              <div className="stat-tile">
+                <div className="stat-label token-label">
+                  <img src="/icp-logo.svg" alt="" className="token-icon" />
+                  ICP allowance
+                </div>
+                <div className="stat-value">
+                  {allowance !== null ? formatIcp(allowance) : "..."}
+                  {work && allowance !== null && work.miningFeeE8s > 0n && (
+                    <span className="stat-value-suffix"> (~{(allowance / work.miningFeeE8s).toString()} blocks)</span>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="miner-controls">
-              {!feeApproved ? (
-                <div className="approve-row">
-                  <label className="approve-blocks-label">
-                    Approve for
-                    <input
-                      className="input approve-blocks-input"
-                      type="number"
-                      min={1}
-                      step={1}
-                      value={approveBlocks}
-                      onChange={(e) => setApproveBlocks(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
-                      disabled={approving}
-                    />
-                    block{approveBlocks === 1 ? "" : "s"}
-                  </label>
-                  <button className="button" onClick={handleApprove} disabled={approving || !work}>
-                    {approving
-                      ? "Approving..."
-                      : `Approve ${work ? formatIcp(work.miningFeeE8s * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP to mine`}
-                  </button>
-                </div>
-              ) : mining ? (
+              <div className="approve-row">
+                <label className="approve-blocks-label">
+                  {feeApproved ? "Approve more:" : "Approve for"}
+                  <input
+                    className="input approve-blocks-input"
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={approveBlocks}
+                    onChange={(e) => setApproveBlocks(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
+                    disabled={approving}
+                  />
+                  block{approveBlocks === 1 ? "" : "s"}
+                </label>
+                <button className="button secondary small" onClick={handleApprove} disabled={approving || !work}>
+                  {approving
+                    ? "Approving..."
+                    : `Approve ${work ? formatIcp(work.miningFeeE8s * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP`}
+                </button>
+              </div>
+              {mining ? (
                 <button className="button secondary" onClick={handleStopMining}>
                   Stop mining
                 </button>
@@ -561,7 +572,7 @@ function App() {
                 <button
                   className="button button-cta"
                   onClick={handleStartMining}
-                  disabled={!work || insufficientIcpBalance}
+                  disabled={!work || insufficientIcpBalance || !feeApproved}
                 >
                   Start mining
                 </button>
@@ -584,16 +595,14 @@ function App() {
                 wallet to start mining.
               </p>
             )}
-            {!feeApproved && (
-              <p className="wallet-hint">
-                Hashing itself is free (it's your own CPU) — the{" "}
-                {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee is only charged each
-                time you <em>submit</em> a valid proof, win or lose. Pick how many blocks'
-                worth to approve above -- a longer mining session means more submissions, so a
-                bigger batch means fewer "insufficient ICP allowance" interruptions, at the
-                cost of authorizing more ICP in one popup.
-              </p>
-            )}
+            <p className="wallet-hint">
+              Hashing itself is free (it's your own CPU) — the{" "}
+              {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee is only charged each time
+              you <em>submit</em> a valid proof, win or lose. The "ICP allowance" tile above
+              shows exactly how much you have left; pick how many blocks' worth to approve and
+              hit Approve any time, even before it hits zero, to avoid "insufficient ICP
+              allowance" interrupting a mining session.
+            </p>
           </>
         )}
       </section>
