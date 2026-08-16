@@ -15,28 +15,10 @@ export default defineConfig(({ command }) => {
       outDir: "./src/bindings/ledger",
     }),
     icpBindgen({
-      // The reference miner's own interface -- used by DeployMiner.tsx to
-      // call approveIcpFee()/start() on a freshly deployed instance.
-      didFile: "../miner/miner.did",
-      outDir: "./src/bindings/miner",
-    }),
-    icpBindgen({
       // Hand-written subset of the real mainnet ICP ledger's interface --
       // it's not a canister this project builds/deploys, see idl/icp_ledger.did.
       didFile: "./idl/icp_ledger.did",
       outDir: "./src/bindings/icp_ledger",
-    }),
-    icpBindgen({
-      // Hand-written subset of the real Cycles Minting Canister's interface
-      // -- see idl/cmc.did. Used by DeployMiner.tsx.
-      didFile: "./idl/cmc.did",
-      outDir: "./src/bindings/cmc",
-    }),
-    icpBindgen({
-      // Hand-written subset of the IC management canister's interface --
-      // see idl/management.did. Used by DeployMiner.tsx.
-      didFile: "./idl/management.did",
-      outDir: "./src/bindings/management",
     }),
   ];
 
