@@ -40,6 +40,7 @@ interface Stats {
   icpLedgerId: { toText(): string };
   totalIcpBurnedE8s: bigint;
   totalIcpFeesCollectedE8s: bigint;
+  totalIcpConvertedToCyclesE8s: bigint;
 }
 
 interface Block {
@@ -748,6 +749,12 @@ function App() {
               <div className="stat-tile stat-tile-wide">
                 <div className="stat-label">ICP burned (confirmed, updates every sweep)</div>
                 <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
+              </div>
+              <div className="stat-tile stat-tile-wide">
+                <div className="stat-label">ICP converted to cycles (funds this project, not a bug)</div>
+                <div className="stat-value stat-value-small">
+                  {formatIcp(stats.totalIcpConvertedToCyclesE8s)} ICP
+                </div>
               </div>
             </div>
             <div className="meter">

@@ -189,5 +189,11 @@ module {
     /// this is a separate field from totalIcpBurnedE8s, not a replacement
     /// for it.
     totalIcpFeesCollectedE8s : Nat;
+    /// Cumulative ICP (e8s) converted to cycles via the CMC across every
+    /// sweepTreasury() call ever made -- see totalIcpConvertedToCycles in
+    /// main.mo. Explains the gap between totalIcpFeesCollectedE8s and
+    /// totalIcpBurnedE8s: it's cyclesFundRatioBps's permanent share, not a
+    /// bug or a pending sweep.
+    totalIcpConvertedToCyclesE8s : Nat;
   };
 }
