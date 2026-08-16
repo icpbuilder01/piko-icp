@@ -968,36 +968,43 @@ actor self {
     totalIcpBurned += amountE8s;
   };
 
-  // Shares mother's own cycles surplus with frontend and the reference
-  // miner -- neither has any way to earn cycles on its own, unlike mother
-  // (which self-funds via sweepTreasury above), so both have depended
-  // entirely on manual `icp canister top-up` since launch. mother is the
-  // one canister whose running costs scale with mining activity in the
-  // first place (via the cyclesFundRatioBps share of every fee), so
-  // routing part of that back out to the two canisters that make mining
-  // possible in the first place -- the site people mine from, and the
-  // reference miner people can inspect -- closes the loop project-wide
-  // instead of just for mother.
+  // Shares mother's own cycles surplus with ledger, frontend, and the
+  // reference miner -- none of the three has any way to earn cycles on its
+  // own, unlike mother (which self-funds via sweepTreasury above), so all
+  // three had depended entirely on manual `icp canister top-up` since
+  // launch. mother is the one canister whose running costs scale with
+  // mining activity in the first place (via the cyclesFundRatioBps share
+  // of every fee), so routing part of that back out to the three canisters
+  // that make mining possible in the first place -- the ledger PIKO itself
+  // lives on, the site people mine from, and the reference miner people can
+  // inspect -- closes the loop project-wide instead of just for mother.
+  // Without this, ledger in particular would eventually run dry with no
+  // automatic path back to solvency at all, which is exactly the kind of
+  // silent single point of failure a genuinely autonomous, no-team-required
+  // system (the whole point of eventually blackholing mother/ledger) can't
+  // afford to depend on someone remembering to top up by hand.
   //
   // Deliberately simple: keeps CYCLES_RESERVE for itself, splits whatever
-  // is left 50/50 between the two (skipping either that isn't configured,
-  // e.g. a deployment that never set PUBLIC_CANISTER_ID:frontend). No
-  // state kept here either, for the same reason sweepTreasury keeps none:
-  // it just re-reads Cycles.balance() fresh every call.
-  public shared func topUpProject() : async { toFrontend : Nat; toMiner : Nat } {
+  // is left evenly three ways (skipping any that isn't configured, e.g. a
+  // deployment that never set PUBLIC_CANISTER_ID:frontend -- ledgerId
+  // itself is always present, see its own declaration, so it's never
+  // skipped). No state kept here either, for the same reason sweepTreasury
+  // keeps none: it just re-reads Cycles.balance() fresh every call.
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat } {
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toFrontend = 0; toMiner = 0 } };
+    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [frontendId, referenceMinerId],
+      [?ledgerId, frontendId, referenceMinerId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toFrontend = 0; toMiner = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0 } };
 
     let surplus = balance - CYCLES_RESERVE;
     let share = surplus / targets.size();
     let Management : Types.ManagementActor = actor (Principal.toText(Principal.fromText("aaaaa-aa")));
 
+    var sentToLedger = 0;
     var sentToFrontend = 0;
     var sentToMiner = 0;
     for (target in targets.vals()) {
@@ -1007,13 +1014,14 @@ actor self {
       } catch (_e) { null };
       switch (_outcome) {
         case (?()) {
+          if (target == ledgerId) { sentToLedger += share };
           if (?target == frontendId) { sentToFrontend += share };
           if (?target == referenceMinerId) { sentToMiner += share };
         };
         case null {};
       };
     };
-    { toFrontend = sentToFrontend; toMiner = sentToMiner };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
