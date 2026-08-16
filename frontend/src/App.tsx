@@ -99,6 +99,11 @@ function App() {
   const [sessionBlocks, setSessionBlocks] = useState(0);
   const [totalBlocksWon, setTotalBlocksWon] = useState<bigint | null>(null);
   const [miningMessage, setMiningMessage] = useState<string | null>(null);
+  // "critical" for the two stop conditions (out of ICP / allowance
+  // exhausted) -- easy to miss as plain muted text right after a run of
+  // wins, and unlike a plain "not accepted" or transient-retry message,
+  // mining has actually stopped at this point and needs the player to act.
+  const [miningMessageKind, setMiningMessageKind] = useState<"good" | "critical" | null>(null);
   const [lastWinReward, setLastWinReward] = useState<bigint | null>(null);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [copiedLedger, setCopiedLedger] = useState(false);
@@ -256,10 +261,12 @@ function App() {
       if ("Ok" in (result as object)) {
         refreshAllowance(identity);
       } else {
+        setMiningMessageKind("critical");
         setMiningMessage(`Approval failed: ${JSON.stringify((result as { Err: unknown }).Err)}`);
       }
     } catch (err) {
       console.error("ICP approval failed", err);
+      setMiningMessageKind("critical");
       setMiningMessage("Approval failed.");
     } finally {
       setApproving(false);
@@ -303,6 +310,7 @@ function App() {
       if ("Ok" in result) {
         setSessionBlocks((n) => n + 1);
         setLastWinReward(result.Ok.reward);
+        setMiningMessageKind("good");
         setMiningMessage(`Block #${result.Ok.height} won — +${formatPiko(result.Ok.reward)} PIKO 🎉`);
         setConfettiTrigger((n) => n + 1);
         refreshDashboard();
@@ -315,13 +323,16 @@ function App() {
         if (reason) {
           handleStopMining();
           refreshIcpBalance(id);
+          setMiningMessageKind("critical");
           setMiningMessage(`Mining stopped: ${reason}. Approve more ICP to keep mining.`);
           return;
         }
+        setMiningMessageKind(null);
         setMiningMessage(`Not accepted: ${JSON.stringify(result.Err)}`);
       }
     } catch (err) {
       console.error("submitProof failed", err);
+      setMiningMessageKind(null);
       setMiningMessage("Submission failed, still mining...");
     }
     if (miningRef.current) {
@@ -354,6 +365,7 @@ function App() {
     setSessionAttempts(0);
     setSessionBlocks(0);
     setMiningMessage(null);
+    setMiningMessageKind(null);
   }
 
   function handleStopMining() {
@@ -624,7 +636,7 @@ function App() {
               )}
               {miningMessage && (
                 <div className="mining-message-row">
-                  <span className="mining-message">{miningMessage}</span>
+                  <span className={`mining-message ${miningMessageKind ?? ""}`}>{miningMessage}</span>
                   {lastWinReward !== null && (
                     <button className="button secondary small" onClick={handleShare}>
                       Share the win
