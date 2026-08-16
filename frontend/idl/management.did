@@ -1,8 +1,14 @@
 // Minimal, hand-written subset of the IC management canister's interface
 // (aaaaa-aa, a protocol-level canister on every subnet, not something this
-// project deploys), covering only install_code -- used by DeployMiner.tsx
-// to install the miner wasm onto a freshly created canister. Part of the
-// stable IC interface spec: https://internetcomputer.org/docs/references/ic-interface-spec.
+// project deploys). install_code is used by DeployMiner.tsx to install the
+// miner wasm onto a freshly created canister. stop_canister/start_canister
+// are used by updateMinerCode() (see its own comment): unlike the miner
+// actor's own stop() method, stop_canister actually blocks, at the IC
+// protocol level, until every outstanding inter-canister call the canister
+// has in flight has genuinely drained -- which is what install_code's own
+// "outstanding message callbacks" trap requires before an upgrade can
+// succeed. Part of the stable IC interface spec:
+// https://internetcomputer.org/docs/references/ic-interface-spec.
 
 type canister_install_mode = variant {
   install;
@@ -19,4 +25,6 @@ type install_code_args = record {
 
 service : {
   install_code : (install_code_args) -> ();
+  stop_canister : (record { canister_id : principal }) -> ();
+  start_canister : (record { canister_id : principal }) -> ();
 }
