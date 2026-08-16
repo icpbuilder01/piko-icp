@@ -53,6 +53,8 @@ actor self {
   var feeCyclesPerSubmit : Nat = 1_000_000_000;
 
   transient var timerId : ?Timer.TimerId = null;
+  // Reentrancy guard for tick() -- see its own comment for why this matters.
+  transient var ticking : Bool = false;
 
   // ---- Hashing (must stay byte-for-byte identical to mother/src/main.mo) ----
 
@@ -111,6 +113,22 @@ actor self {
 
   func tick<system>() : async () {
     if (not mining) { return };
+    // A tick that's still awaiting getWork()/submitProof() below can still
+    // be in flight when the *next* recurring-timer firing calls tick()
+    // again -- Timer.recurringTimer doesn't wait for the previous call to
+    // finish, and async functions are reentrant by default in Motoko, so
+    // nothing stops that on its own. Once real-world round-trip time to
+    // `mother` (consensus + network) exceeds tickIntervalSeconds even
+    // occasionally, overlapping ticks compound: each one queues its own
+    // outbound call, the canister's outstanding-call queue saturates, and
+    // *every* getWork() attempt starts failing immediately (a synchronous
+    // reject, indistinguishable from a real failure once caught below) --
+    // a self-inflicted traffic jam that never clears on its own, since a
+    // getWork() failure doesn't stop mining or cancel the timer. Skipping
+    // any tick that finds one already in flight is what actually prevents
+    // the pile-up, rather than just reacting to it after the fact.
+    if (ticking) { return };
+    ticking := true;
 
     // Recomputed from the current feeCyclesPerSubmit on every tick (rather
     // than a fixed constant) so the safety margin stays correct even after
@@ -122,13 +140,14 @@ actor self {
       mining := false;
       cancelTimer();
       lastError := ?"stopped: cycle balance too low, call deposit() then start() again";
+      ticking := false;
       return;
     };
 
     let work = try { ?(await Mother.getWork()) } catch (_e) { null };
     let w = switch (work) {
       case (?w) { w };
-      case null { lastError := ?"getWork() call failed"; return };
+      case null { lastError := ?"getWork() call failed"; ticking := false; return };
     };
 
     let header = headerBytes(w.previousHash, w.height);
@@ -178,6 +197,7 @@ actor self {
         };
       };
     };
+    ticking := false;
   };
 
   func cancelTimer() {
