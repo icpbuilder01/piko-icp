@@ -864,19 +864,6 @@ section.block .miner-panel-head h2 {
   font-weight: 600;
 }
 
-/* ---- Dice teaser (the game itself lives on its own site, casino-frontend/) ---- */
-
-.dice-teaser .button-cta {
-  margin-top: 6px;
-  display: inline-block;
-  text-decoration: none;
-}
-
-.blocks td.good {
-  color: var(--good);
-  font-weight: 700;
-}
-
 /* ---- Table ---- */
 
 table.blocks {
@@ -1208,10 +1195,3 @@ p.pull-quote {
   color: var(--accent-strong);
 }
 
-.footer-link-dice {
-  color: var(--spark);
-}
-
-.footer-link-dice:hover {
-  color: color-mix(in srgb, var(--spark) 80%, black);
-}
