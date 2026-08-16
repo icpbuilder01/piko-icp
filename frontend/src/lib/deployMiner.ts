@@ -286,29 +286,41 @@ export async function updateMinerCode(identity: Identity, canisterId: string): P
   // as a side effect of install_code's own upgrade semantics.
   await management.stop_canister({ canister_id: targetPrincipal });
 
-  const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
-  await management.install_code({
-    // Enhanced orthogonal persistence (this project builds with
-    // --default-persistent-actors, see README) makes wasm_memory_persistence
-    // a *required* choice on upgrade, not merely optional the way it reads
-    // in the candid interface -- omitting it entirely gets rejected outright
-    // ("Missing upgrade option"), found by actually clicking this button
-    // rather than trusting it type-checked. "keep" is what an upgrade is
-    // supposed to mean here: preserve the canister's persisted state
-    // (mining status, PIKO/ICP/cycles balances) across the code change --
-    // "replace" would wipe it, equivalent to a reinstall.
-    mode: { __kind__: "upgrade", upgrade: { wasm_memory_persistence: Variant_keep_replace.keep } },
-    canister_id: targetPrincipal,
-    wasm_module: wasmModule,
-    arg: new Uint8Array(),
-  });
-
-  // A canister the IC considers "Stopped" rejects every call -- including
-  // plain queries like getStatus() -- so this has to bring it back to
-  // "Running" before returning, even though the *app-level* mining flag
-  // (already false from miner.stop() above, and untouched by any of this)
-  // stays exactly as intentionally left: idle until an explicit Resume.
-  await management.start_canister({ canister_id: targetPrincipal });
+  // Everything from here on runs inside try/finally: if install_code throws
+  // (out of cycles, a bad wasm, anything) without this, the function would
+  // exit having stopped the canister at the IC level but never having
+  // restarted it -- leaving it rejecting *every* call afterward, including
+  // plain queries like getStatus(), with no way back except this same
+  // button (which needs a getStatus()-free path to even attempt again, see
+  // the "always stop first" comment above) or the owner's own dfx/icp CLI
+  // access. start_canister() runs whether install_code succeeded or not, so
+  // a failed update leaves the miner merely un-upgraded, not bricked.
+  try {
+    const wasmModule = new Uint8Array(await (await fetch("/miner.wasm")).arrayBuffer());
+    await management.install_code({
+      // Enhanced orthogonal persistence (this project builds with
+      // --default-persistent-actors, see README) makes wasm_memory_persistence
+      // a *required* choice on upgrade, not merely optional the way it reads
+      // in the candid interface -- omitting it entirely gets rejected outright
+      // ("Missing upgrade option"), found by actually clicking this button
+      // rather than trusting it type-checked. "keep" is what an upgrade is
+      // supposed to mean here: preserve the canister's persisted state
+      // (mining status, PIKO/ICP/cycles balances) across the code change --
+      // "replace" would wipe it, equivalent to a reinstall.
+      mode: { __kind__: "upgrade", upgrade: { wasm_memory_persistence: Variant_keep_replace.keep } },
+      canister_id: targetPrincipal,
+      wasm_module: wasmModule,
+      arg: new Uint8Array(),
+    });
+  } finally {
+    // A canister the IC considers "Stopped" rejects every call -- including
+    // plain queries like getStatus() -- so this has to bring it back to
+    // "Running" no matter what happened above, even though the *app-level*
+    // mining flag (already false from miner.stop() above, and untouched by
+    // any of this) stays exactly as intentionally left: idle until an
+    // explicit Resume.
+    await management.start_canister({ canister_id: targetPrincipal });
+  }
 }
 
 // Sends more ICP straight to an already-deployed miner canister's own
