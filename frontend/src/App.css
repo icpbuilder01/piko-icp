@@ -674,6 +674,17 @@ section.block .miner-panel-head h2 {
   font-size: 0.84rem;
 }
 
+.mining-message.good {
+  color: var(--good);
+  font-weight: 700;
+}
+
+.mining-message.critical {
+  color: var(--critical);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
 /* ---- Confetti + win flash ---- */
 
 .win-flash {
