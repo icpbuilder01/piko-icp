@@ -70,6 +70,7 @@ type Stats =
    retargetIntervalBlocks: nat;
    targetBlockTimeNanos: nat;
    totalIcpBurnedE8s: nat;
+   totalIcpFeesCollectedE8s: nat;
    totalMinted: nat;
  };
 type PendingNatChange = 
