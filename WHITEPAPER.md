@@ -193,7 +193,10 @@ Six canisters, all on the Internet Computer, do the entire job:
   independently re-verifies every submitted proof, burns the fee, and mints
   the reward.
 - **`miner`** -- an optional, self-owned canister for continuous mining on a
-  timer, for anyone who doesn't want to keep a browser tab open.
+  timer, for anyone who doesn't want to keep a browser tab open. CLI-only:
+  deploying and running one is `git clone` + `icp deploy` + a few
+  `icp canister call` commands (see the README), not something the mining
+  site itself walks you through.
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
   in-browser miner (a Web Worker calling `crypto.subtle.digest`) all ship
   from here.
