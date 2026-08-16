@@ -184,5 +184,10 @@ module {
     /// Cumulative ICP (e8s) actually burned to icpBurnOwner across every
     /// sweepTreasury() call ever made -- see totalIcpBurned in main.mo.
     totalIcpBurnedE8s : Nat;
+    /// Cumulative ICP (e8s) collected as mining fees, updated the instant
+    /// each one is pulled -- see totalIcpFeesCollected in main.mo for why
+    /// this is a separate field from totalIcpBurnedE8s, not a replacement
+    /// for it.
+    totalIcpFeesCollectedE8s : Nat;
   };
 }
