@@ -108,6 +108,7 @@ type Block =
  };
 service : {
   backfillTotalIcpBurned: (amountE8s: nat) -> ();
+  backfillTotalIcpConvertedToCycles: (amountE8s: nat) -> ();
   cancelPendingCyclesFundRatio: () -> ();
   cancelPendingIcpFeeTarget: () -> ();
   claimPendingReward: () -> (SubmitResult);
