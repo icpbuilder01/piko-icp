@@ -62,9 +62,7 @@ export default defineConfig(({ command }) => {
   // Local dev server: look up the local network's root key and the
   // canister ids for both canisters the frontend talks to directly.
   const environment = process.env.ICP_ENVIRONMENT || "local";
-  // "casino-frontend" purely so canister-env.ts can build a link to the
-  // (separately hosted) dice site.
-  const CANISTER_NAMES = ["mother", "ledger", "casino-frontend"];
+  const CANISTER_NAMES = ["mother", "ledger"];
 
   const networkStatus = JSON.parse(
     execSync(`icp network status -e ${environment} --json`, { encoding: "utf-8" })
