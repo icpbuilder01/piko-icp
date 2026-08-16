@@ -81,7 +81,7 @@ the same height is accepted.
 | Initial block reward | 600 PIKO |
 | Halving interval | 17,500 blocks |
 | Premine | 0 |
-| Mining fee (burned per submission) | 0.05 ICP (adjustable; kept low during the adoption phase) |
+| Mining fee (burned per submission) | 0.25 ICP (adjustable via `setMiningFeeE8s`; check `getStats()` for the live value) |
 | Anti-spam cooldown | 0.3s / principal |
 | Difficulty target | 18 bits (starting point and floor; retargets automatically) |
 | Retarget interval | 10 blocks |

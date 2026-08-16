@@ -89,7 +89,7 @@ This mirrors the design the project was inspired by, with a few explicit
   either stall the chain or blow through the supply cap in days if real
   participation ended up far from the initial guess.
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
-  `miningFeeE8s` (**0.15 ICP** as of the public launch -- started at 0.05 ICP
+  `miningFeeE8s` (**0.25 ICP**, raised from 0.15 ICP -- started at 0.05 ICP
   during early solo testing, admin-adjustable via `setMiningFeeE8s`; check
   `getStats()` for the live value rather than trusting this number to stay
   current, see "Read this before mining" below) from
@@ -125,7 +125,7 @@ This mirrors the design the project was inspired by, with a few explicit
     nothing -- there is exactly one winner per block, never more (`mother`
     re-checks the chain height right after the fee pull, before ever
     minting, so a losing submission can never mutate state or double-pay).
-  - **Read this before mining**: even at 0.15 ICP/block (check `getStats()`
+  - **Read this before mining**: even at 0.25 ICP/block (check `getStats()`
     for the current live value)
     with no PIKO market yet, mining is a real-money cost for a token with no
     established, liquid value, and you can lose that cost even with a
