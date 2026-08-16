@@ -255,6 +255,13 @@ actor self {
   public shared ({ caller }) func stop() : async () {
     requireOwner(caller);
     mining := false;
+    // A manual stop is never itself an error, but tick()'s own transient
+    // failures (e.g. "getWork() call failed") never clear lastError on
+    // their own -- they just leave it for the next tick to overwrite once
+    // mining succeeds again. If a stop() lands while one of those is the
+    // last-reported error, leaving it in place would make a canister that's
+    // now genuinely idle look like it's still actively retrying.
+    lastError := null;
     cancelTimer();
   };
 

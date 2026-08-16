@@ -26,7 +26,17 @@ const PIKO_LEDGER_FEE = 10_000n; // matches ledger/icrc1_ledger_init.args -- sam
 // allowance exhausted); anything else is shown as the canister reported it,
 // since an unrecognized message is exactly when the raw detail matters
 // most.
-function friendlyMinerError(raw: string): { text: string; expected: boolean } {
+//
+// `mining` matters for the getWork() case specifically: tick()'s own
+// getWork() failure (miner/src/main.mo) never stops mining by itself --
+// lastError is set and the recurring timer just tries again next tick, so
+// "still mining, retries automatically" is accurate *while status.mining is
+// true*. But lastError is never cleared by stop(), so the exact same text
+// lingers after a Pause (or any other stop() call) that happened to land
+// while this was the last-reported error -- at which point nothing is
+// retrying anymore, and claiming otherwise just leaves the miner looking
+// like it's working when it's actually sitting idle.
+function friendlyMinerError(raw: string, mining: boolean): { text: string; expected: boolean } {
   if (raw.includes("ICP allowance for mother exhausted")) {
     return {
       text: 'Paused: it ran out of approved ICP for mining fees. Click "Approve + start" below to resume.',
@@ -40,10 +50,15 @@ function friendlyMinerError(raw: string): { text: string; expected: boolean } {
     };
   }
   if (raw.includes("getWork() call failed")) {
-    return {
-      text: "Missed one call to the coordinator canister -- still mining, retries automatically every few seconds. Not a site error.",
-      expected: true,
-    };
+    return mining
+      ? {
+          text: "Missed one call to the coordinator canister -- still mining, retries automatically every few seconds. Not a site error.",
+          expected: true,
+        }
+      : {
+          text: 'Stopped after a missed call to the coordinator canister -- click "Resume" below to try again.',
+          expected: true,
+        };
   }
   return { text: raw, expected: false };
 }
@@ -299,7 +314,7 @@ export function MinerCard({ canisterId, identity, onForget }: MinerCardProps) {
       )}
       {status?.lastError &&
         (() => {
-          const { text, expected } = friendlyMinerError(status.lastError);
+          const { text, expected } = friendlyMinerError(status.lastError, status.mining);
           return <p className={expected ? "deploy-miner-status" : "deploy-miner-error"}>{text}</p>;
         })()}
 
