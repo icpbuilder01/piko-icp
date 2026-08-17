@@ -32,7 +32,14 @@ const TICK_MS = 70;
 
 const casinoPrincipal = Principal.fromText(casinoCanisterId);
 
-function betErrorMessage(err: BetError): string {
+// attemptedPayout is what *this* bet's stake/target would have paid out if
+// it won -- only known here, not from the error alone, and worth showing
+// explicitly for BetTooLarge: the cap is on *payout*, not on the stake you
+// typed, so "you bet 20, the max is 21" reads as nonsensical unless the
+// message also shows what your 20 would actually have paid out at your
+// chosen target (which can easily be well above 21 at a low target/high
+// multiplier).
+function betErrorMessage(err: BetError, attemptedPayout: bigint | null): string {
   switch (err.__kind__) {
     case "Anonymous":
       return "Log in to play.";
@@ -44,8 +51,11 @@ function betErrorMessage(err: BetError): string {
       return "A previous bet is still resolving -- try again in a moment.";
     case "RandomnessFailed":
       return "Couldn't draw a fair result -- your stake was refunded, claim it below.";
-    case "BetTooLarge":
-      return `Bet too large for the current bankroll -- max payout right now is ${formatPiko(err.BetTooLarge.maxPayout)} PIKO. Try a smaller amount or a higher target.`;
+    case "BetTooLarge": {
+      const maxPayout = formatPiko(err.BetTooLarge.maxPayout);
+      const yours = attemptedPayout !== null ? `Your bet would have paid ${formatPiko(attemptedPayout)} PIKO if you won -- ` : "";
+      return `${yours}the max payout the bankroll can cover right now is ${maxPayout} PIKO. Try a smaller amount or a higher target (lower target = bigger multiplier = bigger payout for the same stake).`;
+    }
     case "TransferFailed": {
       const inner = err.TransferFailed;
       if (inner.__kind__ === "InsufficientAllowance") return "Approve more first.";
@@ -182,7 +192,7 @@ export function Dice({ identity }: DiceProps) {
         refreshAllowance(identity);
       } else {
         setDisplayRoll(null);
-        setMessage(betErrorMessage(result.Err));
+        setMessage(betErrorMessage(result.Err, potentialPayout));
       }
     } catch (err) {
       stopTicking();
