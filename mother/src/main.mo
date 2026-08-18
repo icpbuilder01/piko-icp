@@ -112,6 +112,20 @@ actor self {
   // not PIKO's own ledger fee (set separately in icrc1_ledger_init.args) --
   // the two happen to share the same value today, but are unrelated.
   let ICP_LEDGER_FEE_E8S : Nat = 10_000;
+  // sweepTreasury() and topUpProject() are deliberately permissionless
+  // (anyone can call them, not just the timer -- see armSweepTimer below),
+  // but that also means anyone can call them in a tight loop. Even when
+  // there's nothing meaningful to sweep/send, each call still costs at
+  // least one real inter-canister call (sweepTreasury always queries this
+  // canister's own ICP balance before its own early-return check) --
+  // cycles an attacker can't spend directly but can still force this
+  // canister to burn. This floor caps how often either can actually do
+  // that real work to once per interval, regardless of how fast they're
+  // called; legitimate manual use ("sweep/top-up right now") still works,
+  // just not faster than this.
+  let MIN_MAINTENANCE_INTERVAL_NANOS : Int = 60_000_000_000; // 60s
+  var lastSweepTreasuryAt : Int = 0;
+  var lastTopUpProjectAt : Int = 0;
   // Dead field, kept on purpose (see "Upgrading mother or miner safely" in
   // the README -- same reason MIN_DIFFICULTY_BITS below has a matching
   // _LIVE sibling): a plain top-level `let`'s *value* is implicitly stable
@@ -917,6 +931,12 @@ actor self {
   let MEMO_TOP_UP_CANISTER : Blob = Blob.fromArray([0x54, 0x50, 0x55, 0x50, 0, 0, 0, 0]);
 
   public shared func sweepTreasury() : async Types.SweepResult {
+    let now = Time.now();
+    if (now - lastSweepTreasuryAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
+      return { swept = 0; burned = 0; cyclesFunded = 0; cyclesMinted = null; notifyError = null };
+    };
+    lastSweepTreasuryAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
+
     let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
     let self_ : Principal = Principal.fromActor(self);
 
@@ -1045,6 +1065,12 @@ actor self {
   // either, for the same reason sweepTreasury keeps none: it just re-reads
   // Cycles.balance() fresh every call.
   public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat } {
+    let now = Time.now();
+    if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0 };
+    };
+    lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
+
     let balance = Cycles.balance();
     if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0 } };
 
