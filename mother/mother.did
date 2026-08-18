@@ -132,9 +132,11 @@ service : {
   setMiningFeeE8s: (e8s: nat) -> ();
   submitProof: (nonce: nat) -> (SubmitResult);
   sweepTreasury: () -> (SweepResult);
-  topUpProject: () -> (record {
-                         toFrontend: nat;
-                         toLedger: nat;
-                         toMiner: nat;
-                       });
+  topUpProject: () ->
+   (record {
+      toDice: nat;
+      toFrontend: nat;
+      toLedger: nat;
+      toMiner: nat;
+    });
 }
