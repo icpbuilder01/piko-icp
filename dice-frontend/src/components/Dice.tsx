@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
-import { getCasinoActor, getLedgerActor } from "../lib/actors";
-import { casinoCanisterId } from "../lib/canister-env";
+import { getDiceActor, getLedgerActor } from "../lib/actors";
+import { diceCanisterId } from "../lib/canister-env";
 import { formatPiko, parseAmount } from "../lib/format";
-import { TokenKind, type Config, type BetResult, type BetError } from "../bindings/casino/casino";
+import { TokenKind, type Config, type BetResult, type BetError } from "../bindings/dice/dice";
 import { Confetti } from "./Confetti";
 
 interface DiceProps {
   identity: Identity | null;
 }
 
-// This site only ever bets PIKO -- the `casino` canister itself still
-// understands ICP too (see casino/src/main.mo), but there's no ICP wallet
+// This site only ever bets PIKO -- the `dice` canister itself still
+// understands ICP too (see dice/src/main.mo), but there's no ICP wallet
 // UI here at all (see Wallet.tsx), so TokenKind.PIKO is the only value ever
 // sent to placeBet().
 const TOKEN = TokenKind.PIKO;
@@ -30,7 +30,7 @@ const APPROVE_ROLLS = 20;
 // continuous slide rather than a series of jumps.
 const TICK_MS = 70;
 
-const casinoPrincipal = Principal.fromText(casinoCanisterId);
+const dicePrincipal = Principal.fromText(diceCanisterId);
 
 // attemptedPayout is what *this* bet's stake/target would have paid out if
 // it won -- only known here, not from the error alone, and worth showing
@@ -82,7 +82,7 @@ export function Dice({ identity }: DiceProps) {
   const tickRef = useRef<number | null>(null);
 
   useEffect(() => {
-    getCasinoActor()
+    getDiceActor()
       .getConfig()
       .then(setConfig)
       .catch((err) => console.error("Failed to load dice config", err));
@@ -92,7 +92,7 @@ export function Dice({ identity }: DiceProps) {
     try {
       const result = await getLedgerActor(id).icrc2_allowance({
         account: { owner: id.getPrincipal() },
-        spender: { owner: casinoPrincipal },
+        spender: { owner: dicePrincipal },
       });
       setAllowance((result as { allowance: bigint }).allowance);
     } catch (err) {
@@ -139,7 +139,7 @@ export function Dice({ identity }: DiceProps) {
     try {
       const approveAmount = amount * BigInt(APPROVE_ROLLS);
       const result = await getLedgerActor(identity).icrc2_approve({
-        spender: { owner: casinoPrincipal },
+        spender: { owner: dicePrincipal },
         amount: approveAmount,
       });
       if ("Ok" in (result as object)) {
@@ -176,8 +176,8 @@ export function Dice({ identity }: DiceProps) {
     setRolling(true);
     startTicking();
     try {
-      const casinoAsUser = getCasinoActor(identity);
-      const result = (await casinoAsUser.placeBet(TOKEN, amount, BigInt(target))) as BetResult;
+      const diceAsUser = getDiceActor(identity);
+      const result = (await diceAsUser.placeBet(TOKEN, amount, BigInt(target))) as BetResult;
       stopTicking();
       if (result.__kind__ === "Ok") {
         const { roll, won, payoutAmount } = result.Ok;

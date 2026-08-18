@@ -10,6 +10,7 @@ off-chain server, no off-chain database.
 
 | Canister | ID | URL |
 |---|---|---|
+| landing | `7w27g-xiaaa-aaaaj-qseja-cai` | https://www.piko.network/ |
 | frontend | `5xdl7-taaaa-aaaaj-qseeq-cai` | https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/ |
 | mother | `45mjf-rqaaa-aaaaj-qsedq-cai` | https://45mjf-rqaaa-aaaaj-qsedq-cai.icp.net/ |
 | miner (reference instance) | `5qcnl-6yaaa-aaaaj-qseea-cai` | https://5qcnl-6yaaa-aaaaj-qseea-cai.icp.net/ |
@@ -20,13 +21,62 @@ own two canisters rather than folded into the site above:
 
 | Canister | ID | URL |
 |---|---|---|
-| casino-frontend | `77zu2-baaaa-aaaaj-qseiq-cai` | https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ |
-| casino | `7yyso-myaaa-aaaaj-qseia-cai` | https://7yyso-myaaa-aaaaj-qseia-cai.icp.net/ |
+| dice-frontend | `77zu2-baaaa-aaaaj-qseiq-cai` | https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ |
+| dice | `7yyso-myaaa-aaaaj-qseia-cai` | https://7yyso-myaaa-aaaaj-qseia-cai.icp.net/ |
+
+(`dice`/`dice-frontend` were named `casino`/`casino-frontend` in this
+project's early history -- same canisters, same IDs, renamed purely at the
+project/repo level once "casino" turned out to read as a heavier claim than
+intended for what is, on the frontend, already just called "PIKO Dice".)
+
+### How the four PIKO sites relate to each other
+
+There are four separately hosted sites, each its own asset canister, on
+purpose -- opting into one is never a bundled default for the others:
+
+```
+                        piko.network (landing)
+                        "you are here" -- links out, explains, verifies
+                       /                                  \
+                      v                                    v
+          frontend (mining dashboard)          dice-frontend (PIKO Dice)
+          Mine.PIKO, Internet Identity,         Roll under a target,
+          leaderboard, live chain stats         1% house edge, PIKO-only
+                      \                                    /
+                       v                                  v
+                          ledger (PIKO's own ICRC-1 token)
+                     both sites move real PIKO through this
+                     one canister -- your balance is the same
+                     everywhere, not per-site play money
+```
+
+- **`landing`** (this domain, `www.piko.network`) is the entry point: a
+  single static page explaining the project, linking out to the two actual
+  applications, and pointing at the whitepaper/source for verification. It
+  never talks to any canister itself -- no wallet, no login, nothing to
+  approve here.
+- **`frontend`** is the mining application: log in with Internet Identity,
+  mine in-browser or point a self-deployed `miner` canister at `mother`,
+  watch the live chain dashboard.
+- **`dice-frontend`** is the betting application (PIKO Dice): a separate
+  login/approval flow, a separate site, deliberately not merged into
+  `frontend` -- playing is an opt-in choice distinct from mining, not
+  something a miner is funneled into.
+- Both applications ultimately move the *same* PIKO through the *same*
+  `ledger` canister -- your balance on the mining dashboard and your balance
+  on the dice site are the same number, not two separate in-game
+  currencies. `mother` and `dice` are the two coordinator canisters behind
+  `frontend` and `dice-frontend` respectively; neither end user ever calls
+  them directly.
 
 The mainnet canisters currently hold modest cycle balances (~0.5T-0.8T each,
 ~3.7T for the ledger) -- enough to run for a good while at low traffic, but
 top up before relying on them long-term:
 `icp canister top-up <name> --amount <cycles> -e ic`.
+`mother` and `dice` each now also automatically forward their own cycles
+surplus to the canisters that depend on them (see "Automatic cycle
+self-funding" below) -- `landing` is the one canister with no such path yet,
+still manual-top-up-only.
 
 **Independent project.** PIKO is inspired by the publicly described
 "proof-of-on-chain-work" mining mechanics of bob.fun, but it is an original
@@ -316,11 +366,13 @@ upgrade of the deployed `mother` canister:
   that fails instantly (bad hash) still adds an entry and costs `mother` a
   little compute. This is a general property of public IC canisters (callers
   don't pay for the canister's own cycles), not unique to PIKO.
-  `pruneStaleAttempts()` -- permissionless, meant to be called periodically
-  by a keeper/cron -- removes entries whose cooldown has already
-  provably expired, bounding how large the map can get between prunes;
-  `mother`'s own cycle balance should still be monitored and topped up
-  periodically.
+  `pruneStaleAttempts()` -- permissionless, and now fired automatically
+  on the same recurring timer as `sweepTreasury()`/`topUpProject()` (fixed
+  after an internal security review found it was only ever callable
+  manually, with nothing actually arming it) -- removes entries whose
+  cooldown has already provably expired, bounding how large the map can get
+  between prunes; still callable manually too. `mother`'s own cycle balance
+  should still be monitored and topped up periodically.
 - **Fixed: `pendingRewards` used to be `transient`.** A reward that's been
   earned but not yet successfully transferred (e.g. the ledger call trapped)
   is real PIKO owed to a specific miner. Marking that map `transient` -- as
@@ -354,6 +406,35 @@ upgrade of the deployed `mother` canister:
   caller matched that placeholder and could operate a freshly deployed,
   not-yet-started miner. `requireOwner` now rejects anonymous callers
   explicitly, closing that window.
+
+## Automatic cycle self-funding
+
+Static asset canisters (`frontend`, `dice-frontend`, `landing`) and `ledger`
+can't earn cycles on their own -- only `mother` and `dice` have a real
+revenue stream (the mining fee / the house edge) to convert into cycles.
+Left alone, that means every other canister depends entirely on someone
+remembering to run `icp canister top-up` by hand forever -- exactly the kind
+of silent single point of failure a system with no team is supposed to not
+depend on.
+
+Two independent, permissionless sweep loops close that gap, each on its own
+hourly-ish recurring timer:
+
+- **`mother`** burns/converts its mining-fee income via `sweepTreasury()`,
+  then shares whatever cycles surplus it has above `CYCLES_RESERVE` (2T)
+  three ways, evenly, with `ledger`, `frontend`, and `miner` (the reference
+  instance) via `topUpProject()`.
+- **`dice`** converts its house-edge ICP profit via `sweepIcpProfit()`, then
+  shares its own cycles surplus above the same 2T reserve with
+  `dice-frontend` via `topUpDiceFrontend()` -- added after an internal
+  security review noted `dice-frontend` had no self-funding path at all,
+  unlike every other canister with a working canister behind it.
+
+**`landing` is the one canister still with no automatic path** -- it's pure
+marketing/entry-point, with no fee or bet flowing through it to convert into
+cycles, so it stays manual-top-up-only for now. Its cycle balance and burn
+rate are worth checking periodically (`icp canister status landing -e ic`)
+until/unless that changes.
 
 ## Security notes
 

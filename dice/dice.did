@@ -1,9 +1,9 @@
-type TokenKind =
+type TransferResult = 
  variant {
-   ICP;
-   PIKO;
+   Err: TransferError;
+   Ok: nat;
  };
-type TransferFromError =
+type TransferFromError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
    BadFee: record {expected_fee: nat;};
@@ -18,7 +18,7 @@ type TransferFromError =
    TemporarilyUnavailable;
    TooOld;
  };
-type TransferError =
+type TransferError = 
  variant {
    BadBurn: record {min_burn_amount: nat;};
    BadFee: record {expected_fee: nat;};
@@ -32,103 +32,105 @@ type TransferError =
    TemporarilyUnavailable;
    TooOld;
  };
-type TransferResult =
+type TokenKind = 
  variant {
-   Ok: nat;
-   Err: TransferError;
+   ICP;
+   PIKO;
  };
-type BetOk =
+type Time = int;
+type SweepResult = 
  record {
-   roll: nat;
-   won: bool;
-   payoutAmount: nat;
+   cyclesFunded: nat;
+   cyclesMinted: opt nat;
+   notifyError: opt text;
+   profit: nat;
  };
-type BetError =
- variant {
-   Anonymous;
-   InvalidTarget;
-   InvalidAmount;
-   BetInProgress;
-   BetTooLarge: record {maxPayout: nat;};
-   TransferFailed: TransferFromError;
-   RandomnessFailed;
- };
-type BetResult =
- variant {
-   Ok: BetOk;
-   Err: BetError;
- };
-type RecentBet =
+type Stats = 
  record {
-   player: principal;
-   token: TokenKind;
+   betsPlaced: nat;
+   betsWon: nat;
+   cyclesBalance: nat;
+   icpBankrollE8s: nat;
+   pikoBankroll: nat;
+   totalPaidOutIcpE8s: nat;
+   totalPaidOutPiko: nat;
+   totalWageredIcpE8s: nat;
+   totalWageredPiko: nat;
+ };
+type RiskConfig = 
+ record {
+   cyclesFundRatioBps: nat;
+   icpBankrollFloorE8s: nat;
+   maxPayoutBps: nat;
+ };
+type RecentBet = 
+ record {
    amount: nat;
-   target: nat;
-   roll: nat;
-   won: bool;
    payoutAmount: nat;
-   timestamp: int;
+   player: principal;
+   roll: nat;
+   target: nat;
+   timestamp: Time;
+   token: TokenKind;
+   won: bool;
  };
-type LeaderboardEntry =
+type PendingWithdrawal = 
+ record {
+   amount: nat;
+   readyAt: Time;
+   to: principal;
+   token: TokenKind;
+ };
+type PendingRiskConfig = 
+ record {
+   readyAt: Time;
+   value: RiskConfig;
+ };
+type PendingAdminChanges = 
+ record {
+   riskConfig: opt PendingRiskConfig;
+   timelockNanos: int;
+   withdrawal: opt PendingWithdrawal;
+ };
+type LeaderboardEntry = 
  record {
    player: principal;
    wageredIcpE8s: nat;
    wageredPiko: nat;
  };
-type RiskConfig =
+type Config = 
  record {
-   maxPayoutBps: nat;
-   icpBankrollFloorE8s: nat;
    cyclesFundRatioBps: nat;
- };
-type PendingRiskConfig =
- record {
-   value: RiskConfig;
-   readyAt: int;
- };
-type PendingWithdrawal =
- record {
-   token: TokenKind;
-   to: principal;
-   amount: nat;
-   readyAt: int;
- };
-type PendingAdminChanges =
- record {
-   riskConfig: opt PendingRiskConfig;
-   withdrawal: opt PendingWithdrawal;
-   timelockNanos: int;
- };
-type Config =
- record {
-   minTarget: nat;
-   maxTarget: nat;
-   payoutNumerator: nat;
-   maxPayoutBps: nat;
    icpBankrollFloorE8s: nat;
-   cyclesFundRatioBps: nat;
-   withdrawalsLocked: bool;
    icpLedgerId: principal;
+   maxPayoutBps: nat;
+   maxTarget: nat;
+   minTarget: nat;
+   payoutNumerator: nat;
    pikoLedgerId: principal;
+   riskConfigLocked: bool;
+   withdrawalsLocked: bool;
  };
-type Stats =
- record {
-   betsPlaced: nat;
-   betsWon: nat;
-   totalWageredIcpE8s: nat;
-   totalWageredPiko: nat;
-   totalPaidOutIcpE8s: nat;
-   totalPaidOutPiko: nat;
-   icpBankrollE8s: nat;
-   pikoBankroll: nat;
-   cyclesBalance: nat;
+type BetResult = 
+ variant {
+   Err: BetError;
+   Ok: BetOk;
  };
-type SweepResult =
+type BetOk = 
  record {
-   profit: nat;
-   cyclesFunded: nat;
-   cyclesMinted: opt nat;
-   notifyError: opt text;
+   payoutAmount: nat;
+   roll: nat;
+   won: bool;
+ };
+type BetError = 
+ variant {
+   Anonymous;
+   BetInProgress;
+   BetTooLarge: record {maxPayout: nat;};
+   InvalidAmount;
+   InvalidTarget;
+   RandomnessFailed;
+   TransferFailed: TransferFromError;
  };
 service : {
   cancelPendingRiskConfig: () -> ();
@@ -148,4 +150,5 @@ service : {
   proposeRiskConfig: (value: RiskConfig) -> ();
   proposeWithdrawal: (token: TokenKind, to: principal, amount: nat) -> ();
   sweepIcpProfit: () -> (SweepResult);
+  topUpDiceFrontend: () -> (record {sent: nat;});
 }
