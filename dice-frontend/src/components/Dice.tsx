@@ -23,6 +23,18 @@ const TOKEN = TokenKind.PIKO;
 // small enough that logging in doesn't mean signing away an unbounded
 // allowance.
 const APPROVE_ROLLS = 20;
+// Every icrc2_transfer_from pull -- which is how dice pulls a bet's stake --
+// also deducts the PIKO ledger's own transfer fee from the caller's
+// allowance, on top of the stake amount itself (same gotcha the mining
+// site's App.tsx already accounts for on the ICP side -- see its own
+// ICP_LEDGER_FEE_E8S comment). Without budgeting this in, both the approved
+// amount and the "am I covered" check here would read as enough allowance
+// for one more roll than the ledger will actually permit, and a bet would
+// fail on-chain with a confusing InsufficientAllowance right after the UI
+// said Roll instead of Approve. This is PIKO's own ledger fee (set in
+// ledger/icrc1_ledger_init.args.template), unrelated to ICP's, but happens
+// to share the same value today.
+const PIKO_LEDGER_FEE_E8S = 10_000n;
 // How fast the "spinning" number ticks while a bet is in flight, and how
 // long the marker takes to glide to its true landing spot once the real
 // result comes back -- see the CSS transition on .dice-marker, which is
@@ -131,13 +143,13 @@ export function Dice({ identity }: DiceProps) {
   const amount = parseAmount(amountInput);
   const payoutMultiplier = target > 0 ? Number(config.payoutNumerator) / target : 0;
   const potentialPayout = amount !== null ? (amount * config.payoutNumerator) / BigInt(target) : null;
-  const feeApproved = amount !== null ? (allowance ?? 0n) >= amount : false;
+  const feeApproved = amount !== null ? (allowance ?? 0n) >= amount + PIKO_LEDGER_FEE_E8S : false;
 
   async function handleApprove() {
     if (!identity || amount === null) return;
     setApproving(true);
     try {
-      const approveAmount = amount * BigInt(APPROVE_ROLLS);
+      const approveAmount = (amount + PIKO_LEDGER_FEE_E8S) * BigInt(APPROVE_ROLLS);
       const result = await getLedgerActor(identity).icrc2_approve({
         spender: { owner: dicePrincipal },
         amount: approveAmount,
