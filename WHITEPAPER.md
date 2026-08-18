@@ -268,10 +268,20 @@ propose/48h-wait/execute/cancel/lock machinery, independent of `mother`'s.
 permanently removing all controllers from a canister -- makes it
 unupgradable by anyone, forever, closing the one door the timelock
 deliberately doesn't cover. The roadmap (&sect;9) covers blackholing
-`ledger` and `mother` once the mechanism has run long enough, in
-production, without a code change. Until then, PIKO's rules are open-source
+`ledger`, `mother`, and eventually `dice` once each has run long enough, in
+production, without a code change, and -- for `mother` and `dice` -- passed
+a third-party audit first. Until then, PIKO's rules are open-source
 and verifiable, and the parameters within them move on a public delay, but
 the code itself is not yet immutable.
+
+**`landing` is deliberately out of scope for blackholing, indefinitely.**
+It holds no funds, calls no other canister, and enforces no rule this paper
+makes any claim about -- see &sect;6: "no login, no approval, nothing at
+stake here." Locking it would buy no additional trust for anyone, at the
+permanent cost of never being able to update the project's own front door
+(new links, corrections, future sites). Immutability is a tool for the
+canisters whose code *is* the promise being made; `landing` isn't one of
+them.
 
 ## 8. Risk disclosure
 
@@ -296,21 +306,37 @@ the code itself is not yet immutable.
 - **Automatic difficulty retargeting.** Done -- see &sect;3. Removes the
   one remaining reason blackholing `mother` would have permanently frozen a
   hand-picked parameter.
+- **Lock `icpFeeTarget` and `cyclesFundRatio`** on `mother`. Done -- both
+  confirmed permanently locked, live and independently checkable via
+  `getStats()`. Turns those two promises from "enforced by a key" into
+  "enforced by code" ahead of blackholing `mother` itself.
 - **Observation period.** Run in production, monitor real block times
   against the 5-minute target, confirm the retarget algorithm tracks
   participation as intended before locking anything else.
 - **Blackhole `ledger`.** Standard DFINITY code with the lowest bug
   surface -- the earliest candidate for permanently removing its
   controller.
-- **Lock `icpFeeTarget` and `cyclesFundRatio`** on `mother` once the burn
-  destination, CMC, and burn/cycles split are considered final -- turning
-  those specific promises into code-enforced ones ahead of blackholing
-  itself.
-- **Blackhole `mother`** once difficulty and fee parameters have
-  stabilized, permanently locking in the supply cap and burn logic.
 - **Third-party security audit**, independent of this paper's own trust-model
-  disclosures, before either blackholing step above or any meaningful
-  liquidity event.
+  disclosures, before blackholing `mother`, before blackholing `dice`, and
+  before any meaningful liquidity event.
+- **Blackhole `mother`** once difficulty and fee parameters have
+  stabilized and the audit above is done, permanently locking in the supply
+  cap and burn logic.
+- **Lock `dice`'s withdrawal path and risk config** (&sect;5, &sect;7) once
+  the bankroll and risk parameters are considered final -- the same
+  propose/48h-wait/lock step already applied to `mother`.
+- **Blackhole `dice`**, after `mother` and only once its own audit --
+  covering bet resolution and the randomness/transfer ordering specifically,
+  not just re-covering `mother`'s already-audited logic -- is done and a
+  real track record of betting volume has run without incident. Deliberately
+  sequenced after `mother`: `dice` has more moving parts (bet resolution,
+  `raw_rand` ordering, ICRC-2 transfers on both PIKO and ICP) and has
+  changed more recently, so it earns immutability on a slower timeline, not
+  the same one.
+- **`landing` is not on this list, on purpose** -- see &sect;7. It holds no
+  funds and makes no promise this paper needs code to enforce, so there is
+  nothing blackholing it would protect -- only future flexibility it would
+  cost.
 - **Liquidity.** A PIKO/ICP pool on an ICP-native DEX, funded
   transparently, once there's a real community of miners to trade with.
 
