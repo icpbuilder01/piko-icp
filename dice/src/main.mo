@@ -95,8 +95,27 @@ actor self {
   var riskConfigLocked : Bool = false;
 
   let ICP_LEDGER_FEE_E8S : Nat = 10_000;
-  let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h, same cadence as mother
+  // Dead field, kept on purpose -- same reason as mother's own
+  // SWEEP_INTERVAL_SECONDS: under this project's --default-persistent-actors
+  // setting, a plain top-level `let`'s value is fixed at this canister's
+  // first install and untouched by later upgrades, so editing this literal
+  // alone would never actually change the running interval. Discovered
+  // still set to the original 1h here (unlike mother, which already caught
+  // this for itself) -- SWEEP_INTERVAL_SECONDS_LIVE below is the real,
+  // effective one.
+  let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h -- dead, see above
+  transient let SWEEP_INTERVAL_SECONDS_LIVE : Nat = 900; // 15 minutes, same cadence as mother
   transient var sweepTimerId : ?Timer.TimerId = null;
+
+  // sweepIcpProfit() and topUpDiceFrontend() are permissionless like
+  // mother's sweepTreasury()/topUpProject() -- same reasoning applies:
+  // without a floor, anyone can call them in a tight loop and force real
+  // inter-canister calls (a balance query at minimum) even when there's
+  // nothing to do. Legitimate manual use still works, just not faster than
+  // this.
+  let MIN_MAINTENANCE_INTERVAL_NANOS : Int = 60_000_000_000; // 60s
+  var lastSweepIcpProfitAt : Int = 0;
+  var lastTopUpDiceFrontendAt : Int = 0;
 
   // Never share cycles below this floor -- keeps whatever this canister
   // needs for its own healthy operation first, only forwards genuine
@@ -112,6 +131,44 @@ actor self {
   // an upgrade never happened from the ledger's point of view either, since
   // the stake pull and the payout are each a single atomic transfer).
   transient let pendingBets : Map.Map<Principal, Bool> = Map.empty<Principal, Bool>();
+
+  // Aggregate payout already promised to *in-flight* bets, per token --
+  // closes a gap pendingBets above doesn't cover. pendingBets only stops
+  // the SAME principal from stacking concurrent bets; it does nothing for
+  // different principals, who can each read the same bankroll snapshot
+  // (icrc1_balance_of is itself an await) before any of them has resolved,
+  // and each get independently approved against maxPayoutBps of that
+  // *same* bankroll -- so N concurrent bets from N different principals
+  // could each individually pass the 1%-of-bankroll check while their
+  // combined payout exposure is N times that. Reserving here, synchronously
+  // right after the bankroll check passes (see placeBet below, same
+  // no-await-in-between discipline as pendingBets itself), and releasing
+  // once the bet resolves (win, loss, or refund) turns the check into "is
+  // there still room, accounting for what's already promised to bets still
+  // in flight" instead of just "was there room a moment ago." Transient,
+  // like pendingBets, for the same reason: a bet truly mid-flight during an
+  // upgrade never happened from the ledger's point of view either.
+  transient var committedPayoutIcp : Nat = 0;
+  transient var committedPayoutPiko : Nat = 0;
+
+  func committedPayoutFor(token : Types.TokenKind) : Nat {
+    switch (token) {
+      case (#ICP) { committedPayoutIcp };
+      case (#PIKO) { committedPayoutPiko };
+    };
+  };
+  func reserveCommittedPayout(token : Types.TokenKind, amount : Nat) {
+    switch (token) {
+      case (#ICP) { committedPayoutIcp += amount };
+      case (#PIKO) { committedPayoutPiko += amount };
+    };
+  };
+  func releaseCommittedPayout(token : Types.TokenKind, amount : Nat) {
+    switch (token) {
+      case (#ICP) { committedPayoutIcp -= amount };
+      case (#PIKO) { committedPayoutPiko -= amount };
+    };
+  };
 
   // Owed-but-unpaid payouts (a transfer back to the winner trapped or
   // errored) -- persisted, exactly like mother's pendingRewards, since this
@@ -329,10 +386,19 @@ actor self {
 
     let payoutAmount = amountE8s * PAYOUT_NUMERATOR / target;
     let maxPayoutAllowed = bankroll * riskConfig.maxPayoutBps / 10_000;
-    if (payoutAmount > maxPayoutAllowed) {
+    let alreadyCommitted = committedPayoutFor(token);
+    let remainingAllowed = if (maxPayoutAllowed > alreadyCommitted) {
+      maxPayoutAllowed - alreadyCommitted;
+    } else { 0 };
+    if (payoutAmount > remainingAllowed) {
       Map.remove(pendingBets, Principal.compare, caller);
-      return #Err(#BetTooLarge({ maxPayout = maxPayoutAllowed }));
+      return #Err(#BetTooLarge({ maxPayout = remainingAllowed }));
     };
+    // Reserved here, synchronously, for the same reason pendingBets is
+    // locked before any await above: a concurrent placeBet from a
+    // *different* principal, interleaving right here, must see this bet's
+    // payoutAmount already counted against the bankroll, not just its own.
+    reserveCommittedPayout(token, payoutAmount);
 
     let pullOutcome = try {
       ?(
@@ -352,10 +418,12 @@ actor self {
       case (? #Ok(_)) {};
       case (? #Err(e)) {
         Map.remove(pendingBets, Principal.compare, caller);
+        releaseCommittedPayout(token, payoutAmount);
         return #Err(#TransferFailed(e));
       };
       case null {
         Map.remove(pendingBets, Principal.compare, caller);
+        releaseCommittedPayout(token, payoutAmount);
         return #Err(#TransferFailed(#TemporarilyUnavailable));
       };
     };
@@ -367,6 +435,11 @@ actor self {
     let Management : Types.ManagementActor = actor ("aaaaa-aa");
     let randOutcome = try { ?(await Management.raw_rand()) } catch (_e) { null };
     Map.remove(pendingBets, Principal.compare, caller);
+    // Resolving one way or another below (refund, win, or loss) -- the
+    // reservation above has done its job of keeping this payoutAmount
+    // counted against the bankroll for the duration of this bet, and from
+    // here the real ledger balance will reflect whatever actually happens.
+    releaseCommittedPayout(token, payoutAmount);
     let roll = switch (randOutcome) {
       case (?bytes) { rollFromBytes(bytes) };
       case null {
@@ -534,6 +607,12 @@ actor self {
   let MEMO_TOP_UP_CANISTER : Blob = Blob.fromArray([0x54, 0x50, 0x55, 0x50, 0, 0, 0, 0]);
 
   public shared func sweepIcpProfit() : async Types.SweepResult {
+    let now = Time.now();
+    if (now - lastSweepIcpProfitAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
+      return { profit = 0; cyclesFunded = 0; cyclesMinted = null; notifyError = null };
+    };
+    lastSweepIcpProfitAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
+
     let IcpLedger : Types.LedgerActor = actor (Principal.toText(icpLedgerId));
     let self_ = Principal.fromActor(self);
     let balance = await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
@@ -590,6 +669,12 @@ actor self {
   // either, for the same reason sweepIcpProfit keeps none: it just re-reads
   // Cycles.balance() fresh every call.
   public shared func topUpDiceFrontend() : async { sent : Nat } {
+    let now = Time.now();
+    if (now - lastTopUpDiceFrontendAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
+      return { sent = 0 };
+    };
+    lastTopUpDiceFrontendAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
+
     let balance = Cycles.balance();
     if (balance <= CYCLES_RESERVE) { return { sent = 0 } };
     switch (diceFrontendId) {
@@ -615,7 +700,7 @@ actor self {
       case null {};
     };
     sweepTimerId := ?Timer.recurringTimer<system>(
-      #seconds SWEEP_INTERVAL_SECONDS,
+      #seconds SWEEP_INTERVAL_SECONDS_LIVE,
       func() : async () {
         ignore (await sweepIcpProfit());
         ignore (await topUpDiceFrontend());
