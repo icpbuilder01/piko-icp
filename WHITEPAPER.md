@@ -269,10 +269,16 @@ permanently removing all controllers from a canister -- makes it
 unupgradable by anyone, forever, closing the one door the timelock
 deliberately doesn't cover. The roadmap (&sect;9) covers blackholing
 `ledger`, `mother`, and eventually `dice` once each has run long enough, in
-production, without a code change, and -- for `mother` and `dice` -- passed
-a third-party audit first. Until then, PIKO's rules are open-source
-and verifiable, and the parameters within them move on a public delay, but
-the code itself is not yet immutable.
+production, without a code change. A paid third-party audit before
+`mother`/`dice` are blackholed is the goal, not a guarantee -- this is a
+self-funded, no-premine project with no treasury to draw on, so whether one
+happens depends on whether it's affordable at the time, not on a promise
+made here. What isn't conditional: the code is open-source today, every
+figure in this paper is independently checkable via query calls, and
+blackholing itself won't happen on a rushed timeline just because an audit
+didn't. Until then, PIKO's rules are open-source and verifiable, and the
+parameters within them move on a public delay, but the code itself is not
+yet immutable.
 
 **`landing` is deliberately out of scope for blackholing, indefinitely.**
 It holds no funds, calls no other canister, and enforces no rule this paper
@@ -316,22 +322,24 @@ them.
 - **Blackhole `ledger`.** Standard DFINITY code with the lowest bug
   surface -- the earliest candidate for permanently removing its
   controller.
-- **Third-party security audit**, independent of this paper's own trust-model
-  disclosures, before blackholing `mother`, before blackholing `dice`, and
-  before any meaningful liquidity event.
-- **Blackhole `mother`** once difficulty and fee parameters have
-  stabilized and the audit above is done, permanently locking in the supply
-  cap and burn logic.
+- **Third-party security audit, funding permitting.** There's no treasury
+  here to pay for one -- no premine, no revenue, fees are burned or turned
+  into cycles, never captured (&sect;4) -- so this happens if and when it's
+  affordable, not on a committed date. Not a precondition this paper can
+  promise before blackholing `mother`/`dice`; a longer production track
+  record and open-source community review are what actually gate that
+  timeline regardless of whether a paid audit happens too.
+- **Blackhole `mother`** once difficulty and fee parameters have stabilized
+  and a long enough production track record backs the code, permanently
+  locking in the supply cap and burn logic.
 - **Lock `dice`'s withdrawal path and risk config** (&sect;5, &sect;7) once
   the bankroll and risk parameters are considered final -- the same
   propose/48h-wait/lock step already applied to `mother`.
-- **Blackhole `dice`**, after `mother` and only once its own audit --
-  covering bet resolution and the randomness/transfer ordering specifically,
-  not just re-covering `mother`'s already-audited logic -- is done and a
-  real track record of betting volume has run without incident. Deliberately
-  sequenced after `mother`: `dice` has more moving parts (bet resolution,
-  `raw_rand` ordering, ICRC-2 transfers on both PIKO and ICP) and has
-  changed more recently, so it earns immutability on a slower timeline, not
+- **Blackhole `dice`**, after `mother` and only once a real track record of
+  betting volume has run without incident -- bet resolution and the
+  randomness/transfer ordering are more moving parts than `mother`'s
+  simpler verify-and-mint path, and have changed more recently, so it earns
+  immutability on a slower timeline, not
   the same one.
 - **`landing` is not on this list, on purpose** -- see &sect;7. It holds no
   funds and makes no promise this paper needs code to enforce, so there is
