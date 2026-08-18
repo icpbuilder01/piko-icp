@@ -280,6 +280,23 @@ didn't. Until then, PIKO's rules are open-source and verifiable, and the
 parameters within them move on a public delay, but the code itself is not
 yet immutable.
 
+**What's been checked in the meantime, pending that audit:** an internal
+self-review -- not independent, and not a substitute for one -- covering
+`mother`, `dice`, and `miner` for concurrency bugs (races between
+different callers, not just the same caller racing itself), and every
+permissionless maintenance function (`sweepTreasury`, `topUpProject`,
+`sweepIcpProfit`, `topUpDiceFrontend`) for spam resistance. One real
+cross-principal race in `dice`'s bankroll check was found and fixed
+(different players could each pass the payout cap against the same
+bankroll snapshot before either resolved); it's now closed with a
+per-token committed-exposure counter, verified under real concurrent load
+locally, not just reasoned about. Separately, the vendored `ledger` wasm
+was hash-verified byte-for-byte against DFINITY's own published release
+artifact, and the `sha2` hashing dependency's actual output was checked
+against known SHA-256 test vectors by running it, rather than trusting its
+version label. None of this replaces an independent audit -- it's the
+floor, not the ceiling.
+
 **`landing` is deliberately out of scope for blackholing, indefinitely.**
 It holds no funds, calls no other canister, and enforces no rule this paper
 makes any claim about -- see &sect;6: "no login, no approval, nothing at
