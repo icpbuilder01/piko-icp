@@ -12,7 +12,7 @@
       color-scheme: light;
 
       /* "Ledger paper" -- warm parchment, deep ink, gold leaf. Same palette
-         as mining/frontend and casino-frontend, so the three sites read as
+         as mining/frontend and dice-frontend, so the three sites read as
          one ecosystem. */
       --bg: #f2ede1;
       --surface: #fbf8f0;
@@ -339,6 +339,11 @@
 
     <div class="about">
       <p>
+        <strong>This page is the hub, not an app.</strong> It doesn't ask you to log in or
+        approve anything -- it just explains PIKO and links out to the two things you can
+        actually do: mine, or play. Both of those live on their own separate canisters below.
+      </p>
+      <p>
         <strong>Mine it</strong> right in your browser -- no wallet software or CLI, just Internet
         Identity -- or run a self-owned canister that mines around the clock. Every accepted proof
         costs a small, non-refundable ICP fee: mostly burned permanently, a share converted to
@@ -346,8 +351,16 @@
       </p>
       <p>
         <strong>PIKO Dice</strong> is a companion game, deliberately hosted on its own separate
-        site: a provably-fair, 1% house edge dice game, resolved by the Internet Computer's own
-        on-chain randomness, giving mined PIKO somewhere to actually be spent.
+        site with its own login/approval flow -- opting into betting is never bundled with
+        mining. A provably-fair, 1% house edge dice game, resolved by the Internet Computer's
+        own on-chain randomness, giving mined PIKO somewhere to actually be spent.
+      </p>
+      <p>
+        <strong>One token, one ledger, everywhere.</strong> The mining site and the dice site
+        move the exact same PIKO through the exact same ledger canister below -- your balance is
+        the same number on both, not separate per-site play money. That's also why this page
+        only ever links to those two applications instead of embedding either: one login, one
+        balance, two things to do with it.
       </p>
       <p>
         Independent project. Mining is inspired by the publicly described "proof-of-on-chain-work"

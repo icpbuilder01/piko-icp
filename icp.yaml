@@ -4,8 +4,8 @@ canisters:
   - ledger
   - mother
   - miner
-  - casino
-  - casino-frontend
+  - dice
+  - dice-frontend
   - frontend
   - landing
 

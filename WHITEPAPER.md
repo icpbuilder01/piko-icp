@@ -168,13 +168,18 @@ figure. A bet whose potential payout would exceed `maxPayoutBps` (1% at
 launch) of that live bankroll is rejected outright, before any stake moves,
 so the game can never accept a bet it couldn't cover if it lost.
 
-**PIKO-only, by site policy.** The `casino` canister's contract itself
+**PIKO-only, by site policy.** The `dice` canister's contract itself
 still understands both PIKO and ICP as bettable tokens, but
-`casino-frontend` -- the only sanctioned way to play -- offers PIKO bets
+`dice-frontend` -- the only sanctioned way to play -- offers PIKO bets
 exclusively. An ICP bet is also economically inert in practice: the ICP
 bankroll starts, and stays, at zero unless someone deliberately funds it, and
 a zero bankroll means `maxPayoutAllowed` is zero, so any ICP bet is rejected
 as too large before a single e8 moves.
+
+(`dice` was named `casino` earlier in this project's history -- same
+canister, same principal, renamed at the project level once that name read
+as a heavier claim than intended for what the site itself always just
+called "PIKO Dice".)
 
 Risk parameters (`maxPayoutBps`, the protected bankroll floor, the
 cycles-funding split) are timelocked and lockable exactly like `mother`'s
@@ -185,7 +190,7 @@ The same hourly-sweep, ICP-profit-to-cycles self-funding pattern as
 ## 6. Architecture
 
 PIKO has no servers, no database, and no off-chain component of any kind.
-Six canisters, all on the Internet Computer, do the entire job:
+Seven canisters, all on the Internet Computer, do the entire job:
 
 - **`ledger`** -- the unmodified, DFINITY-maintained ICRC-1/ICRC-2 ledger
   canister, the same code other ICP tokens run, not a bespoke contract.
@@ -200,11 +205,27 @@ Six canisters, all on the Internet Computer, do the entire job:
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
   in-browser miner (a Web Worker calling `crypto.subtle.digest`) all ship
   from here.
-- **`casino`** -- the PIKO Dice game logic (&sect;5): bet resolution,
+- **`dice`** -- the PIKO Dice game logic (&sect;5): bet resolution,
   bankroll accounting, and its own timelocked risk config.
-- **`casino-frontend`** -- a second, separate static asset canister for
+- **`dice-frontend`** -- a second, separate static asset canister for
   PIKO Dice, intentionally not folded into `frontend` so mining and betting
   stay two distinct sites.
+- **`landing`** -- the project's public entry point (`piko.network`): a
+  single static page explaining PIKO and linking out to the two
+  applications above. It never calls any canister itself -- no login, no
+  approval, nothing at stake here -- purely a signpost.
+
+**How the four sites relate.** `landing` is the hub: it explains the
+project once and links out, rather than duplicating either application.
+`frontend` (mining) and `dice-frontend` (betting) are deliberately separate
+applications with separate login/approval flows -- opting into one is never
+a bundled default for the other -- but both ultimately move the *same*
+PIKO through the *same* `ledger` canister. A balance shown on the mining
+dashboard and a balance shown on the dice site are the same number, read
+from the same account, not two separate in-game currencies. `mother` and
+`dice` are the coordinator canisters behind `frontend` and `dice-frontend`
+respectively; an end user calls the frontend, never the coordinator
+directly.
 
 If every conventional server DFINITY or anyone else operates vanished
 tomorrow, this system would keep running exactly as it does today --
@@ -219,12 +240,12 @@ been tested against concurrent, competing submissions to confirm exactly
 one winner is ever paid per block.
 
 What it cannot yet claim is trustlessness in the strict sense. `mother`,
-`ledger`, `miner`, `frontend`, `casino`, and `casino-frontend` currently
+`ledger`, `miner`, `frontend`, `dice`, and `dice-frontend` currently
 share a single controller. A canister controller can install new code at
 any time, which means the guarantees in this paper hold only as long as
 that controller chooses not to change them by replacing the code outright.
 This is disclosed here deliberately rather than left implicit -- it applies
-to `casino`'s bankroll exactly as it applies to `mother`'s supply cap.
+to `dice`'s bankroll exactly as it applies to `mother`'s supply cap.
 
 **Parameter changes, short of a code upgrade, are timelocked.** The ICP fee
 target (which ledger, which burn account, which CMC) can't change in a
@@ -239,7 +260,7 @@ specific promise from "enforced by a key" into "enforced by code" well
 before the whole canister is blackholed. **Difficulty has no controller
 path at all** -- see &sect;3 -- it retargets itself from on-chain block
 timestamps, so there is nothing to propose, timelock, or lock for it, and
-nothing that freezes once the controller is gone. `casino`'s own risk
+nothing that freezes once the controller is gone. `dice`'s own risk
 parameters (&sect;5) go through the identical
 propose/48h-wait/execute/cancel/lock machinery, independent of `mother`'s.
 
@@ -301,8 +322,9 @@ the code itself is not yet immutable.
 | `ledger` | `56aad-fiaaa-aaaaj-qsefa-cai` | PIKO ICRC-1 ledger |
 | `miner` | `5qcnl-6yaaa-aaaaj-qseea-cai` | Reference miner |
 | `frontend` | `5xdl7-taaaa-aaaaj-qseeq-cai` | Mining site & dashboard |
-| `casino` | `7yyso-myaaa-aaaaj-qseia-cai` | PIKO Dice game logic |
-| `casino-frontend` | `77zu2-baaaa-aaaaj-qseiq-cai` | PIKO Dice site |
+| `dice` | `7yyso-myaaa-aaaaj-qseia-cai` | PIKO Dice game logic |
+| `dice-frontend` | `77zu2-baaaa-aaaaj-qseiq-cai` | PIKO Dice site |
+| `landing` | `7w27g-xiaaa-aaaaj-qseja-cai` | Project entry point (`piko.network`) |
 | ICP ledger | `ryjl3-tyaaa-aaaaa-aaaba-cai` | Mainnet ICP (external) |
 
 Add the `ledger` principal above to the NNS dapp or any ICRC-1-aware wallet

@@ -7,9 +7,9 @@ export default defineConfig(({ command }) => {
   const plugins = [
     react(),
     icpBindgen({
-      // The on-chain dice game -- see ../casino/src/main.mo.
-      didFile: "../casino/casino.did",
-      outDir: "./src/bindings/casino",
+      // The on-chain dice game -- see ../dice/src/main.mo.
+      didFile: "../dice/dice.did",
+      outDir: "./src/bindings/dice",
     }),
     icpBindgen({
       // PIKO's own ledger -- this site only ever bets PIKO (see
@@ -29,7 +29,7 @@ export default defineConfig(({ command }) => {
   // canister ids this frontend talks to directly, plus the sibling
   // `frontend` canister's id (only used to link back to the mining site).
   const environment = process.env.ICP_ENVIRONMENT || "local";
-  const CANISTER_NAMES = ["casino", "ledger", "frontend"];
+  const CANISTER_NAMES = ["dice", "ledger", "frontend"];
 
   const networkStatus = JSON.parse(
     execSync(`icp network status -e ${environment} --json`, { encoding: "utf-8" })

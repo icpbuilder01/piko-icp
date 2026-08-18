@@ -26,7 +26,7 @@ export default defineConfig(({ command }) => {
   // read-only monitoring dashboard (dashboard.html) -- Rollup needs every
   // HTML entry listed explicitly, unlike vite's dev server which serves any
   // .html file by path with no config. PIKO Dice is a deliberately separate
-  // site/canister (see casino-frontend/), not a third page here.
+  // site/canister (see dice-frontend/), not a third page here.
   const build = {
     rollupOptions: {
       input: {

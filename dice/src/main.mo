@@ -13,12 +13,17 @@ import Timer "mo:core/Timer";
 import Map "mo:core/Map";
 import Types "types";
 
-// PIKO casino: a provably-fair, fully on-chain dice game, self-funded in
+// PIKO Dice: a provably-fair, fully on-chain dice game, self-funded in
 // cycles the same way `mother` is. Built as a companion to PIKO mining --
 // see README -- to give PIKO (and ICP) something to do besides sit in a
 // wallet, without ever touching fiat or requiring KYC: every stake and
 // every payout is an ICRC-1/ICRC-2 transfer between principals, nothing
 // off-chain, no human arbiter.
+//
+// Canister name is `dice` (renamed from an earlier `casino`, kept out of
+// the name deliberately -- the game itself, PIKO Dice, was always the
+// public-facing name; this just brings the canister/repo naming in line
+// with it instead of a more loaded internal label).
 //
 // The odds are the standard "roll under" crypto-dice formula (the same one
 // used across the space, e.g. Stake.com's dice game): pick a target in
@@ -54,6 +59,17 @@ actor self {
   var icpLedgerId : Principal = Principal.fromText("ryjl3-tyaaa-aaaaa-aaaba-cai");
   var cmcId : Principal = Principal.fromText("rkp4c-7iaaa-aaaaa-aaaca-cai");
 
+  // dice-frontend has no revenue mechanism of its own -- unlike this
+  // canister, which self-funds via sweepIcpProfit's cyclesFundRatioBps
+  // share of real betting profit -- so without this it would depend
+  // entirely on manual `icp canister top-up` forever, same problem
+  // mother's topUpProject() solves for ledger/frontend/miner. Optional
+  // (not trapping if unset), same reasoning as mother's own frontendId.
+  let diceFrontendId : ?Principal = switch (Runtime.envVar<system>("PUBLIC_CANISTER_ID:dice-frontend")) {
+    case (?text) { ?Principal.fromText(text) };
+    case null { null };
+  };
+
   func ledgerIdFor(token : Types.TokenKind) : Principal {
     switch (token) { case (#ICP) { icpLedgerId }; case (#PIKO) { pikoLedgerId } };
   };
@@ -81,6 +97,11 @@ actor self {
   let ICP_LEDGER_FEE_E8S : Nat = 10_000;
   let SWEEP_INTERVAL_SECONDS : Nat = 3600; // 1h, same cadence as mother
   transient var sweepTimerId : ?Timer.TimerId = null;
+
+  // Never share cycles below this floor -- keeps whatever this canister
+  // needs for its own healthy operation first, only forwards genuine
+  // surplus to dice-frontend. Same floor as mother's own CYCLES_RESERVE.
+  let CYCLES_RESERVE : Nat = 2_000_000_000_000; // 2T
 
   // ---- Bet state ----
   // In-flight lock, not a cooldown: a caller with an unresolved bet can't
@@ -192,6 +213,7 @@ actor self {
       icpBankrollFloorE8s = riskConfig.icpBankrollFloorE8s;
       cyclesFundRatioBps = riskConfig.cyclesFundRatioBps;
       withdrawalsLocked;
+      riskConfigLocked;
       icpLedgerId;
       pikoLedgerId;
     };
@@ -222,7 +244,7 @@ actor self {
 
   public query func getRecentBets() : async [Types.RecentBet] { recentBets };
 
-  // Ranked by PIKO wagered -- the casino-frontend/ site only ever offers
+  // Ranked by PIKO wagered -- the dice-frontend/ site only ever offers
   // PIKO bets (see its Dice.tsx), so ICP volume is not a meaningful sort
   // key even though it's still tracked (see LeaderboardEntry in types.mo
   // for why PIKO and ICP volume are never summed). Built from the union of
@@ -560,6 +582,33 @@ actor self {
     { profit; cyclesFunded = cyclesAmount; cyclesMinted; notifyError };
   };
 
+  // Shares this canister's own cycles surplus with dice-frontend, the same
+  // way mother.topUpProject() does for ledger/frontend/miner -- dice-frontend
+  // is a static asset canister with no way to earn cycles on its own.
+  // Deliberately simple (a single target, unlike mother's three-way split):
+  // keeps CYCLES_RESERVE for itself, forwards the rest. No state kept here
+  // either, for the same reason sweepIcpProfit keeps none: it just re-reads
+  // Cycles.balance() fresh every call.
+  public shared func topUpDiceFrontend() : async { sent : Nat } {
+    let balance = Cycles.balance();
+    if (balance <= CYCLES_RESERVE) { return { sent = 0 } };
+    switch (diceFrontendId) {
+      case null { { sent = 0 } };
+      case (?target) {
+        let surplus = balance - CYCLES_RESERVE;
+        let Management : Types.ManagementActor = actor ("aaaaa-aa");
+        let outcome = try {
+          await (with cycles = surplus) Management.deposit_cycles({ canister_id = target });
+          ?();
+        } catch (_e) { null };
+        switch (outcome) {
+          case (?()) { { sent = surplus } };
+          case null { { sent = 0 } };
+        };
+      };
+    };
+  };
+
   func armSweepTimer<system>() {
     switch (sweepTimerId) {
       case (?id) { Timer.cancelTimer(id) };
@@ -567,7 +616,10 @@ actor self {
     };
     sweepTimerId := ?Timer.recurringTimer<system>(
       #seconds SWEEP_INTERVAL_SECONDS,
-      func() : async () { ignore (await sweepIcpProfit()) },
+      func() : async () {
+        ignore (await sweepIcpProfit());
+        ignore (await topUpDiceFrontend());
+      },
     );
   };
 

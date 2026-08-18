@@ -836,8 +836,11 @@ actor self {
   // blocking legitimate anonymous browser miners -- but it bounds the
   // damage: an entry older than MIN_SUBMIT_INTERVAL_NANOS is provably stale
   // (that principal's cooldown has already expired) and safe to drop.
-  // Permissionless, like sweepTreasury() -- meant to be called periodically
-  // by a keeper/cron rather than relying on any single party.
+  // Permissionless, like sweepTreasury() -- and, like sweepTreasury(), now
+  // also fired automatically on armSweepTimer's recurring timer (see
+  // below), so this no longer depends on an external keeper/cron
+  // remembering to call it. Still callable manually too (e.g. to prune
+  // immediately rather than waiting for the next tick).
   public shared func pruneStaleAttempts() : async Nat {
     let now = Time.now();
     let entries = Iter.toArray(Map.entries(lastAttempt));
@@ -1076,6 +1079,12 @@ actor self {
       func() : async () {
         ignore (await sweepTreasury());
         ignore (await topUpProject());
+        // Was previously only callable manually/by an external
+        // keeper -- meaning lastAttempt could grow unbounded (any free
+        // principal adds an entry, even with an invalid proof) unless
+        // someone remembered to call it. Riding this same timer closes
+        // that gap without needing a separate one.
+        ignore (await pruneStaleAttempts());
       },
     );
   };
