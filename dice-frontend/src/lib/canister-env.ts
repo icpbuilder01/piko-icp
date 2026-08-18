@@ -4,14 +4,14 @@ import { getCanisterEnv } from "@icp-sdk/core/agent/canister-env";
 // project on the asset canister's environment (see vite.config.ts for how
 // this is mirrored during local dev via a cookie).
 interface CanisterEnv {
-  readonly "PUBLIC_CANISTER_ID:casino": string;
+  readonly "PUBLIC_CANISTER_ID:dice": string;
   readonly "PUBLIC_CANISTER_ID:ledger": string;
   readonly "PUBLIC_CANISTER_ID:frontend": string;
 }
 
 export const canisterEnv = getCanisterEnv<CanisterEnv>();
 
-export const casinoCanisterId = canisterEnv["PUBLIC_CANISTER_ID:casino"];
+export const diceCanisterId = canisterEnv["PUBLIC_CANISTER_ID:dice"];
 export const ledgerCanisterId = canisterEnv["PUBLIC_CANISTER_ID:ledger"];
 export const rootKey = canisterEnv.IC_ROOT_KEY;
 

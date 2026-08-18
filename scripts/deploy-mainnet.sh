@@ -17,9 +17,9 @@ cd "$(dirname "$0")/.."
 # ~0.5T creation fee with enough left over to also cover code installation.
 CYCLES_MOTHER=1000000000000          # 1T
 CYCLES_MINER=1000000000000           # 1T
-CYCLES_CASINO=1000000000000          # 1T
+CYCLES_DICE=1000000000000          # 1T
 CYCLES_FRONTEND=1000000000000        # 1T
-CYCLES_CASINO_FRONTEND=1000000000000 # 1T -- PIKO Dice's own site, a separate
+CYCLES_DICE_FRONTEND=1000000000000 # 1T -- PIKO Dice's own site, a separate
                                       # canister from `frontend` on purpose
 CYCLES_LEDGER=4000000000000    # 4T -- the ledger needs the most: it funds
                                 # its own archive canisters as tx history grows
@@ -47,16 +47,16 @@ render_ledger_args "$PLACEHOLDER" "$PLACEHOLDER" # placeholder so the project lo
 echo "==> Creating canisters (mother first, to reserve its principal)..."
 MOTHER_ID=$(get_or_create mother "$CYCLES_MOTHER")
 MINER_ID=$(get_or_create miner "$CYCLES_MINER")
-CASINO_ID=$(get_or_create casino "$CYCLES_CASINO")
+DICE_ID=$(get_or_create dice "$CYCLES_DICE")
 FRONTEND_ID=$(get_or_create frontend "$CYCLES_FRONTEND")
-CASINO_FRONTEND_ID=$(get_or_create casino-frontend "$CYCLES_CASINO_FRONTEND")
+DICE_FRONTEND_ID=$(get_or_create dice-frontend "$CYCLES_DICE_FRONTEND")
 LEDGER_ID=$(get_or_create ledger "$CYCLES_LEDGER")
 DEPLOYER_ID=$(icp identity principal)
 echo "    mother:          $MOTHER_ID"
 echo "    miner:           $MINER_ID"
-echo "    casino:          $CASINO_ID"
+echo "    dice:          $DICE_ID"
 echo "    frontend:        $FRONTEND_ID"
-echo "    casino-frontend: $CASINO_FRONTEND_ID"
+echo "    dice-frontend: $DICE_FRONTEND_ID"
 echo "    ledger:          $LEDGER_ID"
 
 echo "==> Rendering real ledger init args..."
@@ -66,8 +66,8 @@ echo "==> Installing ledger..."
 icp build ledger -e ic
 icp canister install ledger -e ic --mode install --args-file ledger/icrc1_ledger_init.args -y
 
-echo "==> Deploying mother, miner, casino, frontend, casino-frontend..."
-icp deploy mother miner casino frontend casino-frontend -e ic -y
+echo "==> Deploying mother, miner, dice, frontend, dice-frontend..."
+icp deploy mother miner dice frontend dice-frontend -e ic -y
 
 echo ""
 echo "==> Done. If any install step failed with 'out of cycles', top up and retry:"
@@ -75,4 +75,4 @@ echo "    icp canister top-up <name> --amount <cycles> -e ic"
 echo "    icp deploy <name> -e ic -y"
 echo ""
 echo "    frontend (mining):  https://${FRONTEND_ID}.icp.net/"
-echo "    casino-frontend:    https://${CASINO_FRONTEND_ID}.icp.net/"
+echo "    dice-frontend:    https://${DICE_FRONTEND_ID}.icp.net/"

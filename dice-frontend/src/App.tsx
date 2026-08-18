@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
-import { getCasinoActor } from "./lib/actors";
+import { getDiceActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
 import { frontendUrl } from "./lib/canister-env";
 import { formatPiko, shortPrincipal } from "./lib/format";
 import { Dice } from "./components/Dice";
 import { Wallet } from "./components/Wallet";
-import type { Stats, RecentBet, LeaderboardEntry } from "./bindings/casino/casino";
+import type { Stats, RecentBet, LeaderboardEntry } from "./bindings/dice/dice";
 import "./App.css";
 
 const POLL_MS = 5000;
@@ -28,13 +28,13 @@ function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const casino = getCasinoActor();
-      const [s, bets, lb] = await Promise.all([casino.getStats(), casino.getRecentBets(), casino.getLeaderboard()]);
+      const dice = getDiceActor();
+      const [s, bets, lb] = await Promise.all([dice.getStats(), dice.getRecentBets(), dice.getLeaderboard()]);
       setStats(s);
       setRecentBets(bets.slice().reverse());
       setLeaderboard(lb);
     } catch (err) {
-      console.error("Failed to refresh casino stats", err);
+      console.error("Failed to refresh dice stats", err);
     }
   }, []);
 

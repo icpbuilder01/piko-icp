@@ -81,9 +81,14 @@ module {
 
   /// The IC management canister (aaaaa-aa). raw_rand is what resolves every
   /// bet -- see placeBet() in main.mo for why it's only ever called *after*
-  /// the stake has already been pulled from the player.
+  /// the stake has already been pulled from the player. deposit_cycles is
+  /// used by topUpDiceFrontend() to share this canister's own cycles
+  /// surplus with dice-frontend, the same pattern mother.topUpProject()
+  /// uses for ledger/frontend/miner -- credits whatever cycles are attached
+  /// to *this* call to canister_id.
   public type ManagementActor = actor {
     raw_rand : () -> async Blob;
+    deposit_cycles : ({ canister_id : Principal }) -> async ();
   };
 
   /// Which ledger a bet is denominated in. BOB is deliberately not
@@ -119,7 +124,7 @@ module {
   // Wagered volume, kept per-token rather than summed into one figure --
   // PIKO has no established market value (see README) so adding it to ICP
   // wagered would produce a number that means nothing economically. Sorted
-  // by PIKO volume (see getLeaderboard() in main.mo) -- the casino-frontend/
+  // by PIKO volume (see getLeaderboard() in main.mo) -- the dice-frontend/
   // site only ever offers PIKO bets, so that's the only volume that's
   // actually meaningful to rank players by; wageredIcpE8s is still tracked
   // for whoever bets ICP directly against the canister.
@@ -165,6 +170,7 @@ module {
     icpBankrollFloorE8s : Nat;
     cyclesFundRatioBps : Nat;
     withdrawalsLocked : Bool;
+    riskConfigLocked : Bool;
     icpLedgerId : Principal;
     pikoLedgerId : Principal;
   };
