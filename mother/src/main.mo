@@ -669,6 +669,17 @@ actor self {
     } else { sorted };
   };
 
+  // getLeaderboard() above is capped at the top 10, so once there are more
+  // miners than that, nothing else exposes the true total -- added after
+  // being asked "how do I know the real miner count once the leaderboard
+  // stops at 10" and realizing the honest answer was "you currently
+  // can't." minerBlocks has exactly one entry per principal that has ever
+  // won a block, so its size is that count directly, no extra state to
+  // keep in sync.
+  public query func getMinerCount() : async Nat {
+    Map.size(minerBlocks);
+  };
+
   // A single miner's lifetime totals -- getLeaderboard() only ever returns
   // the top 10 by reward, so anyone outside that isn't in it at all. Takes
   // the principal as an argument rather than reading `caller` so the

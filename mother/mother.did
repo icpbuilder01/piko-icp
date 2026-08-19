@@ -116,6 +116,7 @@ service : {
   executeCyclesFundRatioBps: () -> ();
   executeIcpFeeTarget: () -> ();
   getLeaderboard: () -> (vec LeaderboardEntry) query;
+  getMinerCount: () -> (nat) query;
   getMinerStats: (p: principal) -> (LeaderboardEntry) query;
   getPendingAdminChanges: () -> (PendingAdminChanges) query;
   getPendingReward: () -> (nat) query;
