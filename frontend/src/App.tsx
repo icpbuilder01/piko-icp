@@ -443,6 +443,26 @@ function App() {
   // still loading.
   const insufficientIcpBalance = work && icpBalance !== null ? icpBalance < work.miningFeeE8s : false;
 
+  // The "ICP allowance" tile's "~N blocks" figure used to be derived from
+  // the allowance alone -- but an allowance is just a ceiling on what
+  // mother is *permitted* to pull (standard ICRC-2 approve semantics), not
+  // a reservation of funds, so it can legitimately sit well above the
+  // wallet's actual balance (e.g. after mining has spent some of what was
+  // approved, or after sending ICP elsewhere). Showing the allowance-only
+  // figure in that case overstates how many more blocks are actually
+  // affordable: the real ceiling is whichever of the two runs out first.
+  const affordableBlocks =
+    work && allowance !== null
+      ? (() => {
+          const costPerBlock = work.miningFeeE8s + ICP_LEDGER_FEE_E8S;
+          const allowanceBlocks = allowance / costPerBlock;
+          const balanceBlocks = icpBalance !== null ? icpBalance / costPerBlock : allowanceBlocks;
+          return balanceBlocks < allowanceBlocks
+            ? { blocks: balanceBlocks, limitedByBalance: true }
+            : { blocks: allowanceBlocks, limitedByBalance: false };
+        })()
+      : null;
+
   // Proactively stops mining the moment balance/allowance state syncs as
   // insufficient, rather than waiting for the *next* submitProof to fail
   // first (see handleFound's own stop-on-InsufficientAllowance/Funds path,
@@ -618,10 +638,11 @@ function App() {
                 </div>
                 <div className="stat-value">
                   {allowance !== null ? formatIcp(allowance) : "..."}
-                  {work && allowance !== null && (
+                  {affordableBlocks && (
                     <span className="stat-value-suffix">
                       {" "}
-                      (~{(allowance / (work.miningFeeE8s + ICP_LEDGER_FEE_E8S)).toString()} blocks)
+                      (~{affordableBlocks.blocks.toString()} blocks
+                      {affordableBlocks.limitedByBalance ? ", limited by balance" : ""})
                     </span>
                   )}
                 </div>
