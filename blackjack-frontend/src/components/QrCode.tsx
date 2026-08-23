@@ -43,7 +43,7 @@ export function QrCode({ value, size = 200 }: QrCodeProps) {
       shapeRendering="crispEdges"
       className="qr-svg"
       role="img"
-      aria-label="PikoPoker wallet QR code"
+      aria-label="Wallet QR code"
     >
       <rect x={0} y={0} width={dimension} height={dimension} fill="var(--surface)" />
       <g fill="var(--text)">{rects}</g>

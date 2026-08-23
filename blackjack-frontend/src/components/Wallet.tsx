@@ -149,8 +149,8 @@ export function Wallet({ identity, balance, onClose, onBalanceChange }: WalletPr
             </button>
           </div>
           <p className="wallet-hint">
-            Share this principal (or the QR code) with anyone sending you PIKO -- from PikoPay,
-            an exchange, or another wallet. It's just an address, nothing here can move funds on
+            Share this principal (or the QR code) with anyone sending you PIKO -- from an
+            exchange or another wallet. It's just an address, nothing here can move funds on
             its own.
           </p>
         </div>
