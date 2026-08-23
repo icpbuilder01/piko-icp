@@ -15,6 +15,14 @@ off-chain server, no off-chain database.
 | mother | `45mjf-rqaaa-aaaaj-qsedq-cai` | https://45mjf-rqaaa-aaaaj-qsedq-cai.icp.net/ |
 | miner (reference instance) | `5qcnl-6yaaa-aaaaj-qseea-cai` | https://5qcnl-6yaaa-aaaaj-qseea-cai.icp.net/ |
 | ledger | `56aad-fiaaa-aaaaj-qsefa-cai` | https://56aad-fiaaa-aaaaj-qsefa-cai.icp.net/ |
+| index | `ymzxo-vqaaa-aaaaj-qse3q-cai` | https://ymzxo-vqaaa-aaaaj-qse3q-cai.icp.net/ |
+
+`index` is the official pre-built ICRC-1 index-ng canister (same
+`ledger-suite-icrc-2026-03-09` release as `ledger` itself), mirroring the
+ledger's transactions for fast per-account/per-index lookups -- purely
+additive, never touches the ledger. `landing`'s `/tx/?index={n}` page reads
+from it live for external listings (e.g. a token registry) that need a
+transaction-URL format.
 
 **PIKO Dice**, a companion on-chain dice game, is deliberately hosted on its
 own two canisters rather than folded into the site above:
@@ -23,6 +31,23 @@ own two canisters rather than folded into the site above:
 |---|---|---|
 | dice-frontend | `77zu2-baaaa-aaaaj-qseiq-cai` | https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ |
 | dice | `7yyso-myaaa-aaaaj-qseia-cai` | https://7yyso-myaaa-aaaaj-qseia-cai.icp.net/ |
+
+**PikoBlackjack**, a second companion game (full interactive single-deck
+Blackjack -- Hit/Stand/Double/Split), is a *completely separate icp-cli
+project* (its own `icp.yaml`, its own local network, deployed and upgraded
+independently of everything above) -- not part of this repo's own
+canister/deploy lifecycle at all. Its source lives in `blackjack/` and
+`blackjack-frontend/` here purely for public code transparency; deploying
+piko-icp's own `icp.yaml` never touches it.
+
+| Canister | ID | URL |
+|---|---|---|
+| blackjack-frontend | `bcd2h-5iaaa-aaaai-ax4hq-cai` | https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/ |
+| blackjack | `d76up-oaaaa-aaaai-ax4ia-cai` | https://d76up-oaaaa-aaaai-ax4ia-cai.icp.net/ |
+
+Both `dice` and `blackjack` (plus `blackjack-frontend`) receive cycles from
+`mother`'s automatic top-up loop regardless of the project-boundary split --
+see "Automatic cycle self-funding" below.
 
 (`dice`/`dice-frontend` were named `casino`/`casino-frontend` in this
 project's early history -- same canisters, same IDs, renamed purely at the
@@ -35,23 +60,24 @@ There are four separately hosted sites, each its own asset canister, on
 purpose -- opting into one is never a bundled default for the others:
 
 ```
-                        piko.network (landing)
+                              piko.network (landing)
                         "you are here" -- links out, explains, verifies
-                       /                                  \
-                      v                                    v
-          frontend (mining dashboard)          dice-frontend (PIKO Dice)
-          Mine.PIKO, Internet Identity,         Roll under a target,
-          leaderboard, live chain stats         1% house edge, PIKO-only
-                      \                                    /
-                       v                                  v
+                       /                    |                    \
+                      v                     v                     v
+          frontend (mining        dice-frontend (PIKO      blackjack-frontend
+          dashboard) -- Mine      Dice) -- roll under a     -- single-deck
+          PIKO, Internet          target, 1% house edge,    Blackjack, PIKO-
+          Identity, leaderboard   PIKO-only                 only
+                      \                     |                    /
+                       v                    v                   v
                           ledger (PIKO's own ICRC-1 token)
-                     both sites move real PIKO through this
+                     all three sites move real PIKO through this
                      one canister -- your balance is the same
                      everywhere, not per-site play money
 ```
 
 - **`landing`** (this domain, `www.piko.network`) is the entry point: a
-  single static page explaining the project, linking out to the two actual
+  single static page explaining the project, linking out to the actual
   applications, and pointing at the whitepaper/source for verification. It
   never talks to any canister itself -- no wallet, no login, nothing to
   approve here.
@@ -62,12 +88,17 @@ purpose -- opting into one is never a bundled default for the others:
   login/approval flow, a separate site, deliberately not merged into
   `frontend` -- playing is an opt-in choice distinct from mining, not
   something a miner is funneled into.
-- Both applications ultimately move the *same* PIKO through the *same*
-  `ledger` canister -- your balance on the mining dashboard and your balance
-  on the dice site are the same number, not two separate in-game
-  currencies. `mother` and `dice` are the two coordinator canisters behind
-  `frontend` and `dice-frontend` respectively; neither end user ever calls
-  them directly.
+- **`blackjack-frontend`** is the second betting application (PikoBlackjack):
+  same separation principle as `dice-frontend`, but a genuinely separate
+  icp-cli project (see the table above) -- its source is vendored into this
+  repo under `blackjack/`/`blackjack-frontend/` for transparency, not
+  deployed from here.
+- All three applications ultimately move the *same* PIKO through the *same*
+  `ledger` canister -- your balance is the same number everywhere, not
+  separate per-site play money. `mother`, `dice`, and `blackjack` are the
+  three coordinator canisters behind `frontend`, `dice-frontend`, and
+  `blackjack-frontend` respectively; neither end user ever calls them
+  directly.
 
 The mainnet canisters currently hold modest cycle balances (~0.5T-0.8T each,
 ~3.7T for the ledger) -- enough to run for a good while at low traffic, but

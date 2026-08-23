@@ -1,0 +1,246 @@
+type TransferResult = 
+ variant {
+   Err: TransferError;
+   Ok: nat;
+ };
+type TransferFromError = 
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientAllowance: record {allowance: nat;};
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type TransferError = 
+ variant {
+   BadBurn: record {min_burn_amount: nat;};
+   BadFee: record {expected_fee: nat;};
+   CreatedInFuture: record {ledger_time: nat64;};
+   Duplicate: record {duplicate_of: nat;};
+   GenericError: record {
+                   error_code: nat;
+                   message: text;
+                 };
+   InsufficientFunds: record {balance: nat;};
+   TemporarilyUnavailable;
+   TooOld;
+ };
+type TokenKind = 
+ variant {
+   ICP;
+   PIKO;
+ };
+type Time = int;
+type SweepResult = 
+ record {
+   cyclesFunded: nat;
+   cyclesMinted: opt nat;
+   notifyError: opt text;
+   profit: nat;
+ };
+type Stats = 
+ record {
+   cyclesBalance: nat;
+   icpBankrollE8s: nat;
+   pikoBankroll: nat;
+   roundsPlayed: nat;
+   totalPaidOutIcpE8s: nat;
+   totalPaidOutPiko: nat;
+   totalWageredIcpE8s: nat;
+   totalWageredPiko: nat;
+ };
+type Rules = 
+ record {
+   blackjackPayoutBps: nat;
+   dealerStandsOn: nat;
+   deckCount: nat;
+   doubleAfterSplitAllowed: bool;
+   doubleDownAllowed: bool;
+   insuranceOffered: bool;
+   resplitAllowed: bool;
+   roundExpiryNanos: int;
+   splitAllowed: bool;
+ };
+type ResolvedStatus = 
+ variant {
+   DealerBust;
+   DealerWin;
+   PlayerBlackjack;
+   PlayerBust;
+   PlayerWin;
+   Push;
+ };
+type ResolvedPlayerHandView = 
+ record {
+   betAmount: nat;
+   cards: vec Card;
+   payoutAmount: nat;
+   status: ResolvedStatus;
+   total: nat;
+ };
+type RecentRound = 
+ record {
+   amount: nat;
+   dealerCards: vec Card;
+   hands:
+    vec record {
+          cards: vec Card;
+          payoutAmount: nat;
+          status: ResolvedStatus;
+        };
+   player: principal;
+   timestamp: Time;
+   token: TokenKind;
+ };
+type PlayerHandView = 
+ record {
+   cards: vec Card;
+   status: opt ResolvedStatus;
+   total: nat;
+ };
+type PendingWithdrawal = 
+ record {
+   amount: nat;
+   readyAt: Time;
+   to: principal;
+   token: TokenKind;
+ };
+type PendingBankrollConfig = 
+ record {
+   readyAt: Time;
+   value: BankrollConfig;
+ };
+type PendingAdminChanges = 
+ record {
+   bankrollConfig: opt PendingBankrollConfig;
+   timelockNanos: int;
+   withdrawal: opt PendingWithdrawal;
+ };
+type LeaderboardEntry = 
+ record {
+   player: principal;
+   wageredIcpE8s: nat;
+   wageredPiko: nat;
+ };
+type Config = 
+ record {
+   bankrollConfigLocked: bool;
+   cyclesFundRatioBps: nat;
+   icpBankrollFloorE8s: nat;
+   icpLedgerId: principal;
+   maxPayoutBps: nat;
+   pikoLedgerId: principal;
+   withdrawalsLocked: bool;
+ };
+type ClaimResult = 
+ variant {
+   Err: BlackjackError;
+   Ok: nat;
+ };
+type CardSuit = 
+ variant {
+   Clubs;
+   Diamonds;
+   Hearts;
+   Spades;
+ };
+type CardRank = 
+ variant {
+   Ace;
+   Eight;
+   Five;
+   Four;
+   Jack;
+   King;
+   Nine;
+   Queen;
+   Seven;
+   Six;
+   Ten;
+   Three;
+   Two;
+ };
+type Card = 
+ record {
+   rank: CardRank;
+   suit: CardSuit;
+ };
+type BlackjackView = 
+ variant {
+   Open:
+    record {
+      activeHandIndex: nat;
+      canDouble: bool;
+      canSplit: bool;
+      dealerUpCard: Card;
+      hands: vec PlayerHandView;
+    };
+   Resolved:
+    record {
+      dealerCards: vec Card;
+      dealerTotal: nat;
+      hands: vec ResolvedPlayerHandView;
+      totalPayoutAmount: nat;
+    };
+ };
+type BlackjackResult = 
+ variant {
+   Err: BlackjackError;
+   Ok: BlackjackView;
+ };
+type BlackjackError = 
+ variant {
+   ActionNotAllowed;
+   Anonymous;
+   BetTooLarge: record {maxPayout: nat;};
+   InvalidAmount;
+   NoOpenRound;
+   RandomnessFailed;
+   RoundAlreadyOpen;
+   TransferFailed: TransferFromError;
+ };
+type BankrollConfig = 
+ record {
+   cyclesFundRatioBps: nat;
+   icpBankrollFloorE8s: nat;
+   maxPayoutBps: nat;
+ };
+service : {
+  cancelPendingBankrollConfig: () -> ();
+  cancelPendingWithdrawal: () -> ();
+  claimPendingPayout: (token: TokenKind) -> (ClaimResult);
+  deal: (token: TokenKind, amountE8s: nat) -> (BlackjackResult);
+  doubleDown: () -> (BlackjackResult);
+  executeBankrollConfig: () -> ();
+  executeWithdrawal: () -> (TransferResult);
+  forceResolveRound: (player: principal) -> (BlackjackResult);
+  getConfig: () -> (Config) query;
+  getLeaderboard: () -> (vec LeaderboardEntry) query;
+  getOpenRound: () -> (opt BlackjackView) query;
+  getOpenRoundsCount: () -> (nat) query;
+  getPendingAdminChanges: () -> (PendingAdminChanges) query;
+  getPendingPayout: (token: TokenKind) -> (nat) query;
+  getRecentRounds: () -> (vec RecentRound) query;
+  getRules: () -> (Rules) query;
+  getStats: () -> (Stats);
+  hit: () -> (BlackjackResult);
+  lockBankrollConfig: () -> ();
+  lockPikoLedgerId: () -> ();
+  lockWithdrawals: () -> ();
+  proposeBankrollConfig: (value: BankrollConfig) -> ();
+  proposeWithdrawal: (token: TokenKind, to: principal, amount: nat) -> ();
+  refreshBankrollCaches: () -> ();
+  resolveExpiredRound: (player: principal) -> (BlackjackResult);
+  setPikoLedgerId: (id: principal) -> ();
+  split: () -> (BlackjackResult);
+  stand: () -> (BlackjackResult);
+  sweepIcpProfit: () -> (SweepResult);
+  topUpBlackjackFrontend: () -> (record {sent: nat;});
+}
