@@ -6,10 +6,9 @@ import VarArray "mo:core/VarArray";
 import Cards "cards";
 
 // Standalone correctness check for cards.mo, run via `moc -r` (not part of
-// the deployed canister) -- same verification style pikopoker's own
-// test_cards.mo already established for its cards.mo (freshDeck/shuffle
-// ported byte-for-byte from there, so those checks are ported too; the
-// handTotal checks below are new, specific to blackjack).
+// the deployed canister). freshDeck/shuffle are ported byte-for-byte from a
+// previously proven-correct implementation, so those checks are ported too;
+// the handTotal checks below are new, specific to blackjack.
 
 var failures = 0;
 

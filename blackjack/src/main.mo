@@ -16,10 +16,8 @@ import Types "types";
 import Cards "cards";
 
 // PIKO Blackjack: a provably-fair, fully on-chain, interactive single-deck
-// Blackjack game -- a sibling to PIKO Dice/Poker, same self-
-// funding/escrow/timelock shape, different game (this canister used to be
-// PikoPlinko, then PikoSlots; the game changed twice, the bankroll/ledger/
-// admin machinery underneath never has). Single 52-card deck, shuffled
+// Blackjack game -- a sibling to PIKO Dice, same self-funding/escrow/
+// timelock shape, different game. Single 52-card deck, shuffled
 // once per round from one raw_rand call; dealer stands on all totals >=17
 // (no soft-17 hit); blackjack pays 3:2, an ordinary win pays 2:1, a push
 // returns the stake -- see getRules() for the disclosed, canonical
@@ -60,8 +58,8 @@ actor self {
   // 0..51 encoding cards.mo uses -- see viewOf/resolvedView below for the
   // *only* place these get converted (and, while #Open, redacted) into a
   // Types.BlackjackView. var fields make these genuinely mutable records
-  // (same pattern pikopoker's Seat/Table use) so hit()/stand()/etc. can
-  // mutate the copy already stored in `rounds` in place via Map.get.
+  // so hit()/stand()/etc. can mutate the copy already stored in `rounds`
+  // in place via Map.get.
   //
   // NEVER return a Round (or its hands/dealerCards) directly to a caller --
   // always go through viewOf/resolvedView, which is what actually enforces
@@ -152,15 +150,15 @@ actor self {
   };
 
   // ---- Ledger wiring ----
-  // PikoBlackjack is a standalone project like PikoPay/PikoPoker, not a
-  // piko-icp sibling that deploys its own "ledger" canister -- so unlike
-  // dice's pikoLedgerId (injected via PUBLIC_CANISTER_ID:ledger, a real
-  // same-project dependency there), this follows PikoPoker's own pattern
-  // instead: the real, live PIKO ledger by fixed default, with a
-  // controller-only escape hatch for pointing at a local test-ledger during
-  // development, closed off for good by lockPikoLedgerId() before this is
-  // ever trusted with real funds on mainnet -- see
-  // ../scripts/deploy-local.sh for the local redirect.
+  // PikoBlackjack is a standalone icp-cli project, not a piko-icp sibling
+  // that deploys its own "ledger" canister -- so unlike dice's
+  // pikoLedgerId (injected via PUBLIC_CANISTER_ID:ledger, a real
+  // same-project dependency there), this defaults straight to the real,
+  // live PIKO ledger by fixed principal, with a controller-only escape
+  // hatch for pointing at a local test-ledger during development, closed
+  // off for good by lockPikoLedgerId() before this is ever trusted with
+  // real funds on mainnet -- see ../scripts/deploy-local.sh for the local
+  // redirect.
   var pikoLedgerId : Principal = Principal.fromText("56aad-fiaaa-aaaaj-qsefa-cai");
   var pikoLedgerLocked : Bool = false;
 
