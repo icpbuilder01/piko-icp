@@ -10,9 +10,8 @@ export const canisterEnv = getCanisterEnv<CanisterEnv>();
 export const blackjackCanisterId = canisterEnv["PUBLIC_CANISTER_ID:blackjack"];
 export const rootKey = canisterEnv.IC_ROOT_KEY;
 
-// See pikopoker-frontend's canister-env.ts for the identical reasoning: only
-// the local gateway serves from a *.localhost host, so that's enough to
-// tell local dev apart from mainnet.
+// Only the local gateway serves from a *.localhost host, so that's enough
+// to tell local dev apart from mainnet.
 const isLocal = window.location.hostname.endsWith("localhost");
 
 // The real, live PIKO ledger on mainnet -- blackjack itself defaults to this

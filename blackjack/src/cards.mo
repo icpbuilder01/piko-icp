@@ -4,9 +4,9 @@ import Types "types";
 
 // Deck, shuffle, and blackjack hand-total logic -- a pure module with no
 // actor/canister state, so it can be unit-tested standalone with `moc -r`
-// (see test_cards.mo), same pattern as pikopoker's own cards.mo (this
-// module's freshDeck/shuffle/entropyToNat are ported byte-for-byte from
-// there, already proven correct there).
+// (see test_cards.mo). freshDeck/shuffle/entropyToNat are ported
+// byte-for-byte from a previously proven-correct implementation used
+// elsewhere in this same family of PIKO canisters.
 //
 // A card is a Nat8 0..51 internally: rank = card % 13 (0 = "2" ... 12 =
 // Ace), suit = card / 13 (0..3, arbitrary suit order -- gameplay never
