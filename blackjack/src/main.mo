@@ -18,13 +18,13 @@ import Cards "cards";
 // PIKO Blackjack: a provably-fair, fully on-chain, interactive single-deck
 // Blackjack game -- a sibling to PIKO Dice/Poker, same self-
 // funding/escrow/timelock shape, different game (this canister used to be
-// PikoPlinko, then PikoSlots; the game changed twice now, the bankroll/
-// ledger/admin machinery underneath never has -- see git history for
-// either earlier version if it's ever useful again). Single 52-card deck,
-// shuffled once per round from one raw_rand call; dealer stands on all
-// totals >=17 (no soft-17 hit); blackjack pays 3:2, an ordinary win pays
-// 2:1, a push returns the stake -- see getRules() for the disclosed,
-// canonical numbers. No double-down/split/insurance in this version.
+// PikoPlinko, then PikoSlots; the game changed twice, the bankroll/ledger/
+// admin machinery underneath never has). Single 52-card deck, shuffled
+// once per round from one raw_rand call; dealer stands on all totals >=17
+// (no soft-17 hit); blackjack pays 3:2, an ordinary win pays 2:1, a push
+// returns the stake -- see getRules() for the disclosed, canonical
+// numbers, including Double Down/Split (no insurance, no resplit, no
+// double after split).
 //
 // Unlike spin() (a single atomic call), a round here genuinely spans
 // several calls (deal -> hit* -> stand), which is a new shape for this
