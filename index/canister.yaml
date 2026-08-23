@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://github.com/dfinity/icp-cli/raw/refs/tags/v1.3.0/docs/schemas/canister-yaml-schema.json
+
+# Official pre-built ICRC-1 index-ng canister from dfinity/ic (release
+# ledger-suite-icrc-2026-03-09 -- the exact same release the `ledger`
+# canister's own wasm comes from, see ../ledger/canister.yaml). Purely
+# additive: indexes the existing ledger's transactions per-account for fast
+# lookups (what wallets/explorers like OpenChat need to show transaction
+# history) -- never touches the ledger itself, no changes to token mechanics.
+#
+# ic-icrc1-index-ng.wasm downloaded directly from
+# https://github.com/dfinity/ic/releases/download/ledger-suite-icrc-2026-03-09/ic-icrc1-index-ng.wasm.gz,
+# decompressed, and verified: sha256 matches the release's published hash,
+# and `ic-wasm metadata candid:service` extracted from the wasm itself is
+# byte-identical (minus a trailing blank line) to index-ng.did downloaded
+# separately from the same release -- same verification approach already
+# used for `ledger` (see the security review notes).
+name: index
+recipe:
+  type: "@dfinity/prebuilt@v2.1.0"
+  configuration:
+    path: ic-icrc1-index-ng.wasm
+    sha256: 0768d43e0ca776c80515eb917839cbee0adca38ef69fb28280407c28fe4ea979
+    compress: true
+init_args:
+  path: index_init.args
+  format: candid

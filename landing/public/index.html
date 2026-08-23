@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/piko-logo.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server." />
+  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server. Play Dice or Blackjack with it, provably fair, fully on-chain." />
   <title>PIKO</title>
   <style>
     :root {
@@ -29,6 +29,7 @@
       --accent-soft: #f5ddc4;
 
       --spark: #1a56b8;
+      --felt: #a3271d;
 
       --bevel-hi: #fffdf7;
       --bevel-lo: #a8975f;
@@ -58,6 +59,7 @@
         --accent-soft: #3a2410;
 
         --spark: #3d9bff;
+        --felt: #ff5c4d;
 
         --bevel-hi: #56492c;
         --bevel-lo: #000000;
@@ -237,6 +239,10 @@
       color: var(--spark);
     }
 
+    .link-card.blackjack .link-title {
+      color: var(--felt);
+    }
+
     .ledger-box {
       background: var(--surface);
       border-style: solid;
@@ -326,9 +332,10 @@
       <img src="/piko-logo.svg" alt="" />
       <h1>PIKO</h1>
       <p>
-        A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the
-        Internet Computer. No team allocation, no presale, no off-chain server -- the only way any
-        PIKO comes into existence is by paying the same on-chain cost everyone else pays.
+        A fair-launch, proof-of-on-chain-work token -- real SHA-256 proof-of-work, mined and
+        verified entirely inside canisters on the Internet Computer, no off-chain pool or server.
+        No team allocation, no presale -- the only way any PIKO comes into existence is by paying
+        the same on-chain cost everyone else pays.
       </p>
       <div class="tag-row">
         <span class="tag">Fixed supply, 21M</span>
@@ -340,8 +347,8 @@
     <div class="about">
       <p>
         <strong>This page is the hub, not an app.</strong> It doesn't ask you to log in or
-        approve anything -- it just explains PIKO and links out to the two things you can
-        actually do: mine, or play. Both of those live on their own separate canisters below.
+        approve anything -- it just explains PIKO and links out to the things you can
+        actually do: mine, or play. Each of those lives on its own separate canister below.
       </p>
       <p>
         <strong>Mine it</strong> right in your browser -- no wallet software or CLI, just Internet
@@ -350,17 +357,12 @@
         cycles to keep the protocol's own canisters funded.
       </p>
       <p>
-        <strong>PIKO Dice</strong> is a companion game, deliberately hosted on its own separate
-        site with its own login/approval flow -- opting into betting is never bundled with
-        mining. A provably-fair, 1% house edge dice game, resolved by the Internet Computer's
-        own on-chain randomness, giving mined PIKO somewhere to actually be spent.
-      </p>
-      <p>
-        <strong>One token, one ledger, everywhere.</strong> The mining site and the dice site
-        move the exact same PIKO through the exact same ledger canister below -- your balance is
-        the same number on both, not separate per-site play money. That's also why this page
-        only ever links to those two applications instead of embedding either: one login, one
-        balance, two things to do with it.
+        <strong>PIKO Dice</strong> and <strong>PikoBlackjack</strong> are companion games, each
+        deliberately hosted on its own separate site with its own login/approval flow -- opting
+        into betting is never bundled with mining. Both are provably fair, resolved by the
+        Internet Computer's own on-chain randomness, giving mined PIKO somewhere to actually be
+        spent: Dice is a simple 1% house edge roll, Blackjack is a full interactive single-deck
+        game (Hit/Stand/Double/Split) against the same kind of on-chain-escrowed bankroll.
       </p>
       <p>
         Independent project. Mining is inspired by the publicly described "proof-of-on-chain-work"
@@ -378,6 +380,10 @@
       <a class="link-card dice" href="https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
         <div class="link-title"><span class="icon">&#127922;</span>Play PIKO Dice</div>
         <div class="link-desc">Provably-fair, 1% house edge, PIKO-only on-chain dice.</div>
+      </a>
+      <a class="link-card blackjack" href="https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#127183;</span>Play PikoBlackjack</div>
+        <div class="link-desc">Interactive single-deck Blackjack (Hit/Stand/Double/Split), bet in PIKO, fully on-chain.</div>
       </a>
       <a class="link-card" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/dashboard.html" target="_blank" rel="noopener noreferrer">
         <div class="link-title"><span class="icon">&#9638;</span>Live chain dashboard</div>
@@ -405,8 +411,8 @@
         <button type="button" class="copy-btn" id="copy-ledger">Copy</button>
       </div>
       <p class="ledger-hint">
-        This is the same canister the mining and dice sites transfer PIKO through -- verify it
-        yourself against the whitepaper's canister reference before trusting it.
+        This is the same canister the mining, dice, and blackjack sites transfer PIKO through --
+        verify it yourself against the whitepaper's canister reference before trusting it.
       </p>
     </div>
 
