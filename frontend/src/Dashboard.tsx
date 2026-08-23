@@ -36,6 +36,32 @@ function formatCycles(raw: bigint): string {
   return `${t.toFixed(2)}T`;
 }
 
+// Network hashrate isn't a value `mother` tracks (or could -- it only ever
+// sees the winning nonce, never how many were tried) -- this is the same
+// inference every PoW explorer makes: expected attempts to clear N leading
+// zero bits is 2^N, so attempts/second is that over the observed time per
+// block. Averaged over the blocks found since the last retarget specifically
+// (not the raw recent-blocks buffer), so a difficulty change mid-window
+// never mixes an old and new difficulty into one estimate.
+function estimateHashrate(difficultyBits: bigint, blocksSinceRetarget: number, lastRetargetAtNanos: bigint): number | null {
+  const secondsSinceRetarget = (Date.now() - Number(lastRetargetAtNanos / 1_000_000n)) / 1000;
+  if (blocksSinceRetarget <= 0 || secondsSinceRetarget <= 0) return null;
+  const avgSecondsPerBlock = secondsSinceRetarget / blocksSinceRetarget;
+  return 2 ** Number(difficultyBits) / avgSecondsPerBlock;
+}
+
+function formatHashrate(hashesPerSecond: number | null): string {
+  if (hashesPerSecond === null || !isFinite(hashesPerSecond)) return "not enough data yet";
+  const units = ["H/s", "KH/s", "MH/s", "GH/s", "TH/s"];
+  let value = hashesPerSecond;
+  let i = 0;
+  while (value >= 1000 && i < units.length - 1) {
+    value /= 1000;
+    i += 1;
+  }
+  return `~${value.toFixed(value < 10 ? 2 : 1)} ${units[i]}`;
+}
+
 function formatBlockTime(nanos: bigint): string {
   const seconds = Number(nanos) / 1e9;
   if (seconds < 120) return `${Math.round(seconds)}s`;
@@ -55,18 +81,21 @@ function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [motherCycles, setMotherCycles] = useState<bigint | null>(null);
+  const [minerCount, setMinerCount] = useState<bigint | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, b, c] = await Promise.all([
+      const [s, b, c, m] = await Promise.all([
         mother.getStats(),
         mother.getRecentBlocks(),
         mother.cyclesBalance(),
+        mother.getMinerCount(),
       ]);
       setStats(s as unknown as Stats);
       setBlocks((b as unknown as Block[]).slice().reverse());
       setMotherCycles(c);
+      setMinerCount(m);
     } catch (err) {
       console.error("Failed to refresh mother stats", err);
     }
@@ -86,6 +115,7 @@ function Dashboard() {
   const supplyPct = stats ? Number((stats.totalMinted * 10000n) / (stats.maxSupply || 1n)) / 100 : 0;
   const retargetDone = stats ? Number(stats.retargetIntervalBlocks - stats.blocksUntilRetarget) : 0;
   const retargetTotal = stats ? Number(stats.retargetIntervalBlocks) : 10;
+  const hashrate = stats ? estimateHashrate(stats.difficultyBits, retargetDone, stats.lastRetargetAt) : null;
 
   return (
     <main className="page dashboard-page">
@@ -130,12 +160,28 @@ function Dashboard() {
                 <div className="hero-figure-label">Current block reward</div>
                 <div className="hero-figure hero-figure-sub">{formatPiko(stats.currentReward)} PIKO</div>
               </div>
+              <div>
+                <div className="hero-figure-label">Miners who've found a block</div>
+                <div className="hero-figure hero-figure-sub">
+                  {minerCount !== null ? minerCount.toLocaleString() : "..."}
+                </div>
+              </div>
+              <div>
+                <div className="hero-figure-label">Last block</div>
+                <div className="hero-figure hero-figure-sub">
+                  {blocks.length > 0 ? timeAgo(blocks[0].timestamp) : "..."}
+                </div>
+              </div>
             </div>
 
             <div className="stat-grid">
               <div className="stat-tile">
                 <div className="stat-label">Difficulty</div>
                 <div className="stat-value">{stats.difficultyBits.toString()} bits</div>
+              </div>
+              <div className="stat-tile">
+                <div className="stat-label">Est. network hashrate</div>
+                <div className="stat-value stat-value-small">{formatHashrate(hashrate)}</div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Mining fee</div>
@@ -210,32 +256,37 @@ function Dashboard() {
           )}
         </div>
         {blocks.length > 0 ? (
-          <table className="blocks">
-            <thead>
-              <tr>
-                <th>Height</th>
-                <th>Miner</th>
-                <th>Reward</th>
-                <th>When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {blocks.map((b) => (
-                <tr key={b.height.toString()}>
-                  <td>{b.height.toString()}</td>
-                  <td className="mono">{shortPrincipal(b.miner.toText())}</td>
-                  <td>{formatPiko(b.reward)}</td>
-                  <td>{timeAgo(b.timestamp)}</td>
+          <div className="table-scroll">
+            <table className="blocks">
+              <thead>
+                <tr>
+                  <th>Height</th>
+                  <th>Miner</th>
+                  <th>Reward</th>
+                  <th>When</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {blocks.map((b) => (
+                  <tr key={b.height.toString()}>
+                    <td>{b.height.toString()}</td>
+                    <td className="mono">{shortPrincipal(b.miner.toText())}</td>
+                    <td>{formatPiko(b.reward)}</td>
+                    <td>{timeAgo(b.timestamp)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state">No blocks mined yet.</div>
         )}
       </section>
 
       <p className="dashboard-footnote">
+        Est. network hashrate is inferred, not measured -- `mother` only ever sees the
+        winning nonce, never how many were tried, so this is 2^difficulty over the average
+        time per block since the last retarget (nothing to infer it from before that).
         Not shown: any individual miner's status (including the reference instance), or
         `frontend` and `ledger`'s own cycles balances -- the latter two don't expose a
         permissionless query for that, so this page doesn't guess.

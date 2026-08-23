@@ -801,26 +801,28 @@ function App() {
           Top miners <span className="section-icon">🏆</span>
         </h2>
         {leaderboard.length > 0 ? (
-          <table className="blocks">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Miner</th>
-                <th>Blocks</th>
-                <th>Total PIKO</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((entry, i) => (
-                <tr key={entry.miner.toText()}>
-                  <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
-                  <td className="mono">{shortPrincipal(entry.miner.toText())}</td>
-                  <td>{entry.blocksFound.toString()}</td>
-                  <td>{formatPiko(entry.totalReward)}</td>
+          <div className="table-scroll">
+            <table className="blocks">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Miner</th>
+                  <th>Blocks</th>
+                  <th>Total PIKO</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {leaderboard.map((entry, i) => (
+                  <tr key={entry.miner.toText()}>
+                    <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
+                    <td className="mono">{shortPrincipal(entry.miner.toText())}</td>
+                    <td>{entry.blocksFound.toString()}</td>
+                    <td>{formatPiko(entry.totalReward)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state">
             No one's on the board yet — mine a block and claim the top spot.
@@ -840,26 +842,28 @@ function App() {
           )}
         </div>
         {blocks.length > 0 ? (
-          <table className="blocks">
-            <thead>
-              <tr>
-                <th>Height</th>
-                <th>Miner</th>
-                <th>Reward</th>
-                <th>When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {blocks.map((b) => (
-                <tr key={b.height.toString()}>
-                  <td>{b.height.toString()}</td>
-                  <td className="mono">{shortPrincipal(b.miner.toText())}</td>
-                  <td>{formatPiko(b.reward)}</td>
-                  <td>{timeAgo(b.timestamp)}</td>
+          <div className="table-scroll">
+            <table className="blocks">
+              <thead>
+                <tr>
+                  <th>Height</th>
+                  <th>Miner</th>
+                  <th>Reward</th>
+                  <th>When</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {blocks.map((b) => (
+                  <tr key={b.height.toString()}>
+                    <td>{b.height.toString()}</td>
+                    <td className="mono">{shortPrincipal(b.miner.toText())}</td>
+                    <td>{formatPiko(b.reward)}</td>
+                    <td>{timeAgo(b.timestamp)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state">
             No blocks mined yet — be the first, see "Mine" above.
