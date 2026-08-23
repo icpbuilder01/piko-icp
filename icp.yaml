@@ -2,6 +2,7 @@
 
 canisters:
   - ledger
+  - index
   - mother
   - miner
   - dice

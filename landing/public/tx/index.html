@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/piko-logo.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Look up a PIKO ledger transaction by index, read directly on-chain." />
+  <title>PIKO Transaction Lookup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f2ede1;
+      --surface: #fbf8f0;
+      --surface-2: #eae2cf;
+      --border: #ddd2b3;
+      --border-strong: #c9b98a;
+      --text: #1a1508;
+      --text-secondary: #5c5340;
+      --text-muted: #8f8468;
+      --accent: #b1550f;
+      --bevel-hi: #fffdf7;
+      --bevel-lo: #a8975f;
+      --hard-shadow: rgba(26, 21, 8, 0.4);
+      --font-display: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #050403;
+        --surface: #0e0c09;
+        --surface-2: #17130f;
+        --border: #2a251d;
+        --border-strong: #3d3626;
+        --text: #f5efdf;
+        --text-secondary: #b3a98f;
+        --text-muted: #756c58;
+        --accent: #f2803a;
+        --bevel-hi: #56492c;
+        --bevel-lo: #000000;
+        --hard-shadow: rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg);
+      background-image: radial-gradient(var(--border) 1px, transparent 1px);
+      background-size: 26px 26px;
+      color: var(--text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: var(--accent); }
+    main { max-width: 640px; margin: 0 auto; padding: 40px 20px; }
+    h1 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      letter-spacing: 0.01em;
+      margin: 0 0 10px;
+      word-break: break-word;
+    }
+    .muted { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; margin: 0 0 20px; }
+    .mono { font-family: var(--font-display); font-size: 0.82rem; }
+    .lookup-row { display: flex; gap: 8px; }
+    input[type="text"] {
+      flex: 1;
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      padding: 10px 12px;
+      background: var(--surface);
+      color: var(--text);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-lo);
+      border-left-color: var(--bevel-lo);
+      border-bottom-color: var(--bevel-hi);
+      border-right-color: var(--bevel-hi);
+    }
+    button {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+      background: var(--surface-2);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 10px 18px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--surface); }
+    table.value-map {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      box-shadow: 3px 3px 0 var(--hard-shadow);
+    }
+    table.value-map td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    table.value-map td.key {
+      font-family: var(--font-display);
+      color: var(--text-muted);
+      white-space: nowrap;
+      width: 1%;
+    }
+    table.value-map table.value-map { box-shadow: none; }
+    ul.value-array { margin: 0; padding-left: 18px; }
+  </style>
+  <script type="module" crossorigin src="/tx/assets/index-regytmuH.js"></script>
+</head>
+
+<body>
+  <main id="root"></main>
+</body>
+
+</html>
