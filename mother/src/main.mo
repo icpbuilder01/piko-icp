@@ -75,6 +75,19 @@ actor self {
     case (?text) { ?Principal.fromText(text) };
     case null { null };
   };
+  // PikoBlackjack (`~/piko-plinko/`) is a wholly separate icp-cli project
+  // from piko-icp -- not a dependency in this workspace's own icp.yaml --
+  // so icp-cli's PUBLIC_CANISTER_ID:* auto-injection (used for ledger/
+  // frontend/miner/dice above, all same-workspace siblings) never fires for
+  // it. Its two mainnet canister ids are fixed and already publicly known
+  // (same reasoning as pikoLedgerId's hardcoded default inside plinko
+  // itself), so they're hardcoded literals here rather than left unset.
+  // Same PIKO-bet-only situation as dice: PikoBlackjack has its own small
+  // ICP-profit-funded cycles loop (sweepIcpProfit/topUpPlinkoFrontend in
+  // plinko/src/main.mo) that nets ~0 in practice, so it depends on mother's
+  // surplus the same way dice does.
+  let plinkoId : ?Principal = ?Principal.fromText("d76up-oaaaa-aaaai-ax4ia-cai");
+  let plinkoFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai");
 
   // The ICP ledger used to charge (and burn) the mining fee, and the
   // account transfers to it are burned to. Defaults to the real mainnet ICP
@@ -1050,17 +1063,18 @@ actor self {
   };
 
   // Shares mother's own cycles surplus with ledger, frontend, the reference
-  // miner, and dice -- none of the four has any way to reliably earn cycles
-  // on its own (dice's *own* sweepIcpProfit loop is fed by ICP betting
-  // profit that, in practice, never materializes -- see diceId's own
-  // comment above), unlike mother (which self-funds via sweepTreasury
-  // above), so all four had depended entirely on manual `icp canister
+  // miner, dice, and PikoBlackjack (both its backend and frontend) -- none
+  // of them has any way to reliably earn cycles on its own (dice's and
+  // PikoBlackjack's *own* sweepIcpProfit loops are fed by ICP betting
+  // profit that, in practice, never materializes -- see diceId's/plinkoId's
+  // own comments above), unlike mother (which self-funds via sweepTreasury
+  // above), so all of them had depended entirely on manual `icp canister
   // top-up` since launch. mother is the one canister whose running costs
   // scale with mining activity in the first place (via the
   // cyclesFundRatioBps share of every fee), so routing part of that back
   // out to the canisters that make mining and betting possible in the
   // first place -- the ledger PIKO itself lives on, the site people mine
-  // from, the reference miner people can inspect, and the dice game --
+  // from, the reference miner people can inspect, and the betting games --
   // closes the loop project-wide instead of just for mother. Without this,
   // ledger in particular would eventually run dry with no automatic path
   // back to solvency at all, which is exactly the kind of silent single
@@ -1075,21 +1089,21 @@ actor self {
   // its own declaration, so it's never skipped). No state kept here
   // either, for the same reason sweepTreasury keeps none: it just re-reads
   // Cycles.balance() fresh every call.
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat } {
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toPlinko : Nat; toPlinkoFrontend : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0 } };
+    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, plinkoId, plinkoFrontendId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 } };
 
     let surplus = balance - CYCLES_RESERVE;
     let share = surplus / targets.size();
@@ -1099,6 +1113,8 @@ actor self {
     var sentToFrontend = 0;
     var sentToMiner = 0;
     var sentToDice = 0;
+    var sentToPlinko = 0;
+    var sentToPlinkoFrontend = 0;
     for (target in targets.vals()) {
       let _outcome = try {
         await (with cycles = share) Management.deposit_cycles({ canister_id = target });
@@ -1110,11 +1126,13 @@ actor self {
           if (?target == frontendId) { sentToFrontend += share };
           if (?target == referenceMinerId) { sentToMiner += share };
           if (?target == diceId) { sentToDice += share };
+          if (?target == plinkoId) { sentToPlinko += share };
+          if (?target == plinkoFrontendId) { sentToPlinkoFrontend += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toPlinko = sentToPlinko; toPlinkoFrontend = sentToPlinkoFrontend };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends

@@ -139,5 +139,7 @@ service : {
       toFrontend: nat;
       toLedger: nat;
       toMiner: nat;
+      toPlinko: nat;
+      toPlinkoFrontend: nat;
     });
 }
