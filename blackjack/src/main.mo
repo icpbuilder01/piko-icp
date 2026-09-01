@@ -36,20 +36,38 @@ import Cards "cards";
 actor self {
 
   // ---- Game constants ----
-  let BLACKJACK_PAYOUT_BPS : Nat = 25_000; // natural blackjack pays 3:2 -- 2.5x total return
-  let WIN_PAYOUT_BPS : Nat = 20_000; // an ordinary win pays 2:1 -- 2x total return
-  let PUSH_PAYOUT_BPS : Nat = 10_000; // a tie returns the stake, 1x
-  let DEALER_STANDS_ON : Nat = 17; // dealer hits below this, stands at/above it -- no soft-17 exception
-  let ROUND_EXPIRY_NANOS : Int = 24 * 60 * 60 * 1_000_000_000; // 24h -- see resolveExpiredRound below
+  // These 5 were plain (non-transient) `let`s on mainnet, so their value was
+  // silently frozen at first install -- discovered when a real upgrade test
+  // (see security audit) showed a source-literal change never taking effect.
+  // Simply adding `transient` to an already-persisted field is itself an
+  // EOP-incompatible change (Motoko treats it as removing a stable field --
+  // confirmed by a real rejected local upgrade: "Memory-incompatible program
+  // upgrade"), the same class of rejection already hit once before on a
+  // field *rename* in this codebase. Fix pattern that's actually
+  // upgrade-safe (same one used for that earlier rename): leave the old
+  // persisted declarations below completely untouched and dead, and use the
+  // new `_LIVE` transient constants (mirroring `SWEEP_INTERVAL_SECONDS_LIVE`
+  // below) for all real usage instead. Never remove these dead declarations.
+  let BLACKJACK_PAYOUT_BPS : Nat = 25_000; // dead, do not use -- see comment above
+  let WIN_PAYOUT_BPS : Nat = 20_000; // dead, do not use -- see comment above
+  let PUSH_PAYOUT_BPS : Nat = 10_000; // dead, do not use -- see comment above
+  let DEALER_STANDS_ON : Nat = 17; // dead, do not use -- see comment above
+  let ROUND_EXPIRY_NANOS : Int = 24 * 60 * 60 * 1_000_000_000; // dead, do not use -- see comment above
+
+  transient let BLACKJACK_PAYOUT_BPS_LIVE : Nat = 25_000; // natural blackjack pays 3:2 -- 2.5x total return
+  transient let WIN_PAYOUT_BPS_LIVE : Nat = 20_000; // an ordinary win pays 2:1 -- 2x total return
+  transient let PUSH_PAYOUT_BPS_LIVE : Nat = 10_000; // a tie returns the stake, 1x
+  transient let DEALER_STANDS_ON_LIVE : Nat = 17; // dealer hits below this, stands at/above it -- no soft-17 exception
+  transient let ROUND_EXPIRY_NANOS_LIVE : Int = 24 * 60 * 60 * 1_000_000_000; // 24h -- see resolveExpiredRound below
 
   func payoutBpsFor(status : Types.ResolvedStatus) : Nat {
     switch (status) {
-      case (#PlayerBlackjack) { BLACKJACK_PAYOUT_BPS };
+      case (#PlayerBlackjack) { BLACKJACK_PAYOUT_BPS_LIVE };
       case (#PlayerBust) { 0 };
-      case (#DealerBust) { WIN_PAYOUT_BPS };
-      case (#PlayerWin) { WIN_PAYOUT_BPS };
+      case (#DealerBust) { WIN_PAYOUT_BPS_LIVE };
+      case (#PlayerWin) { WIN_PAYOUT_BPS_LIVE };
       case (#DealerWin) { 0 };
-      case (#Push) { PUSH_PAYOUT_BPS };
+      case (#Push) { PUSH_PAYOUT_BPS_LIVE };
     };
   };
 
@@ -214,16 +232,46 @@ actor self {
   };
   var bankrollConfigLocked : Bool = false;
 
-  let ICP_LEDGER_FEE_E8S : Nat = 10_000;
+  // ICP_LEDGER_FEE_E8S/MIN_MAINTENANCE_INTERVAL_NANOS/CYCLES_RESERVE/
+  // MIN_DEAL_INTERVAL_NANOS were plain (non-transient) `let`s on mainnet --
+  // same dead+`_LIVE` fix pattern as the game constants above (see that
+  // comment for why simply adding `transient` in place is EOP-incompatible
+  // and was confirmed to hard-reject a real local upgrade).
+  let ICP_LEDGER_FEE_E8S : Nat = 10_000; // dead, do not use -- see game-constants comment above
+  transient let ICP_LEDGER_FEE_E8S_LIVE : Nat = 10_000;
   transient let SWEEP_INTERVAL_SECONDS_LIVE : Nat = 900; // 15 minutes, same cadence as mother/dice
   transient var sweepTimerId : ?Timer.TimerId = null;
 
-  let MIN_MAINTENANCE_INTERVAL_NANOS : Int = 60_000_000_000; // 60s
+  let MIN_MAINTENANCE_INTERVAL_NANOS : Int = 60_000_000_000; // dead, do not use -- see game-constants comment above
+  transient let MIN_MAINTENANCE_INTERVAL_NANOS_LIVE : Int = 60_000_000_000; // 60s
   var lastSweepIcpProfitAt : Int = 0;
   var lastTopUpPlinkoFrontendAt : Int = 0; // DEPRECATED, no longer read -- see lastTopUpBlackjackFrontendAt and plinkoFrontendId's own comment above
   var lastTopUpBlackjackFrontendAt : Int = 0;
 
-  let CYCLES_RESERVE : Nat = 2_000_000_000_000; // 2T, same floor as mother/dice
+  let CYCLES_RESERVE : Nat = 2_000_000_000_000; // dead, do not use -- see game-constants comment above
+  transient let CYCLES_RESERVE_LIVE : Nat = 2_000_000_000_000; // 2T, same floor as mother/dice
+
+  // Same anti-spam cooldown as mother's submitProof / dice's placeBet, for
+  // the same reason: without it, a caller with no PIKO/ICP and no allowance
+  // can call deal() in a tight loop and force a real icrc2_transfer_from
+  // *and* raw_rand() (one of the more expensive IC calls) on every attempt,
+  // for free, even though the pull will always fail (see security audit).
+  // 0.3s still leaves any real player far more room than they'd ever need
+  // between hands.
+  let MIN_DEAL_INTERVAL_NANOS : Int = 300_000_000; // dead, do not use -- see game-constants comment above
+  transient let MIN_DEAL_INTERVAL_NANOS_LIVE : Int = 300_000_000; // 0.3s
+  transient let lastDealAttempt : Map.Map<Principal, Time.Time> = Map.empty<Principal, Time.Time>();
+
+  // Same reasoning as MIN_DEAL_INTERVAL_NANOS, applied to claimPendingPayout:
+  // pay() re-credits the pending map on a failed transfer (see its own
+  // comment), so a principal with a genuinely non-zero pending payout during
+  // a ledger outage could otherwise loop claimPendingPayout() for free and
+  // force a real icrc1_transfer attempt on every call (see security audit).
+  // Narrower attack surface than deal() -- only matters while a real pending
+  // payout exists -- but kept consistent with every other fund-pulling
+  // entrypoint rather than being the one exception.
+  transient let MIN_CLAIM_INTERVAL_NANOS : Int = 300_000_000; // 0.3s
+  transient let lastClaimAttempt : Map.Map<Principal, Time.Time> = Map.empty<Principal, Time.Time>();
 
   // ---- Round state -- committedPayout mirrors dice's own of the same
   // name. Unlike the old spin() (which deliberately had no per-principal
@@ -379,51 +427,71 @@ actor self {
       bankrollConfigLocked;
       icpLedgerId;
       pikoLedgerId;
+      pikoLedgerLocked;
     };
   };
 
   public query func getRules() : async Types.Rules {
     {
       deckCount = 1;
-      dealerStandsOn = DEALER_STANDS_ON;
-      blackjackPayoutBps = BLACKJACK_PAYOUT_BPS;
+      dealerStandsOn = DEALER_STANDS_ON_LIVE;
+      blackjackPayoutBps = BLACKJACK_PAYOUT_BPS_LIVE;
       doubleDownAllowed = true;
       splitAllowed = true;
       resplitAllowed = false;
       doubleAfterSplitAllowed = false;
       insuranceOffered = false;
-      roundExpiryNanos = ROUND_EXPIRY_NANOS;
+      roundExpiryNanos = ROUND_EXPIRY_NANOS_LIVE;
     };
   };
 
+  // Throttles the two live ledger balance fetches below to at most once per
+  // MIN_STATS_REFRESH_INTERVAL_NANOS -- without this, getStats() was a
+  // public func any anonymous caller could loop for free, forcing two real
+  // inter-canister calls per iteration and burning this canister's own
+  // cycles (the callee, not the caller, pays for outbound IC calls) -- see
+  // security audit. Set synchronously before either await, same pattern as
+  // every other maintenance cooldown in this file, so a burst of concurrent
+  // calls only lets one through per window. Serves the existing bankroll
+  // cache otherwise, which is already exactly what deal()/doubleDown()/
+  // split() size bets against, so this is never less fresh than what
+  // actually gates real money movement.
+  transient let MIN_STATS_REFRESH_INTERVAL_NANOS : Int = 5_000_000_000; // 5s
+  var lastStatsRefreshAt : Int = 0;
+
   public func getStats() : async Types.Stats {
-    let IcpLedger : Types.LedgerActor = actor (Principal.toText(icpLedgerId));
-    let PikoLedger : Types.LedgerActor = actor (Principal.toText(pikoLedgerId));
-    let self_ = Principal.fromActor(self);
-    let icpBankrollE8s = try {
-      await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
-    } catch (_e) { 0 };
-    let pikoBankroll = try {
-      await PikoLedger.icrc1_balance_of({ owner = self_; subaccount = null });
-    } catch (_e) { 0 };
-    // Free self-healing for the bankroll cache deal()/doubleDown()/split()
-    // actually size bets against: this call already fetches both real
-    // ledger balances live, and the frontend already polls getStats() every
-    // few seconds, so piggybacking the resync here means a deposit sent
-    // directly to this canister's own principal (bypassing deal() entirely,
-    // so the cache's normal incremental updates never see it) gets picked
-    // up within one poll interval instead of only on the next 15-minute
-    // sweep-timer tick (see armSweepTimer) or a fresh deploy.
-    setBankrollCache(#ICP, icpBankrollE8s);
-    setBankrollCache(#PIKO, pikoBankroll);
+    let now = Time.now();
+    if (now - lastStatsRefreshAt >= MIN_STATS_REFRESH_INTERVAL_NANOS) {
+      lastStatsRefreshAt := now;
+      let IcpLedger : Types.LedgerActor = actor (Principal.toText(icpLedgerId));
+      let PikoLedger : Types.LedgerActor = actor (Principal.toText(pikoLedgerId));
+      let self_ = Principal.fromActor(self);
+      let icpBankrollE8s = try {
+        await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
+      } catch (_e) { bankrollCacheFor(#ICP) };
+      let pikoBankroll = try {
+        await PikoLedger.icrc1_balance_of({ owner = self_; subaccount = null });
+      } catch (_e) { bankrollCacheFor(#PIKO) };
+      // Free self-healing for the bankroll cache deal()/doubleDown()/split()
+      // actually size bets against: this call already fetches both real
+      // ledger balances live (at most once per throttle window), and the
+      // frontend already polls getStats() every few seconds, so
+      // piggybacking the resync here means a deposit sent directly to this
+      // canister's own principal (bypassing deal() entirely, so the cache's
+      // normal incremental updates never see it) gets picked up within one
+      // throttle window instead of only on the next 15-minute sweep-timer
+      // tick (see armSweepTimer) or a fresh deploy.
+      setBankrollCache(#ICP, icpBankrollE8s);
+      setBankrollCache(#PIKO, pikoBankroll);
+    };
     {
       roundsPlayed;
       totalWageredIcpE8s;
       totalWageredPiko;
       totalPaidOutIcpE8s;
       totalPaidOutPiko;
-      icpBankrollE8s;
-      pikoBankroll;
+      icpBankrollE8s = bankrollCacheFor(#ICP);
+      pikoBankroll = bankrollCacheFor(#PIKO);
       cyclesBalance = Cycles.balance();
     };
   };
@@ -469,6 +537,20 @@ actor self {
 
   public shared ({ caller }) func claimPendingPayout(token : Types.TokenKind) : async Types.ClaimResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
+
+    let now = Time.now();
+    switch (Map.get(lastClaimAttempt, Principal.compare, caller)) {
+      case (?last) {
+        let elapsed = now - last;
+        let remaining = MIN_CLAIM_INTERVAL_NANOS - elapsed;
+        if (remaining > 0) {
+          return #Err(#TooSoon({ retryAfterNanos = Int.toNat(remaining) }));
+        };
+      };
+      case null {};
+    };
+    Map.add(lastClaimAttempt, Principal.compare, caller, now);
+
     let m = switch (token) { case (#ICP) { pendingIcpPayouts }; case (#PIKO) { pendingPikoPayouts } };
     let owed = switch (Map.get(m, Principal.compare, caller)) { case (?v) { v }; case null { 0 } };
     if (owed == 0) { return #Err(#InvalidAmount) };
@@ -486,7 +568,7 @@ actor self {
   // once, and pays out the sum if anything is owed.
   func finalizeWholeRound(player : Principal, round : Round) : async Types.BlackjackView {
     if (dealerNeedsToPlay(round.hands)) {
-      while (Cards.handTotal(round.dealerCards) < DEALER_STANDS_ON) {
+      while (Cards.handTotal(round.dealerCards) < DEALER_STANDS_ON_LIVE) {
         let card = round.deck[round.nextIndex];
         round.nextIndex += 1;
         round.dealerCards := Array.concat(round.dealerCards, [card]);
@@ -569,6 +651,20 @@ actor self {
   // under one identity).
   public shared ({ caller }) func deal<system>(token : Types.TokenKind, amountE8s : Nat) : async Types.BlackjackResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
+
+    let now = Time.now();
+    switch (Map.get(lastDealAttempt, Principal.compare, caller)) {
+      case (?last) {
+        let elapsed = now - last;
+        let remaining = MIN_DEAL_INTERVAL_NANOS_LIVE - elapsed;
+        if (remaining > 0) {
+          return #Err(#TooSoon({ retryAfterNanos = Int.toNat(remaining) }));
+        };
+      };
+      case null {};
+    };
+    Map.add(lastDealAttempt, Principal.compare, caller, now);
+
     if (amountE8s == 0) { return #Err(#InvalidAmount) };
     switch (Map.get(rounds, Principal.compare, caller)) {
       case (?_) { return #Err(#RoundAlreadyOpen) };
@@ -580,7 +676,7 @@ actor self {
     await ensureBankrollCacheInitialized(); // a no-op await after the very first round ever -- see the cache's own comment
     let bankroll = bankrollCacheFor(token);
 
-    let reservedPayout = amountE8s * BLACKJACK_PAYOUT_BPS / 10_000;
+    let reservedPayout = amountE8s * BLACKJACK_PAYOUT_BPS_LIVE / 10_000;
     let maxPayoutAllowed = bankroll * bankrollConfig.maxPayoutBps / 10_000;
     let alreadyCommitted = committedPayoutFor(token);
     let remainingAllowed = if (maxPayoutAllowed > alreadyCommitted) { maxPayoutAllowed - alreadyCommitted } else { 0 };
@@ -760,8 +856,9 @@ actor self {
         };
         let hand = round.hands[0];
 
-        let newWorstCase = round.amount * 2 * WIN_PAYOUT_BPS / 10_000; // 4x original
-        let extra = if (newWorstCase > round.reservedPayout) { newWorstCase - round.reservedPayout } else { 0 };
+        let oldReservedPayout = round.reservedPayout;
+        let newWorstCase = round.amount * 2 * WIN_PAYOUT_BPS_LIVE / 10_000; // 4x original
+        let extra = if (newWorstCase > oldReservedPayout) { newWorstCase - oldReservedPayout } else { 0 };
         let bankroll = bankrollCacheFor(round.token);
         let maxPayoutAllowed = bankroll * bankrollConfig.maxPayoutBps / 10_000;
         let alreadyCommitted = committedPayoutFor(round.token);
@@ -769,10 +866,21 @@ actor self {
         if (extra > remainingAllowed) {
           return #Err(#BetTooLarge({ maxPayout = remainingAllowed }));
         };
-        // Reserved and locked synchronously, before the only await below --
-        // see actionInFlight's own comment on Round for exactly why this
-        // lock exists (hit()/stand() never needed one).
+        // Reserved, round.reservedPayout bumped to match, and the action
+        // lock set -- all synchronously, before the only await below (see
+        // actionInFlight's own comment on Round for why this lock exists).
+        // round.reservedPayout must move in lockstep with committedPayout*
+        // rather than only after the pull succeeds: postupgrade's
+        // recomputeCommittedPayout() resyncs committedPayout* purely from
+        // round.reservedPayout summed across `rounds`, so if a canister
+        // upgrade landed while this await was outstanding and
+        // reservedPayout hadn't been bumped yet, the resync would
+        // undercount by `extra` -- and this round's eventual release would
+        // later subtract more than committedPayout actually holds, trapping
+        // on Nat underflow exactly like the bug already fixed once (see
+        // recomputeCommittedPayout's own comment).
         reserveCommittedPayout(round.token, extra);
+        round.reservedPayout := newWorstCase;
         round.actionInFlight := true;
 
         let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(round.token)));
@@ -800,7 +908,7 @@ actor self {
                   case (#ICP) { totalWageredIcpE8s += round.amount; addToMap(playerWageredIcp, caller, round.amount) };
                   case (#PIKO) { totalWageredPiko += round.amount; addToMap(playerWageredPiko, caller, round.amount) };
                 };
-                round.reservedPayout := newWorstCase;
+                // round.reservedPayout already bumped to newWorstCase above.
                 hand.betAmount := round.amount * 2;
                 let card = round.deck[round.nextIndex];
                 round.nextIndex += 1;
@@ -814,12 +922,11 @@ actor self {
                 // Round was force/expiry-resolved while this pull was in
                 // flight (blocked from racing on this round specifically by
                 // actionInFlight, but a controller/expiry call targeting a
-                // *different* round obviously isn't) -- refund the just-
-                // pulled extra stake and release our reservation bump (the
-                // round's own finalize already released its OLD
-                // reservedPayout, from before we bumped it, so `extra`
-                // would otherwise leak permanently).
-                releaseCommittedPayout(round.token, extra);
+                // *different* round obviously isn't) -- round.reservedPayout
+                // was already bumped to newWorstCase before this await, so
+                // the round's own finalize already released the full
+                // newWorstCase (including `extra`); don't release it again
+                // here, just refund the just-pulled extra stake.
                 await pay(round.token, caller, round.amount);
                 #Err(#ActionNotAllowed);
               };
@@ -827,11 +934,13 @@ actor self {
           };
           case (? #Err(e)) {
             releaseCommittedPayout(round.token, extra);
+            round.reservedPayout := oldReservedPayout;
             round.actionInFlight := false;
             #Err(#TransferFailed(e));
           };
           case null {
             releaseCommittedPayout(round.token, extra);
+            round.reservedPayout := oldReservedPayout;
             round.actionInFlight := false;
             #Err(#TransferFailed(#TemporarilyUnavailable));
           };
@@ -865,8 +974,9 @@ actor self {
         // Same 4x ceiling as doubleDown() -- 2 hands, each capped at
         // WIN_PAYOUT_BPS on `amount`, coincidentally equal to doubling one
         // hand's bet then capping it at WIN_PAYOUT_BPS too.
-        let newWorstCase = round.amount * 2 * WIN_PAYOUT_BPS / 10_000;
-        let extra = if (newWorstCase > round.reservedPayout) { newWorstCase - round.reservedPayout } else { 0 };
+        let oldReservedPayout = round.reservedPayout;
+        let newWorstCase = round.amount * 2 * WIN_PAYOUT_BPS_LIVE / 10_000;
+        let extra = if (newWorstCase > oldReservedPayout) { newWorstCase - oldReservedPayout } else { 0 };
         let bankroll = bankrollCacheFor(round.token);
         let maxPayoutAllowed = bankroll * bankrollConfig.maxPayoutBps / 10_000;
         let alreadyCommitted = committedPayoutFor(round.token);
@@ -874,7 +984,12 @@ actor self {
         if (extra > remainingAllowed) {
           return #Err(#BetTooLarge({ maxPayout = remainingAllowed }));
         };
+        // See doubleDown()'s identical comment: round.reservedPayout is
+        // bumped in lockstep with committedPayout*, synchronously before
+        // the only await below, so postupgrade's recomputeCommittedPayout()
+        // can never undercount an in-flight split.
         reserveCommittedPayout(round.token, extra);
+        round.reservedPayout := newWorstCase;
         round.actionInFlight := true;
 
         let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(round.token)));
@@ -902,7 +1017,7 @@ actor self {
                   case (#ICP) { totalWageredIcpE8s += round.amount; addToMap(playerWageredIcp, caller, round.amount) };
                   case (#PIKO) { totalWageredPiko += round.amount; addToMap(playerWageredPiko, caller, round.amount) };
                 };
-                round.reservedPayout := newWorstCase;
+                // round.reservedPayout already bumped to newWorstCase above.
                 let card1 = round.deck[round.nextIndex];
                 let card2 = round.deck[round.nextIndex + 1];
                 round.nextIndex += 2;
@@ -914,7 +1029,9 @@ actor self {
                 #Ok(viewOf(round));
               };
               case null {
-                releaseCommittedPayout(round.token, extra);
+                // See doubleDown()'s identical branch: reservedPayout was
+                // already bumped before this await, so finalize already
+                // released the full newWorstCase -- don't release again.
                 await pay(round.token, caller, round.amount);
                 #Err(#ActionNotAllowed);
               };
@@ -922,11 +1039,13 @@ actor self {
           };
           case (? #Err(e)) {
             releaseCommittedPayout(round.token, extra);
+            round.reservedPayout := oldReservedPayout;
             round.actionInFlight := false;
             #Err(#TransferFailed(e));
           };
           case null {
             releaseCommittedPayout(round.token, extra);
+            round.reservedPayout := oldReservedPayout;
             round.actionInFlight := false;
             #Err(#TransferFailed(#TemporarilyUnavailable));
           };
@@ -973,7 +1092,7 @@ actor self {
       case null { #Err(#NoOpenRound) };
       case (?round) {
         if (round.actionInFlight) { return #Err(#ActionNotAllowed) };
-        if (Time.now() - round.openedAt < ROUND_EXPIRY_NANOS) { Runtime.trap("round has not expired yet") };
+        if (Time.now() - round.openedAt < ROUND_EXPIRY_NANOS_LIVE) { Runtime.trap("round has not expired yet") };
         for (hand in round.hands.vals()) { if (not hand.done) { hand.done := true } };
         let view = await finalizeWholeRound(player, round);
         #Ok(view);
@@ -983,14 +1102,15 @@ actor self {
 
   // ---- Admin (controller-only, timelocked -- identical shape to dice's) ----
 
-  let ADMIN_TIMELOCK_NANOS : Int = 48 * 60 * 60 * 1_000_000_000; // 48h, same as mother/dice
+  let ADMIN_TIMELOCK_NANOS : Int = 48 * 60 * 60 * 1_000_000_000; // dead, do not use -- see game-constants comment above
+  transient let ADMIN_TIMELOCK_NANOS_LIVE : Int = 48 * 60 * 60 * 1_000_000_000; // 48h, same as mother/dice
 
   var pendingBankrollConfig : ?Types.PendingBankrollConfig = null;
   var pendingWithdrawal : ?Types.PendingWithdrawal = null;
   var withdrawalsLocked : Bool = false;
 
   public query func getPendingAdminChanges() : async Types.PendingAdminChanges {
-    { bankrollConfig = pendingBankrollConfig; withdrawal = pendingWithdrawal; timelockNanos = ADMIN_TIMELOCK_NANOS };
+    { bankrollConfig = pendingBankrollConfig; withdrawal = pendingWithdrawal; timelockNanos = ADMIN_TIMELOCK_NANOS_LIVE };
   };
 
   public shared ({ caller }) func proposeBankrollConfig(value : Types.BankrollConfig) : async () {
@@ -998,7 +1118,7 @@ actor self {
     if (bankrollConfigLocked) { Runtime.trap("bankroll config is permanently locked") };
     if (value.cyclesFundRatioBps > 10_000) { Runtime.trap("cyclesFundRatioBps must be <= 10000 (100%)") };
     if (value.maxPayoutBps > 10_000) { Runtime.trap("maxPayoutBps must be <= 10000 (100%)") };
-    pendingBankrollConfig := ?{ value; readyAt = Time.now() + ADMIN_TIMELOCK_NANOS };
+    pendingBankrollConfig := ?{ value; readyAt = Time.now() + ADMIN_TIMELOCK_NANOS_LIVE };
   };
 
   public shared ({ caller }) func cancelPendingBankrollConfig() : async () {
@@ -1027,7 +1147,7 @@ actor self {
   public shared ({ caller }) func proposeWithdrawal(token : Types.TokenKind, to : Principal, amount : Nat) : async () {
     requireController(caller);
     if (withdrawalsLocked) { Runtime.trap("withdrawals are permanently locked") };
-    pendingWithdrawal := ?{ token; to; amount; readyAt = Time.now() + ADMIN_TIMELOCK_NANOS };
+    pendingWithdrawal := ?{ token; to; amount; readyAt = Time.now() + ADMIN_TIMELOCK_NANOS_LIVE };
   };
 
   public shared ({ caller }) func cancelPendingWithdrawal() : async () {
@@ -1084,7 +1204,7 @@ actor self {
 
   public shared func sweepIcpProfit() : async Types.SweepResult {
     let now = Time.now();
-    if (now - lastSweepIcpProfitAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
+    if (now - lastSweepIcpProfitAt < MIN_MAINTENANCE_INTERVAL_NANOS_LIVE) {
       return { profit = 0; cyclesFunded = 0; cyclesMinted = null; notifyError = null };
     };
     lastSweepIcpProfitAt := now;
@@ -1093,7 +1213,7 @@ actor self {
     let self_ = Principal.fromActor(self);
     let balance = await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
     setBankrollCache(#ICP, balance); // this sweep already runs on a timer -- free periodic resync for the ICP side of the bankroll cache
-    let floor = bankrollConfig.icpBankrollFloorE8s + ICP_LEDGER_FEE_E8S;
+    let floor = bankrollConfig.icpBankrollFloorE8s + ICP_LEDGER_FEE_E8S_LIVE;
     if (balance <= floor) {
       return { profit = 0; cyclesFunded = 0; cyclesMinted = null; notifyError = null };
     };
@@ -1141,15 +1261,15 @@ actor self {
 
   public shared func topUpBlackjackFrontend() : async { sent : Nat } {
     let now = Time.now();
-    if (now - lastTopUpBlackjackFrontendAt < MIN_MAINTENANCE_INTERVAL_NANOS) { return { sent = 0 } };
+    if (now - lastTopUpBlackjackFrontendAt < MIN_MAINTENANCE_INTERVAL_NANOS_LIVE) { return { sent = 0 } };
     lastTopUpBlackjackFrontendAt := now;
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { sent = 0 } };
+    if (balance <= CYCLES_RESERVE_LIVE) { return { sent = 0 } };
     switch (blackjackFrontendId) {
       case null { { sent = 0 } };
       case (?target) {
-        let surplus = balance - CYCLES_RESERVE;
+        let surplus = balance - CYCLES_RESERVE_LIVE;
         let Management : Types.ManagementActor = actor ("aaaaa-aa");
         let outcome = try {
           await (with cycles = surplus) Management.deposit_cycles({ canister_id = target });
@@ -1163,6 +1283,42 @@ actor self {
     };
   };
 
+  // lastDealAttempt is transient and unbounded: any caller can add an entry
+  // for free just by calling deal(), even one that will immediately fail on
+  // the amount check or the stake pull. Same accepted-risk pattern as
+  // mother's lastAttempt / dice's lastBetAttempt (see security audit) --
+  // nothing here prevents an entry from being created, but an entry older
+  // than MIN_DEAL_INTERVAL_NANOS is provably stale and safe to drop. Fired
+  // automatically on armSweepTimer's recurring timer; still callable
+  // manually too.
+  public shared func pruneStaleDealAttempts() : async Nat {
+    let now = Time.now();
+    let entries = Iter.toArray(Map.entries(lastDealAttempt));
+    let stale = Array.filter<(Principal, Time.Time)>(
+      entries,
+      func((_, t)) { now - t > MIN_DEAL_INTERVAL_NANOS_LIVE },
+    );
+    for ((p, _) in stale.vals()) {
+      Map.remove(lastDealAttempt, Principal.compare, p);
+    };
+    stale.size();
+  };
+
+  // Same self-pruning pattern as pruneStaleDealAttempts, for
+  // lastClaimAttempt.
+  public shared func pruneStaleClaimAttempts() : async Nat {
+    let now = Time.now();
+    let entries = Iter.toArray(Map.entries(lastClaimAttempt));
+    let stale = Array.filter<(Principal, Time.Time)>(
+      entries,
+      func((_, t)) { now - t > MIN_CLAIM_INTERVAL_NANOS },
+    );
+    for ((p, _) in stale.vals()) {
+      Map.remove(lastClaimAttempt, Principal.compare, p);
+    };
+    stale.size();
+  };
+
   func armSweepTimer<system>() {
     switch (sweepTimerId) { case (?id) { Timer.cancelTimer(id) }; case null {} };
     sweepTimerId := ?Timer.recurringTimer<system>(
@@ -1174,6 +1330,8 @@ actor self {
         // cache for free; PIKO has no equivalent periodic sweep of its
         // own, so resync it here on the same cadence.
         await refreshBankrollCache(#PIKO);
+        ignore (await pruneStaleDealAttempts());
+        ignore (await pruneStaleClaimAttempts());
       },
     );
   };

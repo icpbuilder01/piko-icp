@@ -141,6 +141,7 @@ module {
 
   public type BlackjackError = {
     #Anonymous;
+    #TooSoon : { retryAfterNanos : Nat };
     #InvalidAmount;
     #BetTooLarge : { maxPayout : Nat };
     #TransferFailed : TransferFromError;
@@ -220,6 +221,7 @@ module {
     bankrollConfigLocked : Bool;
     icpLedgerId : Principal;
     pikoLedgerId : Principal;
+    pikoLedgerLocked : Bool;
   };
 
   public type Stats = {
