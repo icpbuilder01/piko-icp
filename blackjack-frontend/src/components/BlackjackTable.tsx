@@ -43,7 +43,16 @@ function HandZone({
   active: boolean;
   bet: bigint | null;
 }) {
-  const showChip = bet !== null && bet > 0n;
+  // Once resolved, the server-reported per-hand betAmount is the real bet
+  // for this specific hand (doubled after doubleDown(), unchanged-per-hand
+  // after split()) -- use it instead of the original client-typed `amount`,
+  // which only ever reflects what was true before any double/split. While
+  // still #Open, PlayerHandView carries no betAmount (the server hasn't
+  // committed to a final per-hand figure yet, e.g. double/split are still
+  // selectable), so `bet` (the original typed wager) is the only amount
+  // available and remains the correct display for that case.
+  const displayBet = "betAmount" in hand ? hand.betAmount : bet;
+  const showChip = displayBet !== null && displayBet > 0n;
   return (
     <div className={`bj-zone ${active ? "bj-zone-active" : ""}`}>
       <div className="bj-zone-head">
@@ -58,7 +67,7 @@ function HandZone({
       {showChip && (
         <div className="bj-chip-stack">
           <span className="bj-chip" aria-hidden="true" />
-          <span className="bj-chip-amount">{formatCompact(bet)}</span>
+          <span className="bj-chip-amount">{formatCompact(displayBet)}</span>
         </div>
       )}
     </div>

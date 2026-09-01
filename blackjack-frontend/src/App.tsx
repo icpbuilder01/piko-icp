@@ -52,6 +52,8 @@ function blackjackErrorMessage(err: BlackjackError): string {
   switch (err.__kind__) {
     case "Anonymous":
       return "Log in to play.";
+    case "TooSoon":
+      return "Slow down a little -- try again in a moment.";
     case "InvalidAmount":
       return "Enter a valid bet amount.";
     case "RandomnessFailed":
@@ -380,6 +382,13 @@ function App() {
       setOpenRound(result.Ok);
       if (result.Ok.__kind__ === "Resolved") handleRoundResolved(result.Ok.Resolved);
       setDealing(false);
+      // doubleDown()/split() both refresh allowance unconditionally after a
+      // successful pull; deal() only did so via handleRoundResolved's own
+      // refresh (i.e. only when the round resolved immediately on a
+      // natural), leaving the far more common #Open outcome showing a
+      // purely optimistic local subtraction until the round eventually
+      // resolves or the page reloads. Refresh here too so it's consistent.
+      refreshAllowance(id);
     } catch (err) {
       console.error("Deal failed", err);
       showMessage("Deal failed -- try again.");
