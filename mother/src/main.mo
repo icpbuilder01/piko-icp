@@ -75,19 +75,28 @@ actor self {
     case (?text) { ?Principal.fromText(text) };
     case null { null };
   };
-  // PikoBlackjack (`~/piko-plinko/`) is a wholly separate icp-cli project
+  // PikoBlackjack (`~/Blackjack/`) is a wholly separate icp-cli project
   // from piko-icp -- not a dependency in this workspace's own icp.yaml --
   // so icp-cli's PUBLIC_CANISTER_ID:* auto-injection (used for ledger/
   // frontend/miner/dice above, all same-workspace siblings) never fires for
   // it. Its two mainnet canister ids are fixed and already publicly known
-  // (same reasoning as pikoLedgerId's hardcoded default inside plinko
+  // (same reasoning as pikoLedgerId's hardcoded default inside blackjack
   // itself), so they're hardcoded literals here rather than left unset.
   // Same PIKO-bet-only situation as dice: PikoBlackjack has its own small
-  // ICP-profit-funded cycles loop (sweepIcpProfit/topUpPlinkoFrontend in
-  // plinko/src/main.mo) that nets ~0 in practice, so it depends on mother's
-  // surplus the same way dice does.
-  let plinkoId : ?Principal = ?Principal.fromText("d76up-oaaaa-aaaai-ax4ia-cai");
-  let plinkoFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai");
+  // ICP-profit-funded cycles loop (sweepIcpProfit/topUpBlackjackFrontend in
+  // blackjack/src/main.mo) that nets ~0 in practice, so it depends on
+  // mother's surplus the same way dice does.
+  //
+  // plinkoId/plinkoFrontendId below are dead (PikoBlackjack began as
+  // "Plinko") -- kept declared-but-unused rather than renamed, since
+  // renaming an already-persisted field is itself an EOP-incompatible
+  // upgrade (confirmed by a real rejected local upgrade this session, see
+  // WHITEPAPER.md-adjacent security review notes around 2026-09-01) --
+  // blackjackId/blackjackFrontendId below are the real, live values.
+  let plinkoId : ?Principal = ?Principal.fromText("d76up-oaaaa-aaaai-ax4ia-cai"); // dead, do not use -- see comment above
+  let plinkoFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai"); // dead, do not use -- see comment above
+  let blackjackId : ?Principal = ?Principal.fromText("d76up-oaaaa-aaaai-ax4ia-cai");
+  let blackjackFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai");
 
   // The ICP ledger used to charge (and burn) the mining fee, and the
   // account transfers to it are burned to. Defaults to the real mainnet ICP
@@ -1066,8 +1075,9 @@ actor self {
   // miner, dice, and PikoBlackjack (both its backend and frontend) -- none
   // of them has any way to reliably earn cycles on its own (dice's and
   // PikoBlackjack's *own* sweepIcpProfit loops are fed by ICP betting
-  // profit that, in practice, never materializes -- see diceId's/plinkoId's
-  // own comments above), unlike mother (which self-funds via sweepTreasury
+  // profit that, in practice, never materializes -- see diceId's/
+  // blackjackId's own comments above), unlike mother (which self-funds via
+  // sweepTreasury
   // above), so all of them had depended entirely on manual `icp canister
   // top-up` since launch. mother is the one canister whose running costs
   // scale with mining activity in the first place (via the
@@ -1089,21 +1099,21 @@ actor self {
   // its own declaration, so it's never skipped). No state kept here
   // either, for the same reason sweepTreasury keeps none: it just re-reads
   // Cycles.balance() fresh every call.
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toPlinko : Nat; toPlinkoFrontend : Nat } {
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 } };
+    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, plinkoId, plinkoFrontendId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toPlinko = 0; toPlinkoFrontend = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 } };
 
     let surplus = balance - CYCLES_RESERVE;
     let share = surplus / targets.size();
@@ -1113,8 +1123,8 @@ actor self {
     var sentToFrontend = 0;
     var sentToMiner = 0;
     var sentToDice = 0;
-    var sentToPlinko = 0;
-    var sentToPlinkoFrontend = 0;
+    var sentToBlackjack = 0;
+    var sentToBlackjackFrontend = 0;
     for (target in targets.vals()) {
       let _outcome = try {
         await (with cycles = share) Management.deposit_cycles({ canister_id = target });
@@ -1126,13 +1136,13 @@ actor self {
           if (?target == frontendId) { sentToFrontend += share };
           if (?target == referenceMinerId) { sentToMiner += share };
           if (?target == diceId) { sentToDice += share };
-          if (?target == plinkoId) { sentToPlinko += share };
-          if (?target == plinkoFrontendId) { sentToPlinkoFrontend += share };
+          if (?target == blackjackId) { sentToBlackjack += share };
+          if (?target == blackjackFrontendId) { sentToBlackjackFrontend += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toPlinko = sentToPlinko; toPlinkoFrontend = sentToPlinkoFrontend };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends

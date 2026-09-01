@@ -135,11 +135,11 @@ service : {
   sweepTreasury: () -> (SweepResult);
   topUpProject: () ->
    (record {
+      toBlackjack: nat;
+      toBlackjackFrontend: nat;
       toDice: nat;
       toFrontend: nat;
       toLedger: nat;
       toMiner: nat;
-      toPlinko: nat;
-      toPlinkoFrontend: nat;
     });
 }
