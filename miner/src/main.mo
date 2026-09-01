@@ -6,6 +6,7 @@ import Array "mo:core/Array";
 import Cycles "mo:core/Cycles";
 import Runtime "mo:core/Runtime";
 import Timer "mo:core/Timer";
+import Time "mo:core/Time";
 import Sha256 "mo:sha2/Sha256";
 import Types "types";
 
@@ -377,17 +378,36 @@ actor self {
     });
   };
 
+  // Throttles the balance fetches below to at most once per
+  // MIN_STATUS_REFRESH_INTERVAL_NANOS -- without this, getStatus() was a
+  // public func any caller could loop for free, forcing real inter-canister
+  // calls (ICP balance, plus mother.getStats() and a PIKO balance lookup) on
+  // every iteration and burning this canister's own cycles, the same
+  // free-cycle-burn DoS pattern already closed on dice's getStats(). Set
+  // synchronously before either await, same pattern used there. On a
+  // ledger-call failure, keep the last cached value instead of resetting to
+  // 0, so a transient blip doesn't make getStatus() briefly lie about a
+  // balance dropping to zero.
+  transient let MIN_STATUS_REFRESH_INTERVAL_NANOS : Int = 5_000_000_000; // 5s
+  var lastStatusRefreshAt : Int = 0;
+  var icpBalanceCache : Nat = 0;
+  var pikoBalanceCache : Nat = 0;
+
   public func getStatus() : async Types.Status {
-    let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
-    let icpBalanceE8s = try {
-      await IcpLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
-    } catch (_e) { 0 };
-    let pikoBalance = try {
-      let MotherStats : Types.MotherStatsActor = actor (Principal.toText(motherId));
-      let stats = await MotherStats.getStats();
-      let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
-      await PikoLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
-    } catch (_e) { 0 };
+    let now = Time.now();
+    if (now - lastStatusRefreshAt >= MIN_STATUS_REFRESH_INTERVAL_NANOS) {
+      lastStatusRefreshAt := now;
+      let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
+      icpBalanceCache := try {
+        await IcpLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
+      } catch (_e) { icpBalanceCache };
+      pikoBalanceCache := try {
+        let MotherStats : Types.MotherStatsActor = actor (Principal.toText(motherId));
+        let stats = await MotherStats.getStats();
+        let PikoLedger : Types.IcpLedgerActor = actor (Principal.toText(stats.ledgerId));
+        await PikoLedger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
+      } catch (_e) { pikoBalanceCache };
+    };
     {
       mining;
       owner;
@@ -399,8 +419,8 @@ actor self {
       tickIntervalSeconds;
       feeCyclesPerSubmit;
       cyclesBalance = Cycles.balance();
-      icpBalanceE8s;
-      pikoBalance;
+      icpBalanceE8s = icpBalanceCache;
+      pikoBalance = pikoBalanceCache;
       lastError;
     };
   };
