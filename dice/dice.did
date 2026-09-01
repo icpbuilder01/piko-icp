@@ -122,7 +122,7 @@ type BetOk =
    roll: nat;
    won: bool;
  };
-type BetError = 
+type BetError =
  variant {
    Anonymous;
    BetInProgress;
@@ -130,6 +130,7 @@ type BetError =
    InvalidAmount;
    InvalidTarget;
    RandomnessFailed;
+   TooSoon: record {retryAfterNanos: nat;};
    TransferFailed: TransferFromError;
  };
 service : {
@@ -149,6 +150,7 @@ service : {
   placeBet: (token: TokenKind, amountE8s: nat, target: nat) -> (BetResult);
   proposeRiskConfig: (value: RiskConfig) -> ();
   proposeWithdrawal: (token: TokenKind, to: principal, amount: nat) -> ();
+  pruneStaleBetAttempts: () -> (nat);
   sweepIcpProfit: () -> (SweepResult);
   topUpDiceFrontend: () -> (record {sent: nat;});
 }

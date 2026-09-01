@@ -55,6 +55,8 @@ function betErrorMessage(err: BetError, attemptedPayout: bigint | null): string 
   switch (err.__kind__) {
     case "Anonymous":
       return "Log in to play.";
+    case "TooSoon":
+      return "Slow down a little -- try again in a moment.";
     case "InvalidAmount":
       return "Enter a valid bet amount.";
     case "InvalidTarget":
