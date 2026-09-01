@@ -77,7 +77,38 @@ function parseIndex(raw: string): bigint | null {
   }
 }
 
+function renderNav(i: bigint, chainLength: bigint): Node {
+  return el("div", { className: "nav-row" }, [
+    el(
+      "button",
+      {
+        disabled: i <= 0n,
+        onclick: () => lookup(i - 1n),
+      },
+      ["← Previous"],
+    ),
+    el(
+      "button",
+      {
+        disabled: i + 1n >= chainLength,
+        onclick: () => lookup(i + 1n),
+      },
+      ["Next →"],
+    ),
+  ]);
+}
+
+// Guards against a stale response overwriting a newer one: clicking
+// Previous/Next/Look-up again before an in-flight lookup() resolves fires a
+// second concurrent get_blocks call, and network responses aren't
+// guaranteed to arrive in request order. Each call captures the generation
+// counter at its start and only renders if it's still current when its
+// response comes back -- an outdated response is silently dropped instead
+// of flashing the wrong block onto the screen.
+let requestGeneration = 0;
+
 async function lookup(i: bigint) {
+  const generation = ++requestGeneration;
   resultEl.replaceChildren(el("p", { className: "muted" }, ["Loading…"]));
   const url = new URL(window.location.href);
   url.searchParams.set("i", i.toString());
@@ -85,6 +116,7 @@ async function lookup(i: bigint) {
 
   try {
     const response = await index.get_blocks({ start: i, length: 1n });
+    if (generation !== requestGeneration) return; // a newer lookup() has since started
     const chainLength = response.chain_length;
     if (response.blocks.length === 0) {
       resultEl.replaceChildren(
@@ -93,32 +125,17 @@ async function lookup(i: bigint) {
             chainLength > 0n ? chainLength - 1n : 0n
           }.`,
         ]),
+        renderNav(i, chainLength),
       );
       return;
     }
     resultEl.replaceChildren(
       el("h1", {}, [`Block #${i}`]),
       renderValue(response.blocks[0]),
-      el("div", { className: "nav-row" }, [
-        el(
-          "button",
-          {
-            disabled: i <= 0n,
-            onclick: () => lookup(i - 1n),
-          },
-          ["← Previous"],
-        ),
-        el(
-          "button",
-          {
-            disabled: i + 1n >= chainLength,
-            onclick: () => lookup(i + 1n),
-          },
-          ["Next →"],
-        ),
-      ]),
+      renderNav(i, chainLength),
     );
   } catch (e) {
+    if (generation !== requestGeneration) return;
     resultEl.replaceChildren(
       el("p", { className: "error" }, [
         `Lookup failed: ${e instanceof Error ? e.message : String(e)}`,
