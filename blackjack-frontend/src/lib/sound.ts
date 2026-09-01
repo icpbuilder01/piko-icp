@@ -5,7 +5,7 @@
 // browsers refuse to start audio otherwise, so this deliberately never
 // tries to construct one eagerly on page load.
 
-const MUTE_KEY = "pikoslots-muted";
+const MUTE_KEY = "pikoblackjack-muted";
 
 let ctx: AudioContext | null = null;
 let muted = localStorage.getItem(MUTE_KEY) === "1";
