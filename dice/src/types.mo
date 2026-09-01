@@ -100,6 +100,7 @@ module {
 
   public type BetError = {
     #Anonymous;
+    #TooSoon : { retryAfterNanos : Nat };
     #InvalidTarget;
     #InvalidAmount;
     #BetInProgress;

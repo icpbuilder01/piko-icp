@@ -117,6 +117,20 @@ actor self {
   var lastSweepIcpProfitAt : Int = 0;
   var lastTopUpDiceFrontendAt : Int = 0;
 
+  // Same anti-spam cooldown as mother's submitProof, for the same reason:
+  // without it, a caller with no PIKO/ICP and no allowance can call
+  // placeBet in a tight loop and force a real icrc1_balance_of
+  // inter-canister call on every attempt, for free, even though the bet
+  // itself will always fail (see security audit). 0.3s still leaves any
+  // real player far more room than they'd ever need between bets.
+  // transient -- see SWEEP_INTERVAL_SECONDS's own comment on this file's
+  // persistence model: a plain (non-transient) let's value is frozen at
+  // first install and untouched by any later upgrade, so a future retune
+  // of this literal would silently never take effect without this
+  // annotation (see security audit).
+  transient let MIN_BET_INTERVAL_NANOS : Int = 300_000_000; // 0.3s
+  transient let lastBetAttempt : Map.Map<Principal, Time.Time> = Map.empty<Principal, Time.Time>();
+
   // Never share cycles below this floor -- keeps whatever this canister
   // needs for its own healthy operation first, only forwards genuine
   // surplus to dice-frontend. Same floor as mother's own CYCLES_RESERVE.
@@ -276,16 +290,37 @@ actor self {
     };
   };
 
+  // Throttles the two live ledger balance fetches below to at most once per
+  // MIN_STATS_REFRESH_INTERVAL_NANOS -- without this, getStats() was a
+  // public func any anonymous caller could loop for free, forcing two real
+  // inter-canister calls per iteration and burning this canister's own
+  // cycles (the callee, not the caller, pays for outbound IC calls) --
+  // exactly the DoS pattern placeBet's own MIN_BET_INTERVAL_NANOS cooldown
+  // already closes, just missed here (see security audit). Set
+  // synchronously before either await, same pattern as every other
+  // maintenance cooldown in this file, so a burst of concurrent calls only
+  // lets one through per window. dice-frontend already polls this every
+  // few seconds, so serving a short-lived cache in between is invisible to
+  // real players.
+  transient let MIN_STATS_REFRESH_INTERVAL_NANOS : Int = 5_000_000_000; // 5s
+  var lastStatsRefreshAt : Int = 0;
+  var icpBankrollCache : Nat = 0;
+  var pikoBankrollCache : Nat = 0;
+
   public func getStats() : async Types.Stats {
-    let IcpLedger : Types.LedgerActor = actor (Principal.toText(icpLedgerId));
-    let PikoLedger : Types.LedgerActor = actor (Principal.toText(pikoLedgerId));
-    let self_ = Principal.fromActor(self);
-    let icpBankrollE8s = try {
-      await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
-    } catch (_e) { 0 };
-    let pikoBankroll = try {
-      await PikoLedger.icrc1_balance_of({ owner = self_; subaccount = null });
-    } catch (_e) { 0 };
+    let now = Time.now();
+    if (now - lastStatsRefreshAt >= MIN_STATS_REFRESH_INTERVAL_NANOS) {
+      lastStatsRefreshAt := now;
+      let IcpLedger : Types.LedgerActor = actor (Principal.toText(icpLedgerId));
+      let PikoLedger : Types.LedgerActor = actor (Principal.toText(pikoLedgerId));
+      let self_ = Principal.fromActor(self);
+      icpBankrollCache := try {
+        await IcpLedger.icrc1_balance_of({ owner = self_; subaccount = null });
+      } catch (_e) { icpBankrollCache };
+      pikoBankrollCache := try {
+        await PikoLedger.icrc1_balance_of({ owner = self_; subaccount = null });
+      } catch (_e) { pikoBankrollCache };
+    };
     {
       betsPlaced;
       betsWon;
@@ -293,8 +328,8 @@ actor self {
       totalWageredPiko;
       totalPaidOutIcpE8s;
       totalPaidOutPiko;
-      icpBankrollE8s;
-      pikoBankroll;
+      icpBankrollE8s = icpBankrollCache;
+      pikoBankroll = pikoBankrollCache;
       cyclesBalance = Cycles.balance();
     };
   };
@@ -363,6 +398,20 @@ actor self {
   // no point at which the caller can see the outcome and still back out.
   public shared ({ caller }) func placeBet<system>(token : Types.TokenKind, amountE8s : Nat, target : Nat) : async Types.BetResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
+
+    let now = Time.now();
+    switch (Map.get(lastBetAttempt, Principal.compare, caller)) {
+      case (?last) {
+        let elapsed = now - last;
+        let remaining = MIN_BET_INTERVAL_NANOS - elapsed;
+        if (remaining > 0) {
+          return #Err(#TooSoon({ retryAfterNanos = Int.toNat(remaining) }));
+        };
+      };
+      case null {};
+    };
+    Map.add(lastBetAttempt, Principal.compare, caller, now);
+
     if (target < MIN_TARGET or target > MAX_TARGET) { return #Err(#InvalidTarget) };
     if (amountE8s == 0) { return #Err(#InvalidAmount) };
     if (Map.get(pendingBets, Principal.compare, caller) != null) {
@@ -694,6 +743,27 @@ actor self {
     };
   };
 
+  // lastBetAttempt is transient and unbounded: any caller can add an entry
+  // for free just by calling placeBet, even an anonymous-adjacent one that
+  // will immediately fail on the target/amount checks. Same accepted-risk
+  // pattern as mother's lastAttempt (see security audit) -- nothing here
+  // prevents an entry from being created, but an entry older than
+  // MIN_BET_INTERVAL_NANOS is provably stale and safe to drop. Fired
+  // automatically on armSweepTimer's recurring timer, same as mother's
+  // pruneStaleAttempts; still callable manually too.
+  public shared func pruneStaleBetAttempts() : async Nat {
+    let now = Time.now();
+    let entries = Iter.toArray(Map.entries(lastBetAttempt));
+    let stale = Array.filter<(Principal, Time.Time)>(
+      entries,
+      func((_, t)) { now - t > MIN_BET_INTERVAL_NANOS },
+    );
+    for ((p, _) in stale.vals()) {
+      Map.remove(lastBetAttempt, Principal.compare, p);
+    };
+    stale.size();
+  };
+
   func armSweepTimer<system>() {
     switch (sweepTimerId) {
       case (?id) { Timer.cancelTimer(id) };
@@ -704,6 +774,7 @@ actor self {
       func() : async () {
         ignore (await sweepIcpProfit());
         ignore (await topUpDiceFrontend());
+        ignore (await pruneStaleBetAttempts());
       },
     );
   };
