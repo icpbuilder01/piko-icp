@@ -306,6 +306,17 @@ function App() {
   async function handleFound(nonce: bigint) {
     const id = identityRef.current;
     if (!id) return;
+    // Snapshotted *before* the real submitProof call below -- see the catch
+    // block's own comment for why: an update call can trap/timeout on the
+    // client side after already committing on the replica, and this is the
+    // only reliable way to tell a real failure apart from "it actually won,
+    // we just never heard back."
+    let statsBeforeSubmit: LeaderboardEntry | null = null;
+    try {
+      statsBeforeSubmit = (await anonymousMother.getMinerStats(id.getPrincipal())) as unknown as LeaderboardEntry;
+    } catch (err) {
+      console.error("Failed to snapshot miner stats before submitting", err);
+    }
     try {
       const mother = getMotherActor(id);
       const result = (await mother.submitProof(nonce)) as SubmitResult;
@@ -334,8 +345,41 @@ function App() {
       }
     } catch (err) {
       console.error("submitProof failed", err);
-      setMiningMessageKind(null);
-      setMiningMessage("Submission failed, still mining...");
+      // A real report from a miner showed exactly this: "Submission
+      // failed" shown locally (no confetti, session counter never bumped)
+      // while the block was actually won and the reward landed -- the
+      // update call trapped/timed out client-side (a network blip, an
+      // agent-js polling gotcha) *after* mother had already processed and
+      // committed it. Rather than assume failure, check real on-chain
+      // state: if this principal's lifetime blocksFound went up since the
+      // snapshot taken right before this call, it won regardless of what
+      // this client ever heard back.
+      let confirmedWin = false;
+      if (statsBeforeSubmit) {
+        try {
+          const statsAfter = (await anonymousMother.getMinerStats(id.getPrincipal())) as unknown as LeaderboardEntry;
+          if (statsAfter.blocksFound > statsBeforeSubmit.blocksFound) {
+            confirmedWin = true;
+            const rewardGained = statsAfter.totalReward - statsBeforeSubmit.totalReward;
+            setSessionBlocks((n) => n + 1);
+            setLastWinReward(rewardGained);
+            setMiningMessageKind("good");
+            setMiningMessage(`Block won — +${formatPiko(rewardGained)} PIKO 🎉 (confirmed after a connection hiccup)`);
+            setConfettiTrigger((n) => n + 1);
+            refreshDashboard();
+            refreshBalance(id);
+            refreshIcpBalance(id);
+            refreshAllowance(id);
+            setTotalBlocksWon(statsAfter.blocksFound);
+          }
+        } catch (verifyErr) {
+          console.error("Failed to verify submission outcome after a client-side error", verifyErr);
+        }
+      }
+      if (!confirmedWin) {
+        setMiningMessageKind(null);
+        setMiningMessage("Submission failed, still mining...");
+      }
     }
     if (miningRef.current) {
       try {
