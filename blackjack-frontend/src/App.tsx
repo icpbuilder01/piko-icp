@@ -494,6 +494,8 @@ function App() {
       if (result.__kind__ === "Ok") {
         showMessage("Payout claimed -- check your balance.");
         refreshBalance(identity);
+      } else if (result.Err.__kind__ === "TooSoon") {
+        showMessage("Slow down a little -- try again in a moment.");
       } else {
         showMessage("Nothing pending to claim right now.");
       }
