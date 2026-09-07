@@ -356,24 +356,36 @@ function App() {
       // this client ever heard back.
       let confirmedWin = false;
       if (statsBeforeSubmit) {
-        try {
-          const statsAfter = (await anonymousMother.getMinerStats(id.getPrincipal())) as unknown as LeaderboardEntry;
-          if (statsAfter.blocksFound > statsBeforeSubmit.blocksFound) {
-            confirmedWin = true;
-            const rewardGained = statsAfter.totalReward - statsBeforeSubmit.totalReward;
-            setSessionBlocks((n) => n + 1);
-            setLastWinReward(rewardGained);
-            setMiningMessageKind("good");
-            setMiningMessage(`Block won — +${formatPiko(rewardGained)} PIKO 🎉 (confirmed after a connection hiccup)`);
-            setConfettiTrigger((n) => n + 1);
-            refreshDashboard();
-            refreshBalance(id);
-            refreshIcpBalance(id);
-            refreshAllowance(id);
-            setTotalBlocksWon(statsAfter.blocksFound);
+        // A single immediate re-query wasn't enough in practice: query calls
+        // can be served by a replica whose state hasn't caught up with the
+        // update that just committed a few hundred ms earlier (ordinary IC
+        // read-after-write lag, not a bug in getMinerStats itself), so the
+        // very first check here could still read the pre-win blocksFound and
+        // wrongly conclude "not a win". Retry a few times with a short delay
+        // before giving up.
+        for (let attempt = 0; attempt < 4 && !confirmedWin; attempt++) {
+          if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
           }
-        } catch (verifyErr) {
-          console.error("Failed to verify submission outcome after a client-side error", verifyErr);
+          try {
+            const statsAfter = (await anonymousMother.getMinerStats(id.getPrincipal())) as unknown as LeaderboardEntry;
+            if (statsAfter.blocksFound > statsBeforeSubmit.blocksFound) {
+              confirmedWin = true;
+              const rewardGained = statsAfter.totalReward - statsBeforeSubmit.totalReward;
+              setSessionBlocks((n) => n + 1);
+              setLastWinReward(rewardGained);
+              setMiningMessageKind("good");
+              setMiningMessage(`Block won — +${formatPiko(rewardGained)} PIKO 🎉 (confirmed after a connection hiccup)`);
+              setConfettiTrigger((n) => n + 1);
+              refreshDashboard();
+              refreshBalance(id);
+              refreshIcpBalance(id);
+              refreshAllowance(id);
+              setTotalBlocksWon(statsAfter.blocksFound);
+            }
+          } catch (verifyErr) {
+            console.error("Failed to verify submission outcome after a client-side error", verifyErr);
+          }
         }
       }
       if (!confirmedWin) {
@@ -763,11 +775,12 @@ function App() {
 
       <section className="block">
         <h2>
-          Add PIKO to your wallet <span className="section-icon">💰</span>
+          Piko ledger ID <span className="section-icon">🔖</span>
         </h2>
         <p className="section-intro">
-          PIKO is a standard ICRC-1 token — add this ledger ID to the NNS
-          dapp, or any other ICRC-1-aware wallet.
+          Not your wallet address (that's above ↑) — this is PIKO's ledger
+          canister ID. Add it to the NNS dapp, or any other ICRC-1-aware
+          wallet, to see and manage your PIKO there too.
         </p>
         <div className="wallet-address-row">
           <code className="wallet-address">{ledgerCanisterId}</code>
@@ -913,6 +926,18 @@ function App() {
             No blocks mined yet — be the first, see "Mine" above.
           </div>
         )}
+      </section>
+
+      <section className="block">
+        <h2>
+          Getting started <span className="section-icon">🚀</span>
+        </h2>
+        <ul className="tech-list">
+          <li>Log in with Internet Identity (top right).</li>
+          <li>Add ICP to your wallet, then approve some for mining fees.</li>
+          <li>Click "Start mining" — hashing runs right in your browser.</li>
+          <li>Win a block, PIKO mints straight to your principal. You're done!</li>
+        </ul>
       </section>
 
       <section className="block tech-block">
