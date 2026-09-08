@@ -1068,12 +1068,14 @@ table.blocks th {
   letter-spacing: 0.04em;
   padding: 6px 8px;
   border: 1px solid var(--border-strong);
+  overflow-wrap: anywhere;
 }
 
 table.blocks td {
   padding: 7px 8px;
   border: 1px solid var(--border);
   color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
 table.blocks tr:nth-child(even) td {
