@@ -592,8 +592,8 @@ function App() {
             <span className="hash-ticker-label">max supply</span>{" "}
             <span className="hash-ticker-value">21,000,000 PIKO</span>
             <span className="hash-ticker-sep">/</span>
-            <span className="hash-ticker-label">premine</span>{" "}
-            <span className="hash-ticker-value">none, ever</span>
+            <span className="hash-ticker-label">circulating supply</span>{" "}
+            <span className="hash-ticker-value">{stats ? `${formatPiko(stats.totalMinted)} PIKO` : "..."}</span>
             <span className="hash-ticker-sep">/</span>
             <span className="hash-ticker-label">servers</span>{" "}
             <span className="hash-ticker-value">zero</span>
