@@ -189,24 +189,26 @@ function App() {
           Top players <span className="section-icon">🏆</span>
         </h2>
         {leaderboard.length > 0 ? (
-          <table className="blocks">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Player</th>
-                <th>PIKO wagered</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboard.map((entry, i) => (
-                <tr key={entry.player.toText()}>
-                  <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
-                  <td className="mono">{shortPrincipal(entry.player.toText())}</td>
-                  <td>{formatPiko(entry.wageredPiko)}</td>
+          <div className="table-scroll">
+            <table className="blocks">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Player</th>
+                  <th>PIKO wagered</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {leaderboard.map((entry, i) => (
+                  <tr key={entry.player.toText()}>
+                    <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
+                    <td className="mono">{shortPrincipal(entry.player.toText())}</td>
+                    <td>{formatPiko(entry.wageredPiko)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state">No one's rolled yet -- be the first.</div>
         )}
@@ -224,28 +226,30 @@ function App() {
           )}
         </div>
         {recentBets.length > 0 ? (
-          <table className="blocks">
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Target</th>
-                <th>Roll</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentBets.map((b, i) => (
-                <tr key={i}>
-                  <td className="mono">{shortPrincipal(b.player.toText())}</td>
-                  <td>{b.target.toString()}</td>
-                  <td>{b.roll.toString()}</td>
-                  <td className={b.won ? "good" : ""}>
-                    {b.won ? `+${formatPiko(b.payoutAmount)} PIKO` : "lost"}
-                  </td>
+          <div className="table-scroll">
+            <table className="blocks">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Target</th>
+                  <th>Roll</th>
+                  <th>Result</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentBets.map((b, i) => (
+                  <tr key={i}>
+                    <td className="mono">{shortPrincipal(b.player.toText())}</td>
+                    <td>{b.target.toString()}</td>
+                    <td>{b.roll.toString()}</td>
+                    <td className={b.won ? "good" : ""}>
+                      {b.won ? `+${formatPiko(b.payoutAmount)} PIKO` : "lost"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state">No rolls yet.</div>
         )}

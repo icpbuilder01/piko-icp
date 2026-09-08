@@ -1043,6 +1043,15 @@ section.block .miner-panel-head h2 {
 
 /* ---- Table ---- */
 
+/* table.blocks has width: 100% but plain table-layout: auto, so its
+   intrinsic column widths (mono-font principals, etc.) can still exceed
+   the card on narrow viewports -- this wrapper contains that overflow by
+   scrolling it internally instead of letting it push past the card edge. */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
 table.blocks {
   width: 100%;
   border-collapse: collapse;
