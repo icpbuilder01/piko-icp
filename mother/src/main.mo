@@ -97,6 +97,15 @@ actor self {
   let plinkoFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai"); // dead, do not use -- see comment above
   let blackjackId : ?Principal = ?Principal.fromText("d76up-oaaaa-aaaai-ax4ia-cai");
   let blackjackFrontendId : ?Principal = ?Principal.fromText("bcd2h-5iaaa-aaaai-ax4hq-cai");
+  // PikoPlace (`~/pikoplace/`) is another wholly separate icp-cli project,
+  // same reasoning as PikoBlackjack above -- its `place` canister id is
+  // hardcoded rather than left unset. Same architecture as dice/
+  // dice-frontend, not blackjack/blackjack-frontend: place has no PIKO/ICP
+  // income of its own at all (every burn leaves the ecosystem for good --
+  // see place/src/main.mo's own comment on topUpPlaceFrontend), so mother
+  // tops up `place` directly here, and place relays its own surplus on to
+  // place-frontend via its own already-existing topUpPlaceFrontend().
+  let placeId : ?Principal = ?Principal.fromText("cpihg-xqaaa-aaaac-bf4ba-cai");
 
   // The ICP ledger used to charge (and burn) the mining fee, and the
   // account transfers to it are burned to. Defaults to the real mainnet ICP
@@ -1099,21 +1108,21 @@ actor self {
   // its own declaration, so it's never skipped). No state kept here
   // either, for the same reason sweepTreasury keeps none: it just re-reads
   // Cycles.balance() fresh every call.
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat } {
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 } };
+    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0 } };
 
     let surplus = balance - CYCLES_RESERVE;
     let share = surplus / targets.size();
@@ -1125,6 +1134,7 @@ actor self {
     var sentToDice = 0;
     var sentToBlackjack = 0;
     var sentToBlackjackFrontend = 0;
+    var sentToPlace = 0;
     for (target in targets.vals()) {
       let _outcome = try {
         await (with cycles = share) Management.deposit_cycles({ canister_id = target });
@@ -1138,11 +1148,12 @@ actor self {
           if (?target == diceId) { sentToDice += share };
           if (?target == blackjackId) { sentToBlackjack += share };
           if (?target == blackjackFrontendId) { sentToBlackjackFrontend += share };
+          if (?target == placeId) { sentToPlace += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
