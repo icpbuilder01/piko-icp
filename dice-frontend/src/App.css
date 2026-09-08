@@ -1107,6 +1107,35 @@ table.blocks td.mono {
   font-size: 0.8rem;
 }
 
+/* Recent rolls: auto layout gave the numeric/short-word columns (Target,
+   Roll) barely any room once the mono Player cell claimed space, wrapping
+   "TARGET"/"ROLL" mid-word. Fixed widths sized so every header fits on one
+   line, and the Player column's principal wraps across two lines instead
+   (already fine -- see table.blocks td.mono above). */
+table.blocks.recent-rolls {
+  table-layout: fixed;
+}
+
+table.blocks.recent-rolls th:nth-child(1),
+table.blocks.recent-rolls td:nth-child(1) {
+  width: 30%;
+}
+
+table.blocks.recent-rolls th:nth-child(2),
+table.blocks.recent-rolls td:nth-child(2) {
+  width: 20%;
+}
+
+table.blocks.recent-rolls th:nth-child(3),
+table.blocks.recent-rolls td:nth-child(3) {
+  width: 16%;
+}
+
+table.blocks.recent-rolls th:nth-child(4),
+table.blocks.recent-rolls td:nth-child(4) {
+  width: 34%;
+}
+
 .empty-state {
   color: var(--text-muted);
   font-size: 0.85rem;
