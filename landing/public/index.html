@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/piko-logo.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server. Play Dice or Blackjack with it, provably fair, fully on-chain." />
+  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server. Play Dice or Blackjack, or paint on PikoPixel, with it -- provably fair, fully on-chain." />
   <title>PIKO</title>
   <style>
     :root {
@@ -30,6 +30,7 @@
 
       --spark: #1a56b8;
       --felt: #a3271d;
+      --pixel: #7a1e9f;
 
       --bevel-hi: #fffdf7;
       --bevel-lo: #a8975f;
@@ -60,6 +61,7 @@
 
         --spark: #3d9bff;
         --felt: #ff5c4d;
+        --pixel: #c56ae0;
 
         --bevel-hi: #56492c;
         --bevel-lo: #000000;
@@ -243,6 +245,10 @@
       color: var(--felt);
     }
 
+    .link-card.pixel .link-title {
+      color: var(--pixel);
+    }
+
     .ledger-box {
       background: var(--surface);
       border-style: solid;
@@ -365,6 +371,12 @@
         game (Hit/Stand/Double/Split) against the same kind of on-chain-escrowed bankroll.
       </p>
       <p>
+        <strong>PikoPixel</strong> is a third companion, and a different kind of one: a shared,
+        r/place-style pixel canvas, not a bet. Burn a small, fixed amount of PIKO to paint one cell
+        a color of your choosing, visible to everyone in real time -- no payout, no bankroll,
+        nothing to win back, just a permanent ICRC-1 burn and a piece of collective art.
+      </p>
+      <p>
         Independent project. Mining is inspired by the publicly described "proof-of-on-chain-work"
         mechanics of bob.fun, but this is an original codebase, token, and brand --
         <strong>not affiliated with, endorsed by, or connected to bob.fun or BOB in any way.</strong>
@@ -384,6 +396,10 @@
       <a class="link-card blackjack" href="https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
         <div class="link-title"><span class="icon">&#127183;</span>Play PikoBlackjack</div>
         <div class="link-desc">Interactive single-deck Blackjack (Hit/Stand/Double/Split), bet in PIKO, fully on-chain.</div>
+      </a>
+      <a class="link-card pixel" href="https://cglm2-byaaa-aaaac-bf4aq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="link-title"><span class="icon">&#127912;</span>Paint on PikoPixel</div>
+        <div class="link-desc">Shared r/place-style canvas, PIKO burned per pixel, live and real-time.</div>
       </a>
       <a class="link-card" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/dashboard.html" target="_blank" rel="noopener noreferrer">
         <div class="link-title"><span class="icon">&#9638;</span>Live chain dashboard</div>
