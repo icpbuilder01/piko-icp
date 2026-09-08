@@ -92,7 +92,7 @@ function App() {
       </header>
 
       <div className="disclaimer disclaimer-strong">
-        <strong>This is a betting game, not an investment.</strong> Bets are PIKO-only. Every losing
+        <strong>This is a game, not an investment.</strong> Bets are PIKO-only. Every losing
         roll's stake is burned into the bankroll, non-refundable, the same way PIKO's mining fee is.
         There's no PIKO market yet (no DEX listing), so winnings are still just PIKO -- only play with
         what you're fully fine losing.
