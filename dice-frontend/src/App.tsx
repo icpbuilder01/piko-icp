@@ -227,7 +227,7 @@ function App() {
         </div>
         {recentBets.length > 0 ? (
           <div className="table-scroll">
-            <table className="blocks">
+            <table className="blocks recent-rolls">
               <thead>
                 <tr>
                   <th>Player</th>
