@@ -1,11 +1,12 @@
-# PIKO Protocol Paper (v1.3)
+# PIKO Protocol Paper (v1.4)
 
 *A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the Internet Computer.*
 
 Live sites: https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/ (mining) &middot;
 https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/ (PIKO Dice, &sect;5) &middot;
 https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/ (PikoBlackjack, &sect;6) &middot;
-https://cglm2-byaaa-aaaac-bf4aq-cai.icp.net/ (PikoPixel, &sect;7)
+https://cglm2-byaaa-aaaac-bf4aq-cai.icp.net/ (PikoPixel, &sect;7) &middot;
+https://2uuxi-qyaaa-aaaac-qhbyq-cai.icp.net/ (PikoPoker, &sect;8)
 
 ## 0. Abstract
 
@@ -106,7 +107,7 @@ near-instantly. Retargeting can still move difficulty arbitrarily far
 controller call involved -- difficulty was set by hand in an earlier
 version of this design, which worked day-to-day but would have frozen
 permanently at whatever value it last held once the coordinator is
-blackholed (&sect;11); the automatic version has no such dead end.
+blackholed (&sect;12); the automatic version has no such dead end.
 
 ## 4. The burn -- and the cycles that keep the lights on
 
@@ -132,7 +133,12 @@ automatically on an hourly timer, so the fee doesn't pay a second ICP ledger
 transfer fee on every single block just to be moved along. The split ratio
 itself is disclosed live via `getStats()`, and -- like the burn destination
 itself -- can be locked permanently by the controller once tuned, so it
-becomes a promise enforced by code rather than by a key (&sect;9).
+becomes a promise enforced by code rather than by a key (&sect;10). Both
+locks on `mother` are no longer hypothetical: `icpFeeTargetLocked` and
+`cyclesFundRatioLocked` are both confirmed `true` live, independently
+checkable via `getStats()` -- the burn destination and the burn/cycles
+split ratio are already enforced by code, not by a key, ahead of `mother`
+itself ever being blackholed.
 
 **Pay-to-play, not play-to-win.** Paying the fee does not guarantee a
 reward. If another submission's fee lands first for the same block, this
@@ -145,7 +151,7 @@ queue.
 
 PIKO Dice is a companion game, giving PIKO somewhere to actually be spent
 rather than only mined and held. It's deliberately a separate pair of
-canisters and a separate site from mining (&sect;8) -- opting into the game
+canisters and a separate site from mining (&sect;9) -- opting into the game
 is a distinct choice from opting into mining, not a bundled default. Bets
 are PIKO-only (see below).
 
@@ -185,9 +191,13 @@ called "PIKO Dice".)
 
 Risk parameters (`maxPayoutBps`, the protected bankroll floor, the
 cycles-funding split) are timelocked and lockable exactly like `mother`'s
-own admin-settable fields -- see &sect;9 for what that means in practice.
-The same hourly-sweep, ICP-profit-to-cycles self-funding pattern as
-`mother` keeps the canister running without manual cycle top-ups.
+own admin-settable fields -- see &sect;10 for what that means in practice.
+Both locks are now exercised on `dice`: `withdrawalsLocked` and
+`riskConfigLocked` are both confirmed `true` live, checkable via
+`getConfig()` -- the bankroll can never be withdrawn and the risk
+parameters can never change again, short of a code upgrade. The same
+hourly-sweep, ICP-profit-to-cycles self-funding pattern as `mother` keeps
+the canister running without manual cycle top-ups.
 
 ## 6. PikoBlackjack
 
@@ -215,8 +225,11 @@ worst-case payout would exceed `maxPayoutBps` (5% at the time of writing)
 of the live, real bankroll is rejected before any stake moves. Risk
 parameters and the withdrawal path go through the identical
 propose/48h-wait/execute/cancel/lock machinery as `mother` and `dice`
-(&sect;9). The same hourly-sweep, ICP-profit-to-cycles pattern keeps the
-canister funded without manual top-ups.
+(&sect;10) -- as with `dice`, all three of `blackjack`'s own locks
+(`pikoLedgerLocked`, `bankrollConfigLocked`, `withdrawalsLocked`) are now
+exercised, all confirmed `true` live. The same hourly-sweep,
+ICP-profit-to-cycles pattern keeps the canister funded without manual
+top-ups.
 
 (`blackjack` began as a simple Plinko-style game, then a slot machine,
 before becoming the Blackjack table described here -- same canister, same
@@ -240,9 +253,10 @@ The `place` canister never holds the PIKO even transiently, so unlike
 every betting game in this family it has no withdrawal path and no
 timelocked risk config -- there's nothing for a controller to withdraw or
 mismanage in the first place. `pikoLedgerId` is locked the same way
-`icpFeeTarget` is (&sect;9): a one-way `lockPikoLedgerId()` call, checkable
+`icpFeeTarget` is (&sect;10): a one-way `lockPikoLedgerId()` call, checkable
 live via `getConfig()`, closes off the only lever that could otherwise
-redirect where burns go.
+redirect where burns go -- confirmed `true` live, the earliest of any
+companion app's ledger lock to actually be exercised.
 
 **Fully permissionless, same anti-spam pattern as the rest of the family.**
 A per-caller cooldown prevents a caller with no PIKO/allowance from forcing
@@ -259,10 +273,71 @@ the ecosystem entirely rather than landing in the canister), so `mother`
 tops it up directly from its own cycles surplus the same way it does for
 `dice`; `place` then relays its own surplus on to `place-frontend`.
 
-## 8. Architecture
+## 8. PikoPoker
+
+PikoPoker is a fourth companion, and the first in the family that's
+player-versus-player rather than player-versus-bankroll: on-chain
+No-Limit Texas Hold'em, up to 8 seats per table, played in real PIKO.
+Unlike Dice (&sect;5) and Blackjack (&sect;6), the canister is not the
+house taking the other side of every hand -- it's the dealer and escrow
+for a table of real opponents, and takes a small, disclosed rake out of
+contested pots rather than a bankroll edge.
+
+**Same escrow-before-play ordering guarantee as the rest of the family.**
+A seat's buy-in is pulled via `icrc2_transfer_from` -- escrowed into that
+player's stack -- before they're dealt into a hand, not after; a shuffle
+uses `raw_rand` per hand, and hole cards are redacted per-caller in every
+query, so no other player (or spectator) can read cards they haven't been
+shown. Public tables are openly joinable; private tables are joined by an
+invite code. A dedicated zero-buy-in "Free Play" table exists purely as
+play money -- no PIKO ever moves for it, by a `buyIn == 0` sentinel the
+contract checks explicitly, not a UI-only distinction.
+
+**Rake, not a bankroll bet.** A small, configurable share of each
+contested pot (`rakeBps`) is retained by the canister rather than a
+Dice/Blackjack-style house edge on a single wager. Collected rake is
+withdrawn through the identical propose/48h-wait/execute/cancel/lock
+machinery as `mother`'s, `dice`'s, and `blackjack`'s own withdrawal paths
+(&sect;10) -- unlike `dice`'s and `blackjack`'s own withdrawal locks
+(both now exercised, &sect;10), `lockRakeWithdrawals` has not been called
+here yet.
+
+**The youngest, and most actively corrected, canister in this family.**
+PikoPoker launched 2026-09-02, materially later than mining, Dice,
+Blackjack, or PikoPixel, and real multiplayer table state (whose turn it
+is, whether a hand is still live, whether a seat is mid-leave) is a
+larger surface than a single bet-and-resolve call. In practice this has
+meant a real fix shipped roughly every one to two weeks since launch --
+most recently, the same day this paper was updated, an internal review
+found and fixed a genuine information-disclosure gap: private-table
+invite codes were generated without real randomness, and two read-only
+query methods didn't check table membership before returning it, together
+meaning a caller who simply enumerated table ids could have read a
+private table's invite code and its live hand state, including cards not
+yet revealed at showdown. Both are fixed and confirmed deployed --
+invite codes are now drawn from `raw_rand`, and every per-table query
+checks the caller actually belongs there first -- but it's disclosed here
+rather than quietly folded into a changelog, in keeping with this
+project's own transparency norm (&sect;10 lists the equivalent findings
+for `dice` and `blackjack`). A separate, still-not-fully-root-caused
+reliability quirk -- an internal self-rescheduling timer occasionally
+failing to fire its own next tick on mainnet specifically, never
+reproduced on a local replica -- is mitigated by the frontend itself
+periodically nudging the same game-advancing method externally, which
+needs no special privilege and has proven reliable in practice, but the
+underlying mechanism isn't proven fixed, only worked around.
+
+**How this shapes PikoPoker's own place in the roadmap (&sect;12):** given
+how recently it launched and how much more often it has needed a real
+code fix than any other companion app, PikoPoker is not on a blackhole
+track yet at all, not even the intermediate lock step the other games are
+already partway through -- see &sect;12 for what would need to change
+first.
+
+## 9. Architecture
 
 PIKO has no servers, no database, and no off-chain component of any kind.
-Eleven canisters, all on the Internet Computer, do the entire job:
+Fourteen canisters, all on the Internet Computer, do the entire job:
 
 - **`ledger`** -- the unmodified, DFINITY-maintained ICRC-1/ICRC-2 ledger
   canister, the same code other ICP tokens run, not a bespoke contract.
@@ -277,6 +352,10 @@ Eleven canisters, all on the Internet Computer, do the entire job:
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
   in-browser miner (a Web Worker calling `crypto.subtle.digest`) all ship
   from here.
+- **`index`** -- the official, unmodified `ic-icrc1-index-ng` canister,
+  indexing every `ledger` transaction so the mining site's own block
+  explorer can look one up by index without a bespoke indexer. It never
+  moves funds, only reads the ledger.
 - **`dice`** -- the PIKO Dice game logic (&sect;5): bet resolution,
   bankroll accounting, and its own timelocked risk config.
 - **`dice-frontend`** -- a second, separate static asset canister for
@@ -291,32 +370,39 @@ Eleven canisters, all on the Internet Computer, do the entire job:
   `dice`/`blackjack` -- there's no bankroll to protect.
 - **`place-frontend`** -- a fourth, separate static asset canister, for the
   same reason `dice-frontend`/`blackjack-frontend` are kept separate.
+- **`pikopoker`** -- PikoPoker's table logic (&sect;8): seating, escrow,
+  hand resolution, and rake accounting across public, private, and Free
+  Play tables.
+- **`pikopoker-frontend`** -- a fifth, separate static asset canister, for
+  the same reason the other companion apps' frontends are kept separate.
 - **`landing`** -- the project's public entry point (`piko.network`): a
   single static page explaining PIKO and linking out to the applications
   above. It never calls any canister itself -- no login, no approval,
   nothing at stake here -- purely a signpost.
 
-**How the five sites relate.** `landing` is the hub: it explains the
+**How the six sites relate.** `landing` is the hub: it explains the
 project once and links out, rather than duplicating any application.
 `frontend` (mining), `dice-frontend` (dice betting), `blackjack-frontend`
-(blackjack), and `place-frontend` (PikoPixel) are deliberately separate
-applications with separate login/approval flows -- opting into one is
-never a bundled default for the others -- but all four ultimately move the
-*same* PIKO through the *same* `ledger` canister. A balance shown on the
-mining dashboard, the dice site, the blackjack table, and the PikoPixel
-canvas is the same number, read from the same account (subject to
-Internet Identity deriving a distinct principal per site's own origin --
-each site pins its own canonical origin so that at least stays consistent
-*within* itself), not separate in-game currencies. `mother`, `dice`,
-`blackjack`, and `place` are the coordinator canisters behind `frontend`,
-`dice-frontend`, `blackjack-frontend`, and `place-frontend` respectively;
-an end user calls the frontend, never the coordinator directly.
+(blackjack), `place-frontend` (PikoPixel), and `pikopoker-frontend`
+(PikoPoker) are deliberately separate applications with separate
+login/approval flows -- opting into one is never a bundled default for
+the others -- but all five ultimately move the *same* PIKO through the
+*same* `ledger` canister. A balance shown on the mining dashboard, the
+dice site, the blackjack table, the PikoPixel canvas, and the poker lobby
+is the same number, read from the same account (subject to Internet
+Identity deriving a distinct principal per site's own origin -- each site
+pins its own canonical origin so that at least stays consistent *within*
+itself), not separate in-game currencies. `mother`, `dice`, `blackjack`,
+`place`, and `pikopoker` are the coordinator canisters behind `frontend`,
+`dice-frontend`, `blackjack-frontend`, `place-frontend`, and
+`pikopoker-frontend` respectively; an end user calls the frontend, never
+the coordinator directly.
 
 If every conventional server DFINITY or anyone else operates vanished
 tomorrow, this system would keep running exactly as it does today --
 nothing about it is hosted in the traditional sense.
 
-## 9. Trust model & security
+## 10. Trust model & security
 
 Every on-chain rule described in this paper -- the supply cap, the burn,
 one winner per block -- is enforced by the code currently installed in
@@ -325,14 +411,15 @@ been tested against concurrent, competing submissions to confirm exactly
 one winner is ever paid per block.
 
 What it cannot yet claim is trustlessness in the strict sense. `mother`,
-`ledger`, `miner`, `frontend`, `dice`, `dice-frontend`, `blackjack`,
-`blackjack-frontend`, `place`, and `place-frontend` currently share a
-single controller. A canister controller can install new code at any time,
-which means the guarantees in this paper hold only as long as that
-controller chooses not to change them by replacing the code outright. This
-is disclosed here deliberately rather than left implicit -- it applies to
-`dice`'s and `blackjack`'s bankrolls, and to where `place` sends every
-burn, exactly as it applies to `mother`'s supply cap.
+`ledger`, `miner`, `frontend`, `index`, `dice`, `dice-frontend`,
+`blackjack`, `blackjack-frontend`, `place`, `place-frontend`, `pikopoker`,
+and `pikopoker-frontend` currently share a single controller. A canister
+controller can install new code at any time, which means the guarantees
+in this paper hold only as long as that controller chooses not to change
+them by replacing the code outright. This is disclosed here deliberately
+rather than left implicit -- it applies to `dice`'s, `blackjack`'s, and
+`pikopoker`'s escrowed funds, and to where `place` sends every burn,
+exactly as it applies to `mother`'s supply cap.
 
 **Parameter changes, short of a code upgrade, are timelocked.** The ICP fee
 target (which ledger, which burn account, which CMC) can't change in a
@@ -350,20 +437,34 @@ timestamps, so there is nothing to propose, timelock, or lock for it, and
 nothing that freezes once the controller is gone. `dice`'s own risk
 parameters (&sect;5) and `blackjack`'s (&sect;6) each go through the
 identical propose/48h-wait/execute/cancel/lock machinery, independent of
-`mother`'s and of each other's. `place` has no risk parameters to
-timelock -- there's no bankroll -- but its own single lever, which real
-PIKO ledger burns are sent to, is now permanently locked too (a plain
-one-way `lockPikoLedgerId()`, no propose/wait step needed since it isn't
-adjustable day-to-day the way a betting risk parameter is).
+`mother`'s and of each other's -- both are now fully locked
+(`riskConfigLocked`/`withdrawalsLocked` confirmed `true` on `dice`;
+`bankrollConfigLocked`/`withdrawalsLocked`/`pikoLedgerLocked` confirmed
+`true` on `blackjack`, all live-checkable via their own `getConfig()`).
+`place` has no risk parameters to timelock -- there's no bankroll -- but
+its own single lever,
+which real PIKO ledger burns are sent to, is now permanently locked too (a
+plain one-way `lockPikoLedgerId()`, no propose/wait step needed since it
+isn't adjustable day-to-day the way a betting risk parameter is).
+`pikopoker`'s rake withdrawal (&sect;8) goes through the same
+propose/48h-wait/execute/cancel/lock machinery as `dice`'s and
+`blackjack`'s (now-locked) bankroll withdrawals, but neither
+`lockRakeWithdrawals` nor its own `lockPikoLedgerId()` -- unlike
+`blackjack`'s and `place`'s, both already exercised -- has been called
+yet.
 
 **What removes the remaining trust requirement:** *blackholing* --
 permanently removing all controllers from a canister -- makes it
 unupgradable by anyone, forever, closing the one door the timelock
-deliberately doesn't cover. The roadmap (&sect;11) covers blackholing
-`ledger`, `mother`, and eventually `dice` and `blackjack`, once each has
-run long enough, in production, without a code change. A paid third-party
-audit before `mother`/`dice`/`blackjack` are blackholed is the goal, not a
-guarantee -- this is a
+deliberately doesn't cover. The roadmap (&sect;12) covers blackholing
+`ledger`, `mother`, and eventually `dice`, `blackjack`, and `place`, once
+each has run long enough, in production, without a code change.
+`pikopoker` (&sect;8) is deliberately not on that list yet -- it is the
+youngest canister in the family and has needed a real code fix far more
+often than the others since launch, so it is not far enough along even
+the intermediate lock step to have a blackhole timeline at all right now.
+A paid third-party audit before `mother`/`dice`/`blackjack` are blackholed
+is the goal, not a guarantee -- this is a
 self-funded, no-premine project with no treasury to draw on, so whether one
 happens depends on whether it's affordable at the time, not on a promise
 made here. What isn't conditional: the code is open-source today, every
@@ -392,19 +493,29 @@ resolve afterward, not just by code review. Separately, the vendored
 was hash-verified byte-for-byte against DFINITY's own published release
 artifact, and the `sha2` hashing dependency's actual output was checked
 against known SHA-256 test vectors by running it, rather than trusting its
-version label. None of this replaces an independent audit -- it's the
-floor, not the ceiling.
+version label. `place` (&sect;7) was reviewed the same way and, as of this
+writing, has had nothing to fix -- its burn-per-placement path checks
+bounds and pulls the fee before mutating any state, and every persisted
+constant was declared correctly from day one. `pikopoker` (&sect;8) is the
+one exception: the same review found and fixed a real information-
+disclosure gap the same day this paper was updated -- private-table
+invite codes weren't drawn from real randomness, and two read-only query
+methods didn't check that a caller actually belonged to the table before
+returning its state, together meaning a table's private code and live
+hand state (cards included) could have been read by anyone willing to
+enumerate table ids. Both are fixed and confirmed deployed. None of this
+replaces an independent audit -- it's the floor, not the ceiling.
 
 **`landing` is deliberately out of scope for blackholing, indefinitely.**
 It holds no funds, calls no other canister, and enforces no rule this paper
-makes any claim about -- see &sect;8: "no login, no approval, nothing at
+makes any claim about -- see &sect;9: "no login, no approval, nothing at
 stake here." Locking it would buy no additional trust for anyone, at the
 permanent cost of never being able to update the project's own front door
 (new links, corrections, future sites). Immutability is a tool for the
 canisters whose code *is* the promise being made; `landing` isn't one of
 them.
 
-## 10. Risk disclosure
+## 11. Risk disclosure
 
 - A PIKO/ICP pool exists on ICPSwap, seeded at the network's own
   mining-cost ratio, but it is small and new -- price can move sharply on
@@ -429,10 +540,16 @@ them.
   anything back: the PIKO spent placing a pixel is gone the moment the
   placement succeeds, by design, every time. Only place with PIKO you're
   fully fine never seeing again.
+- **PikoPoker (&sect;8) is real-stakes poker, not an investment.** Buy-ins
+  are escrowed in real PIKO and paid out by hand outcome, same
+  non-refundable-on-a-loss economics as Dice and Blackjack -- only sit
+  down with PIKO you're fully fine losing. It is also, as of this writing,
+  the youngest and most actively-corrected canister in this family (&sect;8,
+  &sect;10) -- treat it as the least battle-tested application here.
 - PIKO is an independent project. It is not affiliated with, endorsed by,
   or connected to bob.fun or BOB.
 
-## 11. Roadmap
+## 12. Roadmap
 
 - **Automatic difficulty retargeting.** Done -- see &sect;3. Removes the
   one remaining reason blackholing `mother` would have permanently frozen a
@@ -457,31 +574,48 @@ them.
 - **Blackhole `mother`** once difficulty and fee parameters have stabilized
   and a long enough production track record backs the code, permanently
   locking in the supply cap and burn logic.
-- **Lock `dice`'s withdrawal path and risk config** (&sect;5, &sect;9) once
-  the bankroll and risk parameters are considered final -- the same
-  propose/48h-wait/lock step already applied to `mother`.
+- **Lock `dice`'s withdrawal path and risk config** (&sect;5, &sect;10).
+  Done -- `withdrawalsLocked`/`riskConfigLocked` both confirmed
+  permanently locked, live and independently checkable via `getConfig()`,
+  the same propose/48h-wait/lock step already applied to `mother`.
 - **Blackhole `dice`**, after `mother` and only once a real track record of
   betting volume has run without incident -- bet resolution and the
   randomness/transfer ordering are more moving parts than `mother`'s
   simpler verify-and-mint path, and have changed more recently, so it earns
   immutability on a slower timeline, not
   the same one.
-- **Lock `blackjack`'s withdrawal path and risk config** (&sect;6, &sect;9)
-  once its bankroll and risk parameters are considered final -- the same
-  propose/48h-wait/lock step already applied to `mother` and `dice`.
+- **Lock `blackjack`'s withdrawal path and risk config** (&sect;6, &sect;10).
+  Done -- `pikoLedgerLocked`/`bankrollConfigLocked`/`withdrawalsLocked` all
+  confirmed permanently locked, live and independently checkable via
+  `getConfig()`, the same propose/48h-wait/lock step already applied to
+  `mother` and `dice`.
 - **Blackhole `blackjack`**, on a similar track to `dice` -- hand/round
   resolution and the double/split payout logic are more moving parts than
   `mother`'s simpler path, so it earns immutability once a real track
   record of play backs it, not on `mother`'s timeline.
-- **Lock `place`'s ledger id** (&sect;7, &sect;9). Done -- confirmed
+- **Lock `place`'s ledger id** (&sect;7, &sect;10). Done -- confirmed
   permanently locked, live and independently checkable via `getConfig()`.
   No withdrawal path or risk config to lock beyond that, since there's no
   bankroll.
 - **Blackhole `place`**, on a similar track to `dice`/`blackjack` once a
   real track record of use backs it -- simpler logic than either (no
   betting, no payout math), but not a reason to skip the same production
-  track record other canisters earn immutability with.
-- **`landing` is not on this list, on purpose** -- see &sect;9. It holds no
+  track record other canisters earn immutability with. Worth noting as of
+  this writing: only one distinct principal has ever used it, so its
+  fund-handling path has real code review behind it but no real
+  multi-user concurrency track record yet.
+- **Lock `pikopoker`'s ledger id and rake withdrawal path** (&sect;8,
+  &sect;10), the same propose/48h-wait/lock step as `dice`/`blackjack`.
+  Not done -- `lockPikoLedgerId()` has never been called and
+  `lockRakeWithdrawals` hasn't either.
+- **`pikopoker` is deliberately not on a blackhole track at all yet**,
+  unlike every other game in this family -- see &sect;8 for why: it is
+  the youngest canister here and has needed a real fix roughly every one
+  to two weeks since its 2026-09-02 launch, most recently a genuine
+  information-disclosure bug fixed the same day this paper was updated.
+  It needs a materially longer incident-free production run before even
+  the lock step above is worth doing, let alone blackholing.
+- **`landing` is not on this list, on purpose** -- see &sect;10. It holds no
   funds and makes no promise this paper needs code to enforce, so there is
   nothing blackholing it would protect -- only future flexibility it would
   cost.
@@ -503,6 +637,9 @@ them.
 | `blackjack-frontend` | `bcd2h-5iaaa-aaaai-ax4hq-cai` | PikoBlackjack site |
 | `place` | `cpihg-xqaaa-aaaac-bf4ba-cai` | PikoPixel canvas logic |
 | `place-frontend` | `cglm2-byaaa-aaaac-bf4aq-cai` | PikoPixel site |
+| `pikopoker` | `25x4u-gqaaa-aaaac-qhbza-cai` | PikoPoker table logic |
+| `pikopoker-frontend` | `2uuxi-qyaaa-aaaac-qhbyq-cai` | PikoPoker site |
+| `index` | `ymzxo-vqaaa-aaaaj-qse3q-cai` | ICRC-1 transaction index (read-only) |
 | `landing` | `7w27g-xiaaa-aaaaj-qseja-cai` | Project entry point (`piko.network`) |
 | ICP ledger | `ryjl3-tyaaa-aaaaa-aaaba-cai` | Mainnet ICP (external) |
 
@@ -511,4 +648,4 @@ to track your PIKO balance outside this site.
 
 ---
 
-*PIKO Protocol Paper v1.3 -- independent, non-affiliated project -- source code published alongside this paper.*
+*PIKO Protocol Paper v1.4 -- independent, non-affiliated project -- source code published alongside this paper.*
