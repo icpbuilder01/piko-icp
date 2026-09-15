@@ -139,7 +139,10 @@ service : {
       toBlackjackFrontend: nat;
       toDice: nat;
       toFrontend: nat;
+      toIndex: nat;
       toLedger: nat;
       toMiner: nat;
+      toPikopoker: nat;
+      toPlace: nat;
     });
 }
