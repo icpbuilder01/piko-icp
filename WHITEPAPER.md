@@ -1,4 +1,4 @@
-# PIKO Protocol Paper (v1.4)
+# PIKO Protocol Paper (v1.5)
 
 *A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the Internet Computer.*
 
@@ -15,7 +15,8 @@ can search for a nonce that satisfies the current difficulty target, submit
 it, and if it's accepted first, the block reward is minted straight to their
 own principal. There is no team allocation, no presale, and no code path
 that mints PIKO any other way. Every hash attempt runs client-side -- in a
-browser tab via the Web Crypto API, or in a self-owned canister running
+browser tab (one search per available CPU core, hashing via a
+WASM-compiled SHA-256 implementation), or in a self-owned canister running
 around the clock -- and every submission is independently re-verified by the
 coordinating canister before anything is minted.
 
@@ -54,9 +55,14 @@ the same height is accepted.
 
 1. **Approve.** The miner grants the coordinator canister an ICRC-2
    allowance on the ICP ledger, covering a few blocks' worth of mining fee.
-2. **Search.** A Web Worker in the browser (or a timer loop inside a
-   self-deployed canister) repeatedly hashes candidate nonces against the
-   current header using SHA-256, entirely client-side.
+2. **Search.** One Web Worker per available CPU core in the browser (or a
+   timer loop inside a self-deployed canister) repeatedly hashes candidate
+   nonces against the current header using SHA-256, entirely client-side.
+   Each session's search starts from a random per-job base offset rather
+   than nonce zero, so independent sessions -- this same account's other
+   tabs/devices, or any other miner on the network -- search genuinely
+   different, independent slices of the nonce space instead of converging
+   on the same answer.
 3. **Submit.** The moment a valid nonce is found, it's sent to the
    coordinator canister as a single call.
 4. **Verify.** The coordinator recomputes the hash itself -- it never trusts
@@ -74,6 +80,26 @@ the same height is accepted.
    block. Instead they accumulate in the coordinator's own balance, and a
    periodic sweep (automatic, hourly) burns most of it and converts a
    configured share to cycles (&sect;4).
+
+**A fairness gap in step 2's search, found and fixed 2026-09-17.** Every
+session's search originally started from nonce zero. For a fixed header,
+scanning upward from zero always reaches the same nonce first, so two
+sessions searching concurrently -- this same account's own second tab, or
+any two independent miners -- converged on the exact same answer, and
+whichever had the higher raw hashrate found it first *every single time*,
+deterministically, rather than in proportion to its real share of total
+hashrate the way proof-of-work is supposed to work. In practice this meant
+a single well-resourced participant could win nearly every block, not just
+most of them, regardless of how many other miners were active. Each
+session now starts from a random per-job base offset instead (&sect;2,
+step 2), which is also what makes running mining on more than one
+device/tab under the same account actually add combined speed -- before
+the fix it added none, since both searched the identical sequence. This is
+disclosed here in keeping with this project's transparency norm (&sect;10
+lists the equivalent disclosures for `dice`, `blackjack`, and `pikopoker`),
+even though it is a client-side fairness property rather than a fund-safety
+bug -- `mother` independently re-verified every proof throughout, so no
+invalid submission was ever accepted.
 
 ## 3. Tokenomics
 
@@ -350,8 +376,8 @@ Fourteen canisters, all on the Internet Computer, do the entire job:
   `icp canister call` commands (see the README), not something the mining
   site itself walks you through.
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
-  in-browser miner (a Web Worker calling `crypto.subtle.digest`) all ship
-  from here.
+  in-browser miner (one Web Worker per CPU core, hashing via a
+  WASM-compiled SHA-256 implementation) all ship from here.
 - **`index`** -- the official, unmodified `ic-icrc1-index-ng` canister,
   indexing every `ledger` transaction so the mining site's own block
   explorer can look one up by index without a bespoke indexer. It never
@@ -648,4 +674,4 @@ to track your PIKO balance outside this site.
 
 ---
 
-*PIKO Protocol Paper v1.4 -- independent, non-affiliated project -- source code published alongside this paper.*
+*PIKO Protocol Paper v1.5 -- independent, non-affiliated project -- source code published alongside this paper.*
