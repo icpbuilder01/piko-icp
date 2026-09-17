@@ -102,6 +102,15 @@ function staleBlockReason(err: Record<string, unknown>): string | null {
 const anonymousMother = getMotherActor();
 const motherPrincipal = Principal.fromText(motherCanisterId);
 
+// Mining a laptop flat-out at Max heats it up and spins the fan fast --
+// Low/High trade some hashrate (and win chance) for a cooler, quieter
+// machine while doing something else, via the worker's real sleep-based
+// duty cycling (see miner.worker.ts). Approximate real-world CPU load, not
+// an exact guarantee (actual load also depends on the browser/OS scheduler).
+type PowerLevel = "low" | "high" | "max";
+const POWER_DUTY_CYCLE: Record<PowerLevel, number> = { low: 0.32, high: 0.75, max: 1 };
+const POWER_STORAGE_KEY = "piko-mining-power";
+
 // A fresh random base nonce per mining job -- see miner.worker.ts's
 // nonceOffset comment for why: without it, every session (including this
 // same account's other tabs/devices, and every other miner on the network)
@@ -147,6 +156,14 @@ function App() {
   const [icpBalance, setIcpBalance] = useState<bigint | null>(null);
 
   const [mining, setMining] = useState(false);
+  const [power, setPower] = useState<PowerLevel>(() => {
+    try {
+      const stored = localStorage.getItem(POWER_STORAGE_KEY);
+      return stored === "low" || stored === "high" || stored === "max" ? stored : "max";
+    } catch {
+      return "max";
+    }
+  });
   const [hashrate, setHashrate] = useState(0);
   const [sessionAttempts, setSessionAttempts] = useState(0);
   const [sessionBlocks, setSessionBlocks] = useState(0);
@@ -576,10 +593,24 @@ function App() {
         workerIndex: i,
         workerCount: workers.length,
         nonceOffset,
+        dutyCycle: POWER_DUTY_CYCLE[power],
       });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureWorkers is stable (ref-backed), re-running on identity would restart the search needlessly
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureWorkers is stable (ref-backed); power is intentionally read fresh but not a dep -- changing it live is handled by the separate broadcast effect below, not by restarting the search
   }, [mining, work]);
+
+  // Persist the chosen power level, and broadcast a live change to any
+  // already-running workers -- mid-search, no restart needed (see
+  // miner.worker.ts's "power" message).
+  useEffect(() => {
+    try {
+      localStorage.setItem(POWER_STORAGE_KEY, power);
+    } catch {
+      // best-effort only -- a private window or blocked storage just means
+      // the choice won't be remembered next visit, nothing else breaks
+    }
+    workersRef.current.forEach((w) => w.postMessage({ type: "power", dutyCycle: POWER_DUTY_CYCLE[power] }));
+  }, [power]);
 
   useEffect(() => {
     return () => {
@@ -803,6 +834,28 @@ function App() {
               </div>
             </div>
             <div className="miner-controls">
+              <div className="power-row">
+                <span className="power-label">Power:</span>
+                <div className="power-buttons">
+                  {(["low", "high", "max"] as const).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      className={`button small power-btn ${power === level ? "active" : ""}`}
+                      onClick={() => setPower(level)}
+                    >
+                      {level === "low" ? "Low" : level === "high" ? "High" : "Max"}
+                    </button>
+                  ))}
+                </div>
+                <span className="power-hint">
+                  {power === "max"
+                    ? "full CPU speed"
+                    : power === "high"
+                      ? "~75% CPU, cooler"
+                      : "~30% CPU, quiet"}
+                </span>
+              </div>
               <div className="approve-row">
                 <label className="approve-blocks-label">
                   {feeApproved ? "Approve more:" : "Approve for"}
