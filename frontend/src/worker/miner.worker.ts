@@ -33,15 +33,28 @@ interface WorkMessage {
   // devices/tabs actually add real combined speed and no single fast
   // participant is structurally guaranteed to always win first.
   nonceOffset: bigint;
+  // Fraction of full speed to hash at, 0 < dutyCycle <= 1 -- see the Power
+  // message below.
+  dutyCycle: number;
+}
+
+// Lets the power level (Low/High/Max) change live while a search is already
+// running, without losing progress or restarting the current header search
+// -- dutyCycle is read fresh every loop iteration (see the module-level
+// variable below), a WorkMessage only sets its *initial* value.
+interface PowerMessage {
+  type: "power";
+  dutyCycle: number;
 }
 
 interface StopMessage {
   type: "stop";
 }
 
-type InboundMessage = WorkMessage | StopMessage;
+type InboundMessage = WorkMessage | StopMessage | PowerMessage;
 
 let generation = 0; // bumped on every new "work" message to abandon stale loops
+let dutyCycle = 1; // 0 < dutyCycle <= 1; updated live by "work"/"power" messages
 
 function natToBytes8(n: bigint): Uint8Array {
   const buf = new Uint8Array(8);
@@ -98,6 +111,15 @@ async function search(
   let nonce = nonceOffset + BigInt(workerIndex);
   let attemptsSinceReport = 0;
   let lastReport = performance.now();
+  // Duty-cycle throttling for Low/High power: hash flat-out for
+  // DUTY_WINDOW_MS * dutyCycle, then genuinely sleep (not just slow down --
+  // an actual idle worker thread) for the rest of the window, so the CPU
+  // really gets to cool off during the pause instead of just spinning
+  // slower. Reading the module-level `dutyCycle` fresh each iteration
+  // (rather than a captured parameter) is what lets a live power-level
+  // change take effect immediately without restarting the search.
+  const DUTY_WINDOW_MS = 200;
+  let dutyWindowStart = performance.now();
 
   while (generation === myGeneration) {
     const data = new Uint8Array(header.length + 8);
@@ -117,6 +139,16 @@ async function search(
     nonce += stride;
 
     const now = performance.now();
+    // Deliberately does NOT reset lastReport/attemptsSinceReport around this
+    // sleep -- letting the sleep gap fall inside the normal ~400ms report
+    // window below is what makes the displayed hashrate honestly reflect
+    // the *real* throttled rate (fewer real attempts per wall-clock second),
+    // not the misleadingly-full rate this worker only hits while awake.
+    if (dutyCycle < 1 && now - dutyWindowStart >= DUTY_WINDOW_MS * dutyCycle) {
+      await new Promise((resolve) => setTimeout(resolve, DUTY_WINDOW_MS * (1 - dutyCycle)));
+      dutyWindowStart = performance.now();
+    }
+
     if (now - lastReport > 400) {
       reportProgress(attemptsSinceReport, now - lastReport);
       attemptsSinceReport = 0;
@@ -142,6 +174,7 @@ async function search(
 self.onmessage = (event: MessageEvent<InboundMessage>) => {
   const msg = event.data;
   if (msg.type === "work") {
+    dutyCycle = msg.dutyCycle;
     generation++;
     search(
       generation,
@@ -152,6 +185,8 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
       msg.workerCount,
       msg.nonceOffset,
     );
+  } else if (msg.type === "power") {
+    dutyCycle = msg.dutyCycle;
   } else if (msg.type === "stop") {
     generation++; // abandons any in-flight search loop
   }
