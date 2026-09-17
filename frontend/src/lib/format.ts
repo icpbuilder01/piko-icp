@@ -27,6 +27,26 @@ export function parseAmount(input: string): bigint | null {
   }
 }
 
+// Real hash/s can now run from a few hundred (Low power, a slow device)
+// into the millions (WASM hashing, Max power, many cores) -- a raw
+// toLocaleString() integer at that top end (e.g. "5,234,891 H/s") is long
+// enough to overflow a narrow stat tile (this exact thing already happened
+// once, with the "ICP burned" counter, which needed a special wide-tile
+// fix). Adaptive units keep the displayed string short at any scale.
+export function formatHashrate(hashesPerSecond: number | null): string {
+  if (hashesPerSecond === null || !isFinite(hashesPerSecond) || hashesPerSecond < 0) {
+    return "not enough data yet";
+  }
+  const units = ["H/s", "KH/s", "MH/s", "GH/s", "TH/s"];
+  let value = hashesPerSecond;
+  let i = 0;
+  while (value >= 1000 && i < units.length - 1) {
+    value /= 1000;
+    i += 1;
+  }
+  return `${value.toFixed(value < 10 ? 2 : 1)} ${units[i]}`;
+}
+
 export function toHex(bytes: Uint8Array | number[]): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))

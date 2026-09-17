@@ -5,7 +5,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { getMotherActor, getLedgerActor, getIcpLedgerActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
 import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
-import { formatPiko, formatIcp, shortPrincipal, timeAgo, toHex } from "./lib/format";
+import { formatPiko, formatIcp, formatHashrate, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
 import { Confetti } from "./components/Confetti";
 import "./App.css";
@@ -873,9 +873,7 @@ function App() {
             <div className="stat-grid">
               <div className="stat-tile">
                 <div className="stat-label">Hashrate</div>
-                <div className={`stat-value ${mining ? "hot" : ""}`}>
-                  {hashrate.toLocaleString()} H/s
-                </div>
+                <div className={`stat-value ${mining ? "hot" : ""}`}>{formatHashrate(hashrate)}</div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Attempts this session</div>

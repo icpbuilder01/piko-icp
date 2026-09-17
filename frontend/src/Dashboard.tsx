@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { getMotherActor } from "./lib/actors";
-import { formatPiko, formatIcp, shortPrincipal, timeAgo } from "./lib/format";
+import { formatPiko, formatIcp, formatHashrate, shortPrincipal, timeAgo } from "./lib/format";
 import "./Dashboard.css";
 
 const POLL_MS = 4000;
@@ -48,18 +48,6 @@ function estimateHashrate(difficultyBits: bigint, blocksSinceRetarget: number, l
   if (blocksSinceRetarget <= 0 || secondsSinceRetarget <= 0) return null;
   const avgSecondsPerBlock = secondsSinceRetarget / blocksSinceRetarget;
   return 2 ** Number(difficultyBits) / avgSecondsPerBlock;
-}
-
-function formatHashrate(hashesPerSecond: number | null): string {
-  if (hashesPerSecond === null || !isFinite(hashesPerSecond)) return "not enough data yet";
-  const units = ["H/s", "KH/s", "MH/s", "GH/s", "TH/s"];
-  let value = hashesPerSecond;
-  let i = 0;
-  while (value >= 1000 && i < units.length - 1) {
-    value /= 1000;
-    i += 1;
-  }
-  return `~${value.toFixed(value < 10 ? 2 : 1)} ${units[i]}`;
 }
 
 function formatBlockTime(nanos: bigint): string {
@@ -181,7 +169,9 @@ function Dashboard() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Est. network hashrate</div>
-                <div className="stat-value stat-value-small">{formatHashrate(hashrate)}</div>
+                <div className="stat-value stat-value-small">
+                  {hashrate !== null ? `~${formatHashrate(hashrate)}` : formatHashrate(hashrate)}
+                </div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Mining fee</div>

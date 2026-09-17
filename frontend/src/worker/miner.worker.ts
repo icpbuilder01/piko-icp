@@ -5,6 +5,19 @@
 //
 // The byte layout MUST stay identical to mother/src/main.mo's computeHash:
 // sha256(previousHash (32 bytes) # height (8 bytes big-endian) # nonce (8 bytes big-endian)).
+//
+// Hashing uses hash-wasm's SHA-256 (WASM) instead of the Web Crypto API --
+// crypto.subtle is built for occasional, larger operations (its async
+// dispatch overhead dominates for millions of tiny repeated hashes), while
+// a reused WASM hasher instance called synchronously in a tight loop is
+// dramatically faster for this exact workload. Verified byte-for-byte
+// identical output against crypto.subtle and node:crypto across 2000+
+// random inputs (including the empty-input and "abc" published SHA-256
+// test vectors) before this switch -- correctness isn't assumed, mother's
+// own submitProof independently re-verifies every proof anyway, but a
+// wrong local hash would waste real hashing time finding nothing, so this
+// was worth confirming up front rather than after the fact.
+import { createSHA256 } from "hash-wasm";
 
 interface WorkMessage {
   type: "work";
@@ -111,6 +124,13 @@ async function search(
   workerCount: number,
   nonceOffset: bigint,
 ) {
+  // Fresh instance per search() call (i.e. per header, not per attempt) --
+  // negligible cost at this frequency, and keeps the hasher's mutable state
+  // scoped to a single invocation with no possibility of two overlapping
+  // search() calls (an old one not-yet-noticed-it's-stale, and a new one)
+  // ever touching shared hasher state, even in principle.
+  const hasher = await createSHA256();
+
   const header = new Uint8Array(previousHash.length + 8);
   header.set(previousHash, 0);
   header.set(natToBytes8(height), previousHash.length);
@@ -150,7 +170,9 @@ async function search(
     data.set(header, 0);
     data.set(natToBytes8(nonce), header.length);
 
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", data));
+    hasher.init();
+    hasher.update(data);
+    const digest = hasher.digest("binary");
     attemptsSinceReport++;
 
     if (leadingZeroBits(digest) >= difficultyBits) {
