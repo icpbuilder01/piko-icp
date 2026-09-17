@@ -190,6 +190,22 @@ function App() {
   const workerHashratesRef = useRef<number[]>([]);
   const identityRef = useRef<Identity | null>(null);
   const miningRef = useRef(false);
+  // Bumped on every stop and every power-level change -- a "progress"
+  // message a worker was already about to send (or had just sent) under the
+  // *previous* job configuration can still arrive after that, since
+  // postMessage delivery isn't instant and worker timers can lag well
+  // behind real time (especially on mobile, where a backgrounded/throttled
+  // tab can delay a worker's setTimeout-based duty-cycle sleep by far
+  // longer than requested). Without this, that stale message's hashrate
+  // silently overwrites the fresh "stopped"/"just throttled down" value --
+  // reported live: Stop mining leaving the displayed hashrate spinning as
+  // if still mining, and switching power down not visibly dropping the
+  // number, both mobile-only (matches mobile's heavier timer throttling).
+  const jobIdRef = useRef(0);
+  // Timestamp of the last accepted progress report from any worker, used by
+  // the stuck-worker watchdog below to detect a worker pool that's gone
+  // silent (see its own comment).
+  const lastProgressAtRef = useRef(0);
   identityRef.current = identity;
   miningRef.current = mining;
 
@@ -388,6 +404,10 @@ function App() {
       worker.onmessage = (event: MessageEvent) => {
         const msg = event.data;
         if (msg.type === "progress") {
+          // Drop reports left over from a job (work/power config) this
+          // session has already moved past -- see jobIdRef's own comment.
+          if (msg.jobId !== jobIdRef.current) return;
+          lastProgressAtRef.current = Date.now();
           // Each worker only reports its own rate -- sum all of them for the
           // real combined hashrate, rather than overwriting with whichever
           // worker's message happened to arrive last.
@@ -530,6 +550,7 @@ function App() {
 
   function handleStopMining() {
     setMining(false);
+    jobIdRef.current++;
     workersRef.current.forEach((w) => w.postMessage({ type: "stop" }));
     workerHashratesRef.current = workerHashratesRef.current.map(() => 0);
     setHashrate(0);
@@ -571,11 +592,16 @@ function App() {
   // actual header content (not the object reference) before re-posting is
   // what lets the search keep going past one poll interval.
   const lastPostedWorkKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!mining || !work) return;
-    const key = `${work.height}-${work.difficultyBits}-${toHex(work.previousHash)}`;
-    if (key === lastPostedWorkKeyRef.current) return;
-    lastPostedWorkKeyRef.current = key;
+  const workRef = useRef<Work | null>(null);
+  workRef.current = work;
+
+  // Posts the current header to the worker pool (creating it first if
+  // needed). Pulled out of the effect below so the stuck-worker watchdog
+  // further down can call it directly to recover, not just the normal
+  // "a new header arrived" path.
+  function postCurrentWork() {
+    const currentWork = workRef.current;
+    if (!currentWork) return;
     const workers = ensureWorkers();
     // Shared across this job's own workers (so they still partition the
     // space cleanly among themselves via workerIndex/workerCount), but
@@ -587,21 +613,66 @@ function App() {
     workers.forEach((worker, i) => {
       worker.postMessage({
         type: "work",
-        previousHash: new Uint8Array(work.previousHash as Uint8Array),
-        height: work.height,
-        difficultyBits: Number(work.difficultyBits),
+        previousHash: new Uint8Array(currentWork.previousHash as Uint8Array),
+        height: currentWork.height,
+        difficultyBits: Number(currentWork.difficultyBits),
         workerIndex: i,
         workerCount: workers.length,
         nonceOffset,
         dutyCycle: POWER_DUTY_CYCLE[power],
+        jobId: jobIdRef.current,
       });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureWorkers is stable (ref-backed); power is intentionally read fresh but not a dep -- changing it live is handled by the separate broadcast effect below, not by restarting the search
+  }
+
+  useEffect(() => {
+    if (!mining || !work) return;
+    const key = `${work.height}-${work.difficultyBits}-${toHex(work.previousHash)}`;
+    if (key === lastPostedWorkKeyRef.current) return;
+    lastPostedWorkKeyRef.current = key;
+    postCurrentWork();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- postCurrentWork/ensureWorkers are stable (ref-backed); power is intentionally read fresh but not a dep -- changing it live is handled by the separate broadcast effect below, not by restarting the search
   }, [mining, work]);
+
+  // Watchdog: if mining is on but not a single worker has reported progress
+  // in a while, something killed or indefinitely suspended the worker pool
+  // rather than this being ordinary throttling -- reported live, mobile
+  // only: switching to Low power (which introduces real setTimeout-based
+  // sleeps into the worker loop) sometimes left the hashrate stuck at 0
+  // permanently, even across further power changes, until a manual page
+  // reload. Consistent with mobile browsers (iOS Safari especially)
+  // sometimes not cleanly resuming a Worker that was mid-sleep when the tab
+  // was backgrounded/the screen locked -- not something this app can
+  // prevent, but it can detect the resulting silence and recover from it
+  // the same way a manual reload does (tear down and recreate the worker
+  // pool), without requiring the player to notice and do it by hand. Real
+  // reports arrive roughly every ~400-600ms per worker under normal
+  // operation, so this generous a gap with zero of them reporting is a
+  // reliable "something's actually stuck" signal, not throttling variance.
+  const WATCHDOG_TIMEOUT_MS = 8000;
+  useEffect(() => {
+    if (!mining) return;
+    lastProgressAtRef.current = Date.now();
+    const id = setInterval(() => {
+      if (Date.now() - lastProgressAtRef.current <= WATCHDOG_TIMEOUT_MS) return;
+      workersRef.current.forEach((w) => w.terminate());
+      workersRef.current = [];
+      workerHashratesRef.current = [];
+      jobIdRef.current++;
+      lastProgressAtRef.current = Date.now();
+      setHashrate(0);
+      postCurrentWork();
+    }, 3000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- postCurrentWork is stable (ref-backed via workRef/ensureWorkers), re-running this watchdog's setInterval on every render it's defined in would defeat the point
+  }, [mining]);
 
   // Persist the chosen power level, and broadcast a live change to any
   // already-running workers -- mid-search, no restart needed (see
-  // miner.worker.ts's "power" message).
+  // miner.worker.ts's "power" message). Bumps jobIdRef first so any
+  // progress report already in flight under the *old* power level (and so
+  // still reflecting the old, higher-or-lower rate) gets dropped by the
+  // onmessage guard above instead of briefly flashing a stale number.
   useEffect(() => {
     try {
       localStorage.setItem(POWER_STORAGE_KEY, power);
@@ -609,7 +680,18 @@ function App() {
       // best-effort only -- a private window or blocked storage just means
       // the choice won't be remembered next visit, nothing else breaks
     }
-    workersRef.current.forEach((w) => w.postMessage({ type: "power", dutyCycle: POWER_DUTY_CYCLE[power] }));
+    jobIdRef.current++;
+    // Optimistically clear the displayed rate right away instead of leaving
+    // the old number on screen until the first fresh report lands -- on a
+    // throttled mobile tab that first report can take a while, and a number
+    // that visibly resets then climbs back up reads as "this took effect",
+    // where a frozen stale number reads as "nothing happened".
+    workerHashratesRef.current = workerHashratesRef.current.map(() => 0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing the displayed rate with the external worker pool's new config, not derived local state
+    setHashrate(0);
+    workersRef.current.forEach((w) =>
+      w.postMessage({ type: "power", dutyCycle: POWER_DUTY_CYCLE[power], jobId: jobIdRef.current }),
+    );
   }, [power]);
 
   useEffect(() => {

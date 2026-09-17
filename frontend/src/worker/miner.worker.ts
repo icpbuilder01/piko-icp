@@ -36,6 +36,11 @@ interface WorkMessage {
   // Fraction of full speed to hash at, 0 < dutyCycle <= 1 -- see the Power
   // message below.
   dutyCycle: number;
+  // Echoed back on every progress/found report -- lets the main thread tell
+  // "this reflects the job I currently expect" apart from "this was already
+  // in flight under an old config (before a stop/power change) and just
+  // hasn't arrived yet" (see App.tsx's jobIdRef comment for the full story).
+  jobId: number;
 }
 
 // Lets the power level (Low/High/Max) change live while a search is already
@@ -45,6 +50,7 @@ interface WorkMessage {
 interface PowerMessage {
   type: "power";
   dutyCycle: number;
+  jobId: number;
 }
 
 interface StopMessage {
@@ -55,6 +61,7 @@ type InboundMessage = WorkMessage | StopMessage | PowerMessage;
 
 let generation = 0; // bumped on every new "work" message to abandon stale loops
 let dutyCycle = 1; // 0 < dutyCycle <= 1; updated live by "work"/"power" messages
+let currentJobId = 0; // stamped on every outgoing progress/found message
 
 function natToBytes8(n: bigint): Uint8Array {
   const buf = new Uint8Array(8);
@@ -91,6 +98,7 @@ function reportProgress(attempts: number, elapsedMs: number) {
     type: "progress",
     attempts,
     hashrate: elapsedMs > 0 ? Math.round((attempts / elapsedMs) * 1000) : 0,
+    jobId: currentJobId,
   });
 }
 
@@ -120,6 +128,22 @@ async function search(
   // change take effect immediately without restarting the search.
   const DUTY_WINDOW_MS = 200;
   let dutyWindowStart = performance.now();
+  // Real-world report, mobile only: switching power down (e.g. Max -> Low)
+  // could leave the hashrate stuck until this app's own watchdog forcibly
+  // killed and recreated the worker ~10s later -- but switching it *up*
+  // (which the worker was already periodically sleeping under) always
+  // worked instantly. Root cause: `await crypto.subtle.digest(...)`
+  // resolves as a microtask, so a tight loop of nothing but awaited digest
+  // calls (exactly what Max power is) never naturally yields to the
+  // macrotask queue -- which is where a `postMessage`d "power"/"stop"
+  // message's delivery is queued. Some engines (seen here on mobile
+  // WebKit, not desktop V8) don't fairly interleave macrotasks under
+  // sustained microtask pressure, so that message can sit undelivered
+  // indefinitely. A periodic zero-delay `setTimeout` forces a real
+  // macrotask-queue yield regardless of duty cycle, giving pending
+  // messages a guaranteed chance to run at negligible cost to hashrate.
+  const YIELD_INTERVAL_MS = 50;
+  let lastYield = performance.now();
 
   while (generation === myGeneration) {
     const data = new Uint8Array(header.length + 8);
@@ -147,6 +171,10 @@ async function search(
     if (dutyCycle < 1 && now - dutyWindowStart >= DUTY_WINDOW_MS * dutyCycle) {
       await new Promise((resolve) => setTimeout(resolve, DUTY_WINDOW_MS * (1 - dutyCycle)));
       dutyWindowStart = performance.now();
+      lastYield = performance.now();
+    } else if (now - lastYield >= YIELD_INTERVAL_MS) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      lastYield = performance.now();
     }
 
     if (now - lastReport > 400) {
@@ -175,6 +203,7 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
   const msg = event.data;
   if (msg.type === "work") {
     dutyCycle = msg.dutyCycle;
+    currentJobId = msg.jobId;
     generation++;
     search(
       generation,
@@ -187,6 +216,7 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
     );
   } else if (msg.type === "power") {
     dutyCycle = msg.dutyCycle;
+    currentJobId = msg.jobId;
   } else if (msg.type === "stop") {
     generation++; // abandons any in-flight search loop
   }
