@@ -47,6 +47,23 @@ export function formatHashrate(hashesPerSecond: number | null): string {
   return `${value.toFixed(value < 10 ? 2 : 1)} ${units[i]}`;
 }
 
+// Same overflow risk as formatHashrate, applied to a running count instead
+// of a rate -- an hour of WASM-speed mining can push "attempts this
+// session" past a billion (e.g. 5M/s * 3600s = 18e9), and
+// n.toLocaleString() at that size is well over a narrow stat tile's width.
+export function formatCount(n: number): string {
+  if (!isFinite(n) || n < 0) return "0";
+  if (n < 100_000) return Math.round(n).toLocaleString();
+  const units = ["", "K", "M", "B", "T"];
+  let value = n;
+  let i = 0;
+  while (value >= 1000 && i < units.length - 1) {
+    value /= 1000;
+    i += 1;
+  }
+  return `${value.toFixed(value < 10 ? 2 : 1)}${units[i]}`;
+}
+
 export function toHex(bytes: Uint8Array | number[]): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))

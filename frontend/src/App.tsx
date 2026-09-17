@@ -5,7 +5,7 @@ import { Principal } from "@icp-sdk/core/principal";
 import { getMotherActor, getLedgerActor, getIcpLedgerActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
 import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
-import { formatPiko, formatIcp, formatHashrate, shortPrincipal, timeAgo, toHex } from "./lib/format";
+import { formatPiko, formatIcp, formatHashrate, formatCount, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
 import { Confetti } from "./components/Confetti";
 import "./App.css";
@@ -877,7 +877,7 @@ function App() {
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Attempts this session</div>
-                <div className="stat-value">{sessionAttempts.toLocaleString()}</div>
+                <div className="stat-value">{formatCount(sessionAttempts)}</div>
               </div>
               <div className="stat-tile">
                 <div className="stat-label">Blocks won this session</div>
