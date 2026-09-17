@@ -1,7 +1,7 @@
 import { AuthClient } from "@icp-sdk/auth/client";
 
 // Defaults to the current Internet Identity frontend (id.ai) already.
-const MAX_TTL_NANOSECONDS = BigInt(8 * 60 * 60) * BigInt(1_000_000_000); // 8h
+const MAX_TTL_NANOSECONDS = BigInt(24 * 60 * 60) * BigInt(1_000_000_000); // 24h
 
 // Every IC canister is reachable from at least two real, distinct origins
 // -- <id>.icp.net (what this project always links to -- whitepaper,
@@ -27,7 +27,14 @@ let authClientPromise: Promise<AuthClient> | null = null;
 
 function getAuthClient(): Promise<AuthClient> {
   if (!authClientPromise) {
-    authClientPromise = Promise.resolve(new AuthClient());
+    // Mining is meant to run unattended in the background (no mouse/keyboard
+    // needed once started), but AuthClient's default IdleManager only watches
+    // real input events and force-logs-out + reloads after 10 min of none --
+    // killing the in-progress mining worker. Disabled since idle detection
+    // makes no sense for this app's core use case.
+    authClientPromise = Promise.resolve(
+      new AuthClient({ idleOptions: { disableIdle: true } }),
+    );
   }
   return authClientPromise;
 }

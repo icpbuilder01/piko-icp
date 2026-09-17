@@ -11,6 +11,28 @@ interface WorkMessage {
   previousHash: Uint8Array;
   height: bigint;
   difficultyBits: number;
+  // Lets N of these workers (one per CPU core) search disjoint slices of the
+  // nonce space instead of every worker redundantly retrying nonce 0, 1, 2...
+  // from scratch -- workerIndex is this worker's lane, workerCount is the
+  // stride, so together they partition the space evenly.
+  workerIndex: number;
+  workerCount: number;
+  // Without this, every session (this same account's other tab/device, or
+  // any other miner on the network) searches from nonce 0 in the same
+  // deterministic order -- for a given header there's a single fixed first
+  // nonce that satisfies the difficulty target scanning that way, so two
+  // uncoordinated sessions converge on the exact same answer and the slower
+  // one contributes nothing (confirmed: mining the same account from two
+  // devices at once measured zero speedup over the faster device alone).
+  // Worse, it means whichever single miner on the whole network has the
+  // highest raw hashrate deterministically wins almost every block, rather
+  // than winning in proportion to their real share the way PoW is supposed
+  // to work. A random per-job base offset (shared across this session's own
+  // workers, so they still partition cleanly among themselves) makes each
+  // session search a genuinely different, independent slice, so multiple
+  // devices/tabs actually add real combined speed and no single fast
+  // participant is structurally guaranteed to always win first.
+  nonceOffset: bigint;
 }
 
 interface StopMessage {
@@ -59,12 +81,21 @@ function reportProgress(attempts: number, elapsedMs: number) {
   });
 }
 
-async function search(myGeneration: number, previousHash: Uint8Array, height: bigint, difficultyBits: number) {
+async function search(
+  myGeneration: number,
+  previousHash: Uint8Array,
+  height: bigint,
+  difficultyBits: number,
+  workerIndex: number,
+  workerCount: number,
+  nonceOffset: bigint,
+) {
   const header = new Uint8Array(previousHash.length + 8);
   header.set(previousHash, 0);
   header.set(natToBytes8(height), previousHash.length);
 
-  let nonce = 0n;
+  const stride = BigInt(Math.max(1, workerCount));
+  let nonce = nonceOffset + BigInt(workerIndex);
   let attemptsSinceReport = 0;
   let lastReport = performance.now();
 
@@ -83,7 +114,7 @@ async function search(myGeneration: number, previousHash: Uint8Array, height: bi
       return;
     }
 
-    nonce++;
+    nonce += stride;
 
     const now = performance.now();
     if (now - lastReport > 400) {
@@ -112,7 +143,15 @@ self.onmessage = (event: MessageEvent<InboundMessage>) => {
   const msg = event.data;
   if (msg.type === "work") {
     generation++;
-    search(generation, msg.previousHash, msg.height, msg.difficultyBits);
+    search(
+      generation,
+      msg.previousHash,
+      msg.height,
+      msg.difficultyBits,
+      msg.workerIndex,
+      msg.workerCount,
+      msg.nonceOffset,
+    );
   } else if (msg.type === "stop") {
     generation++; // abandons any in-flight search loop
   }

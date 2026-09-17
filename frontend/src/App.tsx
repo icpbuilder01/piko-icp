@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@icp-sdk/core/agent";
+import { DelegationIdentity } from "@icp-sdk/core/identity";
 import { Principal } from "@icp-sdk/core/principal";
 import { getMotherActor, getLedgerActor, getIcpLedgerActor } from "./lib/actors";
 import { login, logout, getStoredIdentity } from "./lib/auth";
@@ -83,8 +84,58 @@ function insufficientIcpReason(err: Record<string, unknown>): string | null {
   return null;
 }
 
+// #InvalidProof/#StaleWork both mean the same harmless thing: someone else
+// (or one of this same player's own other tabs) found this exact block a
+// moment before the submission landed -- the proof was valid for the header
+// being solved, the chain just moved on first. Checked in
+// mother/src/main.mo *before* the mining fee is pulled, so neither case
+// ever costs ICP. A real user asked what the raw "Not accepted:
+// {"InvalidProof":null}" JSON meant -- worth explaining in plain language
+// instead of the raw variant.
+function staleBlockReason(err: Record<string, unknown>): string | null {
+  if ("InvalidProof" in err || "StaleWork" in err) {
+    return "Someone found this block just before you — no fee charged, still mining...";
+  }
+  return null;
+}
+
 const anonymousMother = getMotherActor();
 const motherPrincipal = Principal.fromText(motherCanisterId);
+
+// A fresh random base nonce per mining job -- see miner.worker.ts's
+// nonceOffset comment for why: without it, every session (including this
+// same account's other tabs/devices, and every other miner on the network)
+// searches from nonce 0 in the same deterministic order, so they all
+// converge on the exact same answer instead of each having a genuinely
+// independent, proportional-to-hashrate chance. Masked to 56 bits -- ample
+// headroom below the 64-bit nonce field so a long search session never
+// wraps around it.
+function randomNonceOffset(): bigint {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  let n = 0n;
+  for (const b of bytes) n = (n << 8n) | BigInt(b);
+  return n & 0x00ffffffffffffffn;
+}
+
+// login()'s delegation is only valid for MAX_TTL_NANOSECONDS (24h, see
+// auth.ts) -- with idle-triggered logout now disabled (mining is meant to
+// run unattended), this real expiry is the only thing that can still end a
+// session, and previously nothing warned about it: it just surfaced as a
+// generic failed submitProof call once the delegation actually expired.
+// Reading the real expiration out of the delegation chain lets the app
+// proactively stop mining and show a clear message right when it happens,
+// instead of a confusing "not accepted" error the next time a proof is
+// submitted.
+function delegationExpiryMs(id: Identity): number | null {
+  if (!(id instanceof DelegationIdentity)) return null;
+  const delegations = id.getDelegation().delegations;
+  if (delegations.length === 0) return null;
+  let minExpirationNs = delegations[0].delegation.expiration;
+  for (const { delegation } of delegations) {
+    if (delegation.expiration < minExpirationNs) minExpirationNs = delegation.expiration;
+  }
+  return Number(minExpirationNs / 1_000_000n);
+}
 
 function App() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -118,7 +169,8 @@ function App() {
   // batch instead of clicking Approve every few blocks.
   const [approveBlocks, setApproveBlocks] = useState(APPROVE_BLOCKS_DEFAULT);
 
-  const workerRef = useRef<Worker | null>(null);
+  const workersRef = useRef<Worker[]>([]);
+  const workerHashratesRef = useRef<number[]>([]);
   const identityRef = useRef<Identity | null>(null);
   const miningRef = useRef(false);
   identityRef.current = identity;
@@ -243,6 +295,25 @@ function App() {
     setIdentity(id);
   }
 
+  // Schedules a clean stop right when the delegation actually expires
+  // (~24h from login, see MAX_TTL_NANOSECONDS in auth.ts), instead of
+  // silently waiting for the next submitProof to fail with a confusing
+  // "not accepted" message.
+  useEffect(() => {
+    if (!identity) return;
+    const expiryMs = delegationExpiryMs(identity);
+    if (expiryMs === null) return;
+    const delay = Math.max(0, expiryMs - Date.now());
+    const timer = window.setTimeout(() => {
+      handleStopMining();
+      void logout();
+      setIdentity(null);
+      setMiningMessageKind("critical");
+      setMiningMessage("Your session expired after 24h — log in again to keep mining.");
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [identity]);
+
   async function handleLogout() {
     handleStopMining();
     await logout();
@@ -282,25 +353,38 @@ function App() {
   }
 
   // --- In-browser mining ---
-  // The worker only ever does the CPU-bound hash search; network calls
-  // (submitting a found proof, fetching fresh work) stay here so the worker
-  // never needs an identity or an agent.
-  function ensureWorker(): Worker {
-    if (workerRef.current) return workerRef.current;
-    const worker = new Worker(new URL("./worker/miner.worker.ts", import.meta.url), {
-      type: "module",
-    });
-    worker.onmessage = (event: MessageEvent) => {
-      const msg = event.data;
-      if (msg.type === "progress") {
-        setHashrate(msg.hashrate);
-        setSessionAttempts((n) => n + msg.attempts);
-      } else if (msg.type === "found") {
-        void handleFound(msg.nonce as bigint);
-      }
-    };
-    workerRef.current = worker;
-    return worker;
+  // The workers only ever do the CPU-bound hash search; network calls
+  // (submitting a found proof, fetching fresh work) stay here so a worker
+  // never needs an identity or an agent. One worker per CPU core -- each
+  // searches a disjoint slice of the nonce space (see the worker's own
+  // workerIndex/workerCount comment) instead of a single worker leaving the
+  // other cores idle, which is what "mining" used to mean here.
+  function ensureWorkers(): Worker[] {
+    if (workersRef.current.length > 0) return workersRef.current;
+    const count = Math.max(1, navigator.hardwareConcurrency || 1);
+    workerHashratesRef.current = new Array(count).fill(0);
+    const workers: Worker[] = [];
+    for (let i = 0; i < count; i++) {
+      const worker = new Worker(new URL("./worker/miner.worker.ts", import.meta.url), {
+        type: "module",
+      });
+      worker.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg.type === "progress") {
+          // Each worker only reports its own rate -- sum all of them for the
+          // real combined hashrate, rather than overwriting with whichever
+          // worker's message happened to arrive last.
+          workerHashratesRef.current[i] = msg.hashrate;
+          setHashrate(workerHashratesRef.current.reduce((a, b) => a + b, 0));
+          setSessionAttempts((n) => n + msg.attempts);
+        } else if (msg.type === "found") {
+          void handleFound(msg.nonce as bigint);
+        }
+      };
+      workers.push(worker);
+    }
+    workersRef.current = workers;
+    return workers;
   }
 
   async function handleFound(nonce: bigint) {
@@ -340,8 +424,9 @@ function App() {
           setMiningMessage(`Mining stopped: ${reason}. Approve more ICP to keep mining.`);
           return;
         }
+        const stale = staleBlockReason(result.Err);
         setMiningMessageKind(null);
-        setMiningMessage(`Not accepted: ${JSON.stringify(result.Err)}`);
+        setMiningMessage(stale ?? `Not accepted: ${JSON.stringify(result.Err)}`);
       }
     } catch (err) {
       console.error("submitProof failed", err);
@@ -428,7 +513,8 @@ function App() {
 
   function handleStopMining() {
     setMining(false);
-    workerRef.current?.postMessage({ type: "stop" });
+    workersRef.current.forEach((w) => w.postMessage({ type: "stop" }));
+    workerHashratesRef.current = workerHashratesRef.current.map(() => 0);
     setHashrate(0);
     // Forces the next start to always send fresh work to the worker, even
     // if the polled header happens to be identical to whatever was last
@@ -473,19 +559,31 @@ function App() {
     const key = `${work.height}-${work.difficultyBits}-${toHex(work.previousHash)}`;
     if (key === lastPostedWorkKeyRef.current) return;
     lastPostedWorkKeyRef.current = key;
-    const worker = ensureWorker();
-    worker.postMessage({
-      type: "work",
-      previousHash: new Uint8Array(work.previousHash as Uint8Array),
-      height: work.height,
-      difficultyBits: Number(work.difficultyBits),
+    const workers = ensureWorkers();
+    // Shared across this job's own workers (so they still partition the
+    // space cleanly among themselves via workerIndex/workerCount), but
+    // freshly randomized per header -- otherwise every session on the
+    // network searches from nonce 0 in the same deterministic order and
+    // converges on the same answer (see miner.worker.ts's nonceOffset
+    // comment for the full reasoning).
+    const nonceOffset = randomNonceOffset();
+    workers.forEach((worker, i) => {
+      worker.postMessage({
+        type: "work",
+        previousHash: new Uint8Array(work.previousHash as Uint8Array),
+        height: work.height,
+        difficultyBits: Number(work.difficultyBits),
+        workerIndex: i,
+        workerCount: workers.length,
+        nonceOffset,
+      });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureWorker is stable (ref-backed), re-running on identity would restart the search needlessly
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureWorkers is stable (ref-backed), re-running on identity would restart the search needlessly
   }, [mining, work]);
 
   useEffect(() => {
     return () => {
-      workerRef.current?.terminate();
+      workersRef.current.forEach((w) => w.terminate());
     };
   }, []);
 
