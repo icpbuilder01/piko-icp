@@ -81,26 +81,6 @@ the same height is accepted.
    periodic sweep (automatic, hourly) burns most of it and converts a
    configured share to cycles (&sect;4).
 
-**A fairness gap in step 2's search, found and fixed 2026-09-17.** Every
-session's search originally started from nonce zero. For a fixed header,
-scanning upward from zero always reaches the same nonce first, so two
-sessions searching concurrently -- this same account's own second tab, or
-any two independent miners -- converged on the exact same answer, and
-whichever had the higher raw hashrate found it first *every single time*,
-deterministically, rather than in proportion to its real share of total
-hashrate the way proof-of-work is supposed to work. In practice this meant
-a single well-resourced participant could win nearly every block, not just
-most of them, regardless of how many other miners were active. Each
-session now starts from a random per-job base offset instead (&sect;2,
-step 2), which is also what makes running mining on more than one
-device/tab under the same account actually add combined speed -- before
-the fix it added none, since both searched the identical sequence. This is
-disclosed here in keeping with this project's transparency norm (&sect;10
-lists the equivalent disclosures for `dice`, `blackjack`, and `pikopoker`),
-even though it is a client-side fairness property rather than a fund-safety
-bug -- `mother` independently re-verified every proof throughout, so no
-invalid submission was ever accepted.
-
 ## 3. Tokenomics
 
 | Parameter | Value |
