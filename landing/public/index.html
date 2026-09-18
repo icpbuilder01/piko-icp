@@ -31,6 +31,7 @@
       --spark: #1a56b8;
       --felt: #a3271d;
       --pixel: #7a1e9f;
+      --native: #1a7a4a;
 
       --bevel-hi: #fffdf7;
       --bevel-lo: #a8975f;
@@ -62,6 +63,7 @@
         --spark: #3d9bff;
         --felt: #ff5c4d;
         --pixel: #c56ae0;
+        --native: #3ddb96;
 
         --bevel-hi: #56492c;
         --bevel-lo: #000000;
@@ -249,6 +251,153 @@
       color: var(--pixel);
     }
 
+    .link-card.native .link-title {
+      color: var(--native);
+    }
+
+    .mining-compare {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .compare-card {
+      flex: 1 1 240px;
+      align-self: flex-start;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 18px 18px 16px;
+      box-shadow: 2px 2px 0 var(--hard-shadow);
+    }
+
+    .compare-card h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1rem;
+      margin: 0 0 4px;
+    }
+
+    .compare-card.browser h3 {
+      color: var(--accent);
+    }
+
+    .compare-card.native h3 {
+      color: var(--native);
+    }
+
+    .compare-badge {
+      display: inline-block;
+      font-family: var(--font-display);
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--native);
+      background: color-mix(in srgb, var(--native) 14%, var(--surface));
+      border: 1px solid color-mix(in srgb, var(--native) 45%, var(--border-strong));
+      padding: 2px 7px;
+      margin: 0 0 10px;
+    }
+
+    .compare-card ul {
+      list-style: none;
+      margin: 0 0 14px;
+      padding: 0;
+      color: var(--text-secondary);
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+
+    .compare-card ul li::before {
+      content: "-- ";
+      color: var(--text-muted);
+    }
+
+    .compare-cta {
+      display: inline-block;
+      align-self: flex-start;
+      margin-top: auto;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-2);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 8px 14px;
+      box-shadow: 2px 2px 0 var(--hard-shadow);
+    }
+
+    .compare-card.native .compare-cta {
+      background: color-mix(in srgb, var(--native) 16%, var(--surface-2));
+    }
+
+    .download-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .download-btn {
+      flex: 1 1 auto;
+      text-align: center;
+      font-family: var(--font-sans);
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--text);
+      background: var(--surface-2);
+      border-style: solid;
+      border-width: 2px;
+      border-top-color: var(--bevel-hi);
+      border-left-color: var(--bevel-hi);
+      border-bottom-color: var(--bevel-lo);
+      border-right-color: var(--bevel-lo);
+      padding: 8px 10px;
+      box-shadow: 2px 2px 0 var(--hard-shadow);
+    }
+
+    .download-btn.detected {
+      background: color-mix(in srgb, var(--native) 20%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--native) 55%, var(--border-strong));
+      color: var(--native);
+    }
+
+    .download-btn .os-sub {
+      display: block;
+      font-weight: 400;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .download-note {
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .download-note a {
+      color: var(--text-muted);
+    }
+
     .ledger-box {
       background: var(--surface);
       border-style: solid;
@@ -358,9 +507,11 @@
       </p>
       <p>
         <strong>Mine it</strong> right in your browser -- no wallet software or CLI, just Internet
-        Identity -- or run a self-owned canister that mines around the clock. Every accepted proof
-        costs a small, non-refundable ICP fee: mostly burned permanently, a share converted to
-        cycles to keep the protocol's own canisters funded.
+        Identity -- or install <strong>PikoNativeMiner</strong>, a native desktop app for Windows,
+        macOS and Linux that hashes directly on your CPU's own hardware instructions for a
+        significantly higher rate than a browser tab can reach. Every accepted proof costs a small,
+        non-refundable ICP fee: mostly burned permanently, a share converted to cycles to keep the
+        protocol's own canisters funded. See the comparison and downloads below.
       </p>
       <p>
         <strong>PIKO Dice</strong> and <strong>PikoBlackjack</strong> are companion games, each
@@ -383,12 +534,44 @@
       </p>
     </div>
 
+    <h2 class="section-label">Two ways to mine</h2>
+    <div class="mining-compare">
+      <div class="compare-card browser">
+        <h3><span class="icon">&#127760;</span>Browser Miner</h3>
+        <ul>
+          <li>Nothing to install -- mines right in the tab</li>
+          <li>Just needs Internet Identity to log in</li>
+          <li>Lower hashrate: a browser can't reach your CPU's hardware hashing instructions</li>
+          <li>Good for casual, occasional mining</li>
+        </ul>
+        <a class="compare-cta" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/" target="_blank" rel="noopener noreferrer">Start mining in browser</a>
+      </div>
+      <div class="compare-card native">
+        <div class="compare-badge">New</div>
+        <h3><span class="icon">&#9935;&#65039;</span>Native Miner</h3>
+        <ul>
+          <li>10-20x higher hashrate -- uses your CPU's real hardware hashing instructions</li>
+          <li>Keeps mining in the background, no browser tab needed</li>
+          <li>Windows, macOS &amp; Linux -- free, open-source</li>
+          <li>One app for mining, balances, and sending PIKO/ICP</li>
+        </ul>
+        <div class="download-row">
+          <a class="download-btn" id="dl-windows" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.2/pikonativeminer_0.1.2_x64-setup.exe">Windows<span class="os-sub">.exe installer</span></a>
+          <a class="download-btn" id="dl-mac" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.2/pikonativeminer_0.1.2_universal.dmg">macOS<span class="os-sub">.dmg, Intel &amp; Apple Silicon</span></a>
+          <a class="download-btn" id="dl-linux-deb" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.2/pikonativeminer_0.1.2_amd64.deb">Linux (Ubuntu/Debian)<span class="os-sub">.deb, adds menu icon</span></a>
+          <a class="download-btn" id="dl-linux-appimage" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.2/pikonativeminer_0.1.2_amd64.AppImage">Linux (any distro)<span class="os-sub">.AppImage, no install</span></a>
+        </div>
+        <p class="download-note">
+          Not code-signed yet, so Windows/macOS will warn about an unrecognized publisher --
+          that's expected for independent software, click through to run it. On Fedora/RHEL,
+          grab the <code>.rpm</code> instead, or want to check the source first? See
+          <a href="https://github.com/icpbuilder01/pikonativeminer/releases/latest" target="_blank" rel="noopener noreferrer">all installers &amp; source on GitHub</a>.
+        </p>
+      </div>
+    </div>
+
     <h2 class="section-label">Get started</h2>
     <div class="links">
-      <a class="link-card cta" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#9935;&#65039;</span>Mine PIKO</div>
-        <div class="link-desc">Start mining in your browser -- log in with Internet Identity.</div>
-      </a>
       <a class="link-card dice" href="https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
         <div class="link-title"><span class="icon">&#127922;</span>Play PIKO Dice</div>
         <div class="link-desc">Provably-fair, 1% house edge, PIKO-only on-chain dice.</div>
@@ -451,6 +634,48 @@
         console.error("Copy failed", err);
       }
     });
+
+    (function highlightDetectedOs() {
+      var ua = navigator.userAgent || "";
+      var ids = [];
+      if (/Windows/i.test(ua)) ids = ["dl-windows"];
+      else if (/Macintosh|Mac OS X/i.test(ua)) ids = ["dl-mac"];
+      else if (/Linux/i.test(ua) && !/Android/i.test(ua)) ids = ["dl-linux-deb", "dl-linux-appimage"];
+      ids.forEach(function (id) {
+        var btn = document.getElementById(id);
+        if (btn) btn.classList.add("detected");
+      });
+    })();
+
+    // The 4 download buttons above hardcode a specific release version as a
+    // fallback (in case this fetch fails), but that fallback has already
+    // gone stale twice across real releases (0.1.0 -> 0.1.1 -> 0.1.2) since
+    // nothing forced anyone to remember to bump it here too. Fetching the
+    // real latest release's asset URLs at load time makes this self-
+    // correcting instead of relying on that discipline every time.
+    (function pointDownloadsAtLatestRelease() {
+      var suffixToId = {
+        "_x64-setup.exe": "dl-windows",
+        "_universal.dmg": "dl-mac",
+        "_amd64.deb": "dl-linux-deb",
+        "_amd64.AppImage": "dl-linux-appimage",
+      };
+      fetch("https://api.github.com/repos/icpbuilder01/pikonativeminer/releases/latest")
+        .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+        .then(function (release) {
+          (release.assets || []).forEach(function (asset) {
+            for (var suffix in suffixToId) {
+              if (asset.name.endsWith(suffix)) {
+                var btn = document.getElementById(suffixToId[suffix]);
+                if (btn) btn.href = asset.browser_download_url;
+              }
+            }
+          });
+        })
+        .catch(function (err) {
+          console.error("Could not fetch the latest PikoNativeMiner release, falling back to the hardcoded version in the download links", err);
+        });
+    })();
   </script>
 </body>
 
