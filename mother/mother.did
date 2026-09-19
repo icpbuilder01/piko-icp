@@ -143,6 +143,7 @@ service : {
       toLedger: nat;
       toMiner: nat;
       toPikopoker: nat;
+      toPikopool: nat;
       toPlace: nat;
     });
 }
