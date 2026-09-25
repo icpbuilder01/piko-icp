@@ -121,6 +121,10 @@ actor self {
   // relay to its own frontend, so that one still depends on manual
   // top-ups for now; add it here too if that ever becomes a real problem.
   let pikopokerId : ?Principal = ?Principal.fromText("25x4u-gqaaa-aaaac-qhbza-cai");
+  // Added 2026-09-25: PikoPoker's backend still has no relay to its own
+  // frontend (see pikopokerId above), so mother funds pikopoker-frontend
+  // directly instead.
+  let pikopokerFrontendId : ?Principal = ?Principal.fromText("2uuxi-qyaaa-aaaac-qhbyq-cai");
   // PikoPool (`~/pikopool/`) is another wholly separate icp-cli project,
   // same reasoning as PikoPoker/PikoPlace/PikoBlackjack above -- its
   // `pikopool` canister id is hardcoded rather than left unset. Same
@@ -1180,24 +1184,43 @@ actor self {
   // its own declaration, so it's never skipped). No state kept here
   // either, for the same reason sweepTreasury keeps none: it just re-reads
   // Cycles.balance() fresh every call.
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat } {
+  // Relative share of each topUpProject() split (was an even split until
+  // 2026-09-25). Measured then: dice and place each burn only ~3-7B
+  // cycles/day, keep a 2T reserve and relay the rest to their frontends
+  // (already at 64T and 34T), while pikopoker is the most expensive game
+  // backend to run. transient so the weights stay editable on upgrade.
+  transient let TOP_UP_WEIGHT_DEFAULT : Nat = 10;
+  transient let TOP_UP_WEIGHT_DICE : Nat = 7;
+  transient let TOP_UP_WEIGHT_PLACE : Nat = 7;
+  transient let TOP_UP_WEIGHT_PIKOPOKER : Nat = 20;
+  transient let TOP_UP_WEIGHT_PIKOPOKER_FRONTEND : Nat = 5;
+  func topUpWeight(target : Principal) : Nat {
+    if (?target == diceId) { TOP_UP_WEIGHT_DICE } else if (?target == placeId) {
+      TOP_UP_WEIGHT_PLACE;
+    } else if (?target == pikopokerId) { TOP_UP_WEIGHT_PIKOPOKER } else if (?target == pikopokerFrontendId) {
+      TOP_UP_WEIGHT_PIKOPOKER_FRONTEND;
+    } else { TOP_UP_WEIGHT_DEFAULT };
+  };
+
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0 } };
+    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 } };
 
     let surplus = balance - CYCLES_RESERVE;
-    let share = surplus / targets.size();
+    var totalWeight = 0;
+    for (target in targets.vals()) { totalWeight += topUpWeight(target) };
     let Management : Types.ManagementActor = actor (Principal.toText(Principal.fromText("aaaaa-aa")));
 
     var sentToLedger = 0;
@@ -1210,7 +1233,9 @@ actor self {
     var sentToIndex = 0;
     var sentToPikopoker = 0;
     var sentToPikopool = 0;
+    var sentToPikopokerFrontend = 0;
     for (target in targets.vals()) {
+      let share = surplus * topUpWeight(target) / totalWeight;
       let _outcome = try {
         await (with cycles = share) Management.deposit_cycles({ canister_id = target });
         ?();
@@ -1227,11 +1252,12 @@ actor self {
           if (?target == indexId) { sentToIndex += share };
           if (?target == pikopokerId) { sentToPikopoker += share };
           if (?target == pikopoolId) { sentToPikopool += share };
+          if (?target == pikopokerFrontendId) { sentToPikopokerFrontend += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool; toPikopokerFrontend = sentToPikopokerFrontend };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
