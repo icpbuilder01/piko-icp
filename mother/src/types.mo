@@ -143,6 +143,20 @@ module {
     timestamp : Time.Time;
   };
 
+  /// One completed retarget window: the blocks in [startHeight, endHeight)
+  /// were all mined at difficultyBits, over [startTime, endTime]. Enough to
+  /// infer that window's average network hashrate after the fact
+  /// ((endHeight - startHeight) * 2^difficultyBits / seconds) -- see
+  /// retargetHistory in main.mo.
+  public type RetargetWindow = {
+    startHeight : Nat;
+    endHeight : Nat;
+    startTime : Time.Time;
+    endTime : Time.Time;
+    difficultyBits : Nat;
+    newDifficultyBits : Nat;
+  };
+
   public type SubmitOk = { height : Nat; reward : Nat; hash : Blob };
 
   public type SubmitError = {

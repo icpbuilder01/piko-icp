@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getMotherActor } from "./lib/actors";
 import { formatPiko, formatIcp, formatHashrate, shortPrincipal, timeAgo } from "./lib/format";
+import HashrateChart, { type HashratePoint } from "./components/HashrateChart";
 import "./Dashboard.css";
 
 const POLL_MS = 4000;
@@ -29,6 +30,14 @@ interface Block {
   timestamp: bigint;
 }
 
+interface RetargetWindow {
+  startHeight: bigint;
+  endHeight: bigint;
+  startTime: bigint;
+  endTime: bigint;
+  difficultyBits: bigint;
+}
+
 const mother = getMotherActor();
 
 function formatCycles(raw: bigint): string {
@@ -48,6 +57,21 @@ function estimateHashrate(difficultyBits: bigint, blocksSinceRetarget: number, l
   if (blocksSinceRetarget <= 0 || secondsSinceRetarget <= 0) return null;
   const avgSecondsPerBlock = secondsSinceRetarget / blocksSinceRetarget;
   return 2 ** Number(difficultyBits) / avgSecondsPerBlock;
+}
+
+// Same inference as estimateHashrate, applied to each completed window
+// mother recorded (blocks in a window were all mined at one difficulty).
+function windowToPoint(w: RetargetWindow): HashratePoint | null {
+  const blocks = Number(w.endHeight - w.startHeight);
+  const seconds = Number(w.endTime - w.startTime) / 1e9;
+  if (blocks <= 0 || seconds <= 0) return null;
+  return {
+    time: Number(w.endTime / 1_000_000n),
+    hashesPerSecond: (blocks * 2 ** Number(w.difficultyBits)) / seconds,
+    blocks,
+    difficultyBits: Number(w.difficultyBits),
+    live: false,
+  };
 }
 
 function formatBlockTime(nanos: bigint): string {
@@ -71,6 +95,10 @@ function Dashboard() {
   const [motherCycles, setMotherCycles] = useState<bigint | null>(null);
   const [minerCount, setMinerCount] = useState<bigint | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [history, setHistory] = useState<RetargetWindow[]>([]);
+  // The history only changes at a retarget, so it's refetched when
+  // lastRetargetAt moves rather than on every 4s poll.
+  const historyFetchedFor = useRef<bigint | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -84,6 +112,11 @@ function Dashboard() {
       setBlocks((b as unknown as Block[]).slice().reverse());
       setMotherCycles(c);
       setMinerCount(m);
+      const retargetAt = (s as unknown as Stats).lastRetargetAt;
+      if (historyFetchedFor.current !== retargetAt) {
+        setHistory((await mother.getRetargetHistory()) as unknown as RetargetWindow[]);
+        historyFetchedFor.current = retargetAt;
+      }
     } catch (err) {
       console.error("Failed to refresh mother stats", err);
     }
@@ -104,6 +137,16 @@ function Dashboard() {
   const retargetDone = stats ? Number(stats.retargetIntervalBlocks - stats.blocksUntilRetarget) : 0;
   const retargetTotal = stats ? Number(stats.retargetIntervalBlocks) : 10;
   const hashrate = stats ? estimateHashrate(stats.difficultyBits, retargetDone, stats.lastRetargetAt) : null;
+  const chartPoints: HashratePoint[] = history.map(windowToPoint).filter((p): p is HashratePoint => p !== null);
+  if (stats && hashrate !== null && lastUpdated !== null && chartPoints.length > 0) {
+    chartPoints.push({
+      time: lastUpdated,
+      hashesPerSecond: hashrate,
+      blocks: retargetDone,
+      difficultyBits: Number(stats.difficultyBits),
+      live: true,
+    });
+  }
 
   return (
     <main className="page dashboard-page">
@@ -232,6 +275,17 @@ function Dashboard() {
         ) : (
           <div className="empty-state">Loading chain status...</div>
         )}
+      </section>
+
+      <section className="block">
+        <h2>
+          Network hashrate <span className="section-icon">📈</span>
+        </h2>
+        <p className="section-intro">
+          Estimated hashrate per retarget window (every 10 blocks), inferred from difficulty and
+          block times. The dashed segment is the current window, still in progress.
+        </p>
+        <HashrateChart points={chartPoints} />
       </section>
 
       <section className="block">

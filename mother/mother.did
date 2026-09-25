@@ -106,6 +106,15 @@ type Block =
    reward: nat;
    timestamp: Time;
  };
+type RetargetWindow = 
+ record {
+   difficultyBits: nat;
+   endHeight: nat;
+   endTime: Time;
+   newDifficultyBits: nat;
+   startHeight: nat;
+   startTime: Time;
+ };
 service : {
   backfillTotalIcpBurned: (amountE8s: nat) -> ();
   backfillTotalIcpConvertedToCycles: (amountE8s: nat) -> ();
@@ -121,6 +130,7 @@ service : {
   getPendingAdminChanges: () -> (PendingAdminChanges) query;
   getPendingReward: () -> (nat) query;
   getRecentBlocks: () -> (vec Block) query;
+  getRetargetHistory: () -> (vec RetargetWindow) query;
   getStats: () -> (Stats) query;
   getTotalPendingRewards: () -> (nat) query;
   getWork: () -> (Work) query;
