@@ -304,6 +304,16 @@ actor self {
   var totalIcpConvertedToCycles : Nat = 0;
 
   var recentBlocks : [Types.Block] = [];
+  // One entry per completed retarget window, appended by maybeRetarget(),
+  // oldest first -- the only record of past difficulty (blocks don't carry
+  // it), so the dashboard's hashrate history needs it. Persisted: it's real
+  // chain history. Starts empty at the upgrade that introduced it; nothing
+  // before that is reconstructed. Capped at MAX_RETARGET_HISTORY (~2 months
+  // at 10 blocks x 5 min per window).
+  var retargetHistory : [Types.RetargetWindow] = [];
+  // transient so the cap stays editable on a later upgrade -- see
+  // MIN_DIFFICULTY_BITS_LIVE for why a plain `let` would freeze it.
+  transient let MAX_RETARGET_HISTORY : Nat = 2_000;
   // Persisted, not transient: this is real, specific PIKO owed to specific
   // miners (a block was accepted, its mint just hasn't landed yet). Making
   // this `transient` -- as an earlier version of this file did -- means it
@@ -484,10 +494,29 @@ actor self {
       };
     } else { difficultyBits };
 
+    pushRetargetWindow({
+      startHeight = retargetAnchorHeight;
+      endHeight = height;
+      startTime = retargetAnchorTime;
+      endTime = now;
+      difficultyBits;
+      newDifficultyBits = newBits;
+    });
     difficultyBits := newBits;
     retargetAnchorHeight := height;
     retargetAnchorTime := now;
     lastRetargetAt := now;
+  };
+
+  func pushRetargetWindow(w : Types.RetargetWindow) {
+    let combined = Array.concat(retargetHistory, [w]);
+    let n = combined.size();
+    retargetHistory := if (n > MAX_RETARGET_HISTORY) {
+      Array.tabulate<Types.RetargetWindow>(
+        MAX_RETARGET_HISTORY,
+        func(i) { combined[n - MAX_RETARGET_HISTORY + i] },
+      );
+    } else { combined };
   };
 
   func pushRecentBlock(b : Types.Block) {
@@ -591,6 +620,10 @@ actor self {
 
   public query func getRecentBlocks() : async [Types.Block] {
     recentBlocks;
+  };
+
+  public query func getRetargetHistory() : async [Types.RetargetWindow] {
+    retargetHistory;
   };
 
   public query ({ caller }) func getPendingReward() : async Nat {
