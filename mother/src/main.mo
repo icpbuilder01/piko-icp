@@ -231,7 +231,15 @@ actor self {
   // Never share cycles below this floor -- mother keeps whatever it needs
   // for its own healthy operation first, and only forwards genuine
   // surplus. See topUpProject() below.
+  // Dead field, kept on purpose: a plain `let` keeps its first-install
+  // value (2T) forever under enhanced orthogonal persistence, so editing it
+  // never took effect on upgrade. CYCLES_RESERVE_LIVE below is the real one.
   let CYCLES_RESERVE : Nat = 2_000_000_000_000; // 2T
+  // Raised from 2T on 2026-10-02 ahead of blackholing: mother burns roughly
+  // 10-25B cycles/day, so 2T was only a few months of runway if mining (its
+  // only cycles income) ever dried up. 10T is roughly 1-3 years. transient, for the same
+  // reason as MIN_DIFFICULTY_BITS_LIVE below.
+  transient let CYCLES_RESERVE_LIVE : Nat = 10_000_000_000_000; // 10T
 
   // ---- Mining state ----
   // Genesis header: a fixed, reproducible seed (not a real value, just a
@@ -1177,7 +1185,7 @@ actor self {
   // whole point of eventually blackholing mother/ledger) can't afford to
   // depend on someone remembering to top up by hand.
   //
-  // Deliberately simple: keeps CYCLES_RESERVE for itself, splits whatever
+  // Deliberately simple: keeps CYCLES_RESERVE_LIVE for itself, splits whatever
   // is left evenly across however many targets are configured (skipping
   // any that isn't, e.g. a deployment that never set
   // PUBLIC_CANISTER_ID:frontend -- ledgerId itself is always present, see
@@ -1210,7 +1218,7 @@ actor self {
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 } };
+    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
       [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId],
@@ -1218,7 +1226,7 @@ actor self {
     );
     if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0 } };
 
-    let surplus = balance - CYCLES_RESERVE;
+    let surplus = balance - CYCLES_RESERVE_LIVE;
     var totalWeight = 0;
     for (target in targets.vals()) { totalWeight += topUpWeight(target) };
     let Management : Types.ManagementActor = actor (Principal.toText(Principal.fromText("aaaaa-aa")));
