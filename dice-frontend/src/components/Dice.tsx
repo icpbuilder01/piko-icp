@@ -6,6 +6,7 @@ import { diceCanisterId } from "../lib/canister-env";
 import { formatPiko, parseAmount } from "../lib/format";
 import { TokenKind, type Config, type BetResult, type BetError } from "../bindings/dice/dice";
 import { Confetti } from "./Confetti";
+import { DiceStage, type HistoryEntry, type Outcome } from "./DiceStage";
 
 interface DiceProps {
   identity: Identity | null;
@@ -35,12 +36,8 @@ const APPROVE_ROLLS = 20;
 // ledger/icrc1_ledger_init.args.template), unrelated to ICP's, but happens
 // to share the same value today.
 const PIKO_LEDGER_FEE_E8S = 10_000n;
-// How fast the "spinning" number ticks while a bet is in flight, and how
-// long the marker takes to glide to its true landing spot once the real
-// result comes back -- see the CSS transition on .dice-marker, which is
-// intentionally longer than this interval so a run of ticks reads as one
-// continuous slide rather than a series of jumps.
-const TICK_MS = 70;
+// How many of this session's rolls the history strip keeps.
+const HISTORY_SIZE = 14;
 
 const dicePrincipal = Principal.fromText(diceCanisterId);
 
@@ -88,12 +85,17 @@ export function Dice({ identity }: DiceProps) {
   const [allowance, setAllowance] = useState<bigint | null>(null);
   const [approving, setApproving] = useState(false);
 
+  // awaiting: the bet call is in flight. rolling: awaiting, or the stage is
+  // still animating the landing -- Roll stays disabled for both.
+  const [awaiting, setAwaiting] = useState(false);
   const [rolling, setRolling] = useState(false);
-  const [displayRoll, setDisplayRoll] = useState<number | null>(null);
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [streak, setStreak] = useState(0);
   const [lastWon, setLastWon] = useState<boolean | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
-  const tickRef = useRef<number | null>(null);
+  const rollButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     getDiceActor()
@@ -123,10 +125,33 @@ export function Dice({ identity }: DiceProps) {
     }
   }, [identity, refreshAllowance]);
 
+  // Space rolls again (unless typing in a field) -- quick re-rolls are most
+  // of the fun of dice.
   useEffect(() => {
-    return () => {
-      if (tickRef.current !== null) window.clearInterval(tickRef.current);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "BUTTON" || el.isContentEditable)) return;
+      e.preventDefault();
+      // Clicking the real button keeps every guard in one place: nothing
+      // happens while it's disabled or replaced by Approve.
+      rollButtonRef.current?.click();
     };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const handleSettled = useCallback((o: Outcome) => {
+    setRolling(false);
+    setLastWon(o.won);
+    setHistory((h) => [{ id: o.id, roll: o.roll, won: o.won }, ...h].slice(0, HISTORY_SIZE));
+    setStreak((s) => (o.won ? (s > 0 ? s + 1 : 1) : s < 0 ? s - 1 : -1));
+    setMessage(
+      o.won
+        ? `${o.roll} -- under ${o.target}, you won +${formatPiko(o.payout)} PIKO!`
+        : `${o.roll} -- not under ${o.target}, stake lost.`,
+    );
+    if (o.won) setConfettiTrigger((n) => n + 1);
   }, []);
 
   if (!config) {
@@ -169,57 +194,39 @@ export function Dice({ identity }: DiceProps) {
     }
   }
 
-  function startTicking() {
-    if (tickRef.current !== null) window.clearInterval(tickRef.current);
-    tickRef.current = window.setInterval(() => {
-      setDisplayRoll(Math.floor(Math.random() * 100));
-    }, TICK_MS);
-  }
-
-  function stopTicking() {
-    if (tickRef.current !== null) {
-      window.clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-  }
-
   async function handleRoll() {
-    if (!identity || amount === null || amount <= 0n || rolling) return;
+    if (!identity || amount === null || amount <= 0n || rolling || !feeApproved) return;
     setMessage(null);
     setLastWon(null);
+    setOutcome(null);
     setRolling(true);
-    startTicking();
+    setAwaiting(true);
     try {
       const diceAsUser = getDiceActor(identity);
       const result = (await diceAsUser.placeBet(TOKEN, amount, BigInt(target))) as BetResult;
-      stopTicking();
       if (result.__kind__ === "Ok") {
         const { roll, won, payoutAmount } = result.Ok;
-        setDisplayRoll(Number(roll));
-        setLastWon(won);
-        setMessage(
-          won
-            ? `${Number(roll)} -- under ${target}, you won +${formatPiko(payoutAmount)} PIKO!`
-            : `${Number(roll)} -- not under ${target}, stake lost.`,
-        );
-        if (won) setConfettiTrigger((n) => n + 1);
+        // The stage animates the landing and calls handleSettled when done.
+        setOutcome({ id: Date.now(), roll: Number(roll), won, target, stake: amount, payout: payoutAmount });
         refreshAllowance(identity);
       } else {
-        setDisplayRoll(null);
+        setRolling(false);
         setMessage(betErrorMessage(result.Err, potentialPayout));
       }
     } catch (err) {
-      stopTicking();
       console.error("placeBet failed", err);
-      setDisplayRoll(null);
+      setRolling(false);
       setMessage("Bet failed, nothing was charged if this was a network error -- check your balance.");
     } finally {
-      setRolling(false);
+      setAwaiting(false);
     }
   }
 
-  const markerPct = displayRoll !== null ? (displayRoll / 99) * 100 : null;
-  const zonePct = Math.min(100, Math.max(0, target));
+  function scaleAmount(factor: number) {
+    if (amount === null || amount <= 0n) return;
+    const scaled = factor >= 1 ? amount * BigInt(factor) : amount / BigInt(Math.round(1 / factor));
+    if (scaled > 0n) setAmountInput(formatPiko(scaled).replace(/,/g, ""));
+  }
 
   return (
     <section className={`block dice-panel ${rolling ? "is-rolling" : ""}`}>
@@ -241,19 +248,15 @@ export function Dice({ identity }: DiceProps) {
         <p className="empty-state">Log in to play -- winnings pay out straight to your own principal.</p>
       ) : (
         <>
-          <div className="dice-track-wrap">
-            <div className="dice-track" style={{ background: `linear-gradient(to right, var(--good) 0%, var(--good) ${zonePct}%, var(--critical) ${zonePct}%, var(--critical) 100%)` }}>
-              {markerPct !== null && (
-                <div className={`dice-marker ${lastWon === true ? "won" : lastWon === false ? "lost" : ""}`} style={{ left: `${markerPct}%` }} />
-              )}
-            </div>
-            <div className="dice-readout">
-              <span className={`dice-number ${rolling ? "ticking" : ""} ${lastWon !== null ? "settled" : ""}`}>
-                {displayRoll !== null ? displayRoll.toString().padStart(2, "0") : "--"}
-              </span>
-              <span className="dice-readout-label">last roll (0-99)</span>
-            </div>
-          </div>
+          <DiceStage
+            spinning={awaiting}
+            outcome={outcome}
+            target={target}
+            multiplier={payoutMultiplier}
+            history={history}
+            streak={streak}
+            onSettled={handleSettled}
+          />
 
           <div className="dice-controls">
             <label className="dice-target-row">
@@ -280,13 +283,20 @@ export function Dice({ identity }: DiceProps) {
                 inputMode="decimal"
                 disabled={rolling}
               />
+              <button type="button" className="button dice-quick" onClick={() => scaleAmount(0.5)} disabled={rolling || amount === null}>
+                &frac12;
+              </button>
+              <button type="button" className="button dice-quick" onClick={() => scaleAmount(2)} disabled={rolling || amount === null}>
+                2&times;
+              </button>
               {!feeApproved ? (
                 <button className="button" onClick={handleApprove} disabled={approving || amount === null || rolling}>
                   {approving ? "Approving..." : "Approve PIKO"}
                 </button>
               ) : (
-                <button className="button button-cta" onClick={handleRoll} disabled={rolling || amount === null || amount <= 0n}>
+                <button ref={rollButtonRef} className="button button-cta" onClick={handleRoll} disabled={rolling || amount === null || amount <= 0n}>
                   {rolling ? "Rolling..." : "Roll"}
+                  <span className="dice-key-hint">space</span>
                 </button>
               )}
             </div>
