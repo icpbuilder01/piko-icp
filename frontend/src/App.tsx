@@ -8,6 +8,7 @@ import { motherCanisterId, ledgerCanisterId } from "./lib/canister-env";
 import { formatPiko, formatIcp, formatHashrate, formatCount, shortPrincipal, timeAgo, toHex } from "./lib/format";
 import { Wallet } from "./components/Wallet";
 import { Confetti } from "./components/Confetti";
+import { SponsoredBanner } from "./components/SponsoredBanner";
 import "./App.css";
 
 const POLL_MS = 5000;
@@ -787,6 +788,8 @@ function App() {
           )}
         </div>
       </header>
+
+      <SponsoredBanner />
 
       {work && (
         <div className="hash-ticker">
