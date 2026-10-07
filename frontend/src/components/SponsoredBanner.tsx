@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Actor, HttpAgent } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 import { rootKey } from "../lib/canister-env";
@@ -8,6 +8,18 @@ import { rootKey } from "../lib/canister-env";
 const PLACE_CANISTER_ID = "cpihg-xqaaa-aaaac-bf4ba-cai";
 const PIKOPIXEL_URL = "https://cglm2-byaaa-aaaac-bf4aq-cai.icp0.io/";
 
+// Same 18 colors as PikoPixel's canvas (pikoplace/place-frontend/src/lib/
+// palette.ts): ad images are 32x16 indices into it.
+const PALETTE = [
+  "#ffffff", "#d4d7d9", "#898d90", "#000000",
+  "#be0039", "#ff4500", "#ffa800", "#ffd635",
+  "#00a368", "#7eed56", "#009eaa", "#2450a4",
+  "#3690ea", "#51e9f4", "#811e9f", "#b44ac0",
+  "#ff99aa", "#6d482f",
+];
+const IMAGE_WIDTH = 32;
+const IMAGE_HEIGHT = 16;
+
 const POLL_MS = 60_000;
 const ROTATE_MS = 8_000;
 
@@ -15,12 +27,18 @@ interface Ad {
   text: string;
   link: [] | [string];
   suspicious: boolean;
+  image: [] | [Uint8Array | number[]];
 }
 
 // Hand-written subset of place.did: only getActiveAds, and only the Ad
 // fields the banner shows (Candid lets a reader ignore the rest).
 const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
-  const Ad = IDL.Record({ text: IDL.Text, link: IDL.Opt(IDL.Text), suspicious: IDL.Bool });
+  const Ad = IDL.Record({
+    text: IDL.Text,
+    link: IDL.Opt(IDL.Text),
+    suspicious: IDL.Bool,
+    image: IDL.Opt(IDL.Vec(IDL.Nat8)),
+  });
   return IDL.Service({ getActiveAds: IDL.Func([], [IDL.Vec(Ad)], ["query"]) });
 };
 
@@ -32,7 +50,20 @@ function getPlaceActor() {
   });
 }
 
-// Sponsored text slots rented on PikoPixel by burning PIKO. Nobody reviews
+function AdImage({ image }: { image: Uint8Array | number[] }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = ref.current?.getContext("2d");
+    if (!ctx) return;
+    for (let i = 0; i < IMAGE_WIDTH * IMAGE_HEIGHT; i++) {
+      ctx.fillStyle = PALETTE[image[i]] ?? PALETTE[0];
+      ctx.fillRect(i % IMAGE_WIDTH, Math.floor(i / IMAGE_WIDTH), 1, 1);
+    }
+  }, [image]);
+  return <canvas ref={ref} className="board-image" width={IMAGE_WIDTH} height={IMAGE_HEIGHT} />;
+}
+
+// Sponsored slots rented on PikoPixel by burning PIKO. Nobody reviews
 // them, hence the label. Errors just mean no banner -- mining never
 // depends on this.
 export function SponsoredBanner() {
@@ -71,6 +102,7 @@ export function SponsoredBanner() {
       {ad.suspicious && (
         <span className="board-warning">⚠ Reported as suspicious by several players -- be extra careful</span>
       )}
+      {ad.image[0] && <AdImage image={ad.image[0]} />}
       <span className="board-strip-text">{ad.text}</span>
       {link && (
         <a className="board-strip-link" href={link} target="_blank" rel="noopener noreferrer nofollow">

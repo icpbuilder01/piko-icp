@@ -1131,3 +1131,11 @@ p.pull-quote {
   font-size: 0.74rem;
   font-weight: 700;
 }
+
+.board-image {
+  display: block;
+  width: 96px;
+  height: 48px;
+  image-rendering: pixelated;
+  border: 1px solid var(--bevel-lo);
+}
