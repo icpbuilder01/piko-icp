@@ -1134,8 +1134,8 @@ p.pull-quote {
 
 .board-image {
   display: block;
-  width: 96px;
-  height: 48px;
+  width: 128px;
+  height: 64px;
   image-rendering: pixelated;
   border: 1px solid var(--bevel-lo);
 }
