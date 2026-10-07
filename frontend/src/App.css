@@ -1083,7 +1083,7 @@ p.pull-quote {
 
 /* ---- Sponsored banner (ads rented on PikoPixel) ---- */
 
-.sponsored-banner {
+.board-strip {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1100,7 +1100,7 @@ p.pull-quote {
   box-shadow: 3px 3px 0 var(--hard-shadow);
 }
 
-.sponsored-label {
+.board-strip-label {
   flex-basis: 100%;
   color: var(--text-muted);
   font-size: 0.66rem;
@@ -1109,23 +1109,23 @@ p.pull-quote {
   letter-spacing: 0.05em;
 }
 
-.sponsored-text {
+.board-strip-text {
   color: var(--text);
   font-size: 0.9rem;
   overflow-wrap: anywhere;
 }
 
-.sponsored-link {
+.board-strip-link {
   color: var(--spark);
   font-size: 0.76rem;
   overflow-wrap: anywhere;
 }
 
-.sponsored-label a {
+.board-strip-label a {
   color: inherit;
 }
 
-.sponsored-warning {
+.board-warning {
   flex-basis: 100%;
   color: var(--critical);
   font-size: 0.74rem;

@@ -61,19 +61,19 @@ export function SponsoredBanner() {
   const ad = ads[index % ads.length];
   const link = ad.link[0];
   return (
-    <aside className="sponsored-banner" aria-label="Sponsored">
-      <span className="sponsored-label">
+    <aside className="board-strip" aria-label="Community board">
+      <span className="board-strip-label">
         Sponsored · not verified by PIKO · do your own research ·{" "}
         <a href={PIKOPIXEL_URL} target="_blank" rel="noopener noreferrer">
           rent this slot on PikoPixel
         </a>
       </span>
       {ad.suspicious && (
-        <span className="sponsored-warning">⚠ Reported as suspicious by several players -- be extra careful</span>
+        <span className="board-warning">⚠ Reported as suspicious by several players -- be extra careful</span>
       )}
-      <span className="sponsored-text">{ad.text}</span>
+      <span className="board-strip-text">{ad.text}</span>
       {link && (
-        <a className="sponsored-link" href={link} target="_blank" rel="noopener noreferrer nofollow">
+        <a className="board-strip-link" href={link} target="_blank" rel="noopener noreferrer nofollow">
           {link}
         </a>
       )}
