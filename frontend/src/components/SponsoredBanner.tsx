@@ -9,7 +9,7 @@ const PLACE_CANISTER_ID = "cpihg-xqaaa-aaaac-bf4ba-cai";
 const PIKOPIXEL_URL = "https://cglm2-byaaa-aaaac-bf4aq-cai.icp0.io/";
 
 // Same 18 colors as PikoPixel's canvas (pikoplace/place-frontend/src/lib/
-// palette.ts): ad images are 32x16 indices into it.
+// palette.ts): ad images are 64x32 indices into it.
 const PALETTE = [
   "#ffffff", "#d4d7d9", "#898d90", "#000000",
   "#be0039", "#ff4500", "#ffa800", "#ffd635",
@@ -17,8 +17,8 @@ const PALETTE = [
   "#3690ea", "#51e9f4", "#811e9f", "#b44ac0",
   "#ff99aa", "#6d482f",
 ];
-const IMAGE_WIDTH = 32;
-const IMAGE_HEIGHT = 16;
+const IMAGE_WIDTH = 64;
+const IMAGE_HEIGHT = 32;
 
 const POLL_MS = 60_000;
 const ROTATE_MS = 8_000;
