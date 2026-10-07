@@ -14,12 +14,13 @@ const ROTATE_MS = 8_000;
 interface Ad {
   text: string;
   link: [] | [string];
+  suspicious: boolean;
 }
 
 // Hand-written subset of place.did: only getActiveAds, and only the Ad
 // fields the banner shows (Candid lets a reader ignore the rest).
 const idlFactory: IDL.InterfaceFactory = ({ IDL }) => {
-  const Ad = IDL.Record({ text: IDL.Text, link: IDL.Opt(IDL.Text) });
+  const Ad = IDL.Record({ text: IDL.Text, link: IDL.Opt(IDL.Text), suspicious: IDL.Bool });
   return IDL.Service({ getActiveAds: IDL.Func([], [IDL.Vec(Ad)], ["query"]) });
 };
 
@@ -67,6 +68,9 @@ export function SponsoredBanner() {
           rent this slot on PikoPixel
         </a>
       </span>
+      {ad.suspicious && (
+        <span className="sponsored-warning">⚠ Reported as suspicious by several players -- be extra careful</span>
+      )}
       <span className="sponsored-text">{ad.text}</span>
       {link && (
         <a className="sponsored-link" href={link} target="_blank" rel="noopener noreferrer nofollow">

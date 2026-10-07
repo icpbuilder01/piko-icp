@@ -1124,3 +1124,10 @@ p.pull-quote {
 .sponsored-label a {
   color: inherit;
 }
+
+.sponsored-warning {
+  flex-basis: 100%;
+  color: var(--critical);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
