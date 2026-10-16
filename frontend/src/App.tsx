@@ -820,7 +820,7 @@ function App() {
 
       <div className="disclaimer disclaimer-strong slim">
         <strong>Mining costs real ICP.</strong> {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
-        per block, non-refundable the moment a proof is accepted. PIKO is
+        per valid proof submitted, non-refundable -- even if someone else wins that block first. PIKO is
         experimental, no-premine, and has no established market yet. Only
         mine with ICP you can afford to lose. Not affiliated with bob.fun or
         BOB.
@@ -871,7 +871,7 @@ function App() {
                     </div>
                   </div>
                   <div className="stat-tile">
-                    <div className="stat-label">Cost per block</div>
+                    <div className="stat-label">Cost per proof</div>
                     <div className="stat-value token-label">
                       <img src="/icp-logo.svg" alt="" className="token-icon" />
                       {work ? formatIcp(work.miningFeeE8s) : "..."} ICP

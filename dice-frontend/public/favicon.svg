@@ -10,8 +10,11 @@
   <rect x="40" y="34" width="16" height="60" rx="5" fill="#ffffff"/>
   <circle cx="65" cy="51" r="23" fill="#ffffff"/>
   <circle cx="65" cy="51" r="11.5" fill="url(#piko-coin)"/>
-  <!-- Dice badge: distinguishes this favicon from PIKO mining's when both
-       are pinned to a phone home screen side by side. -->
-  <circle cx="96" cy="96" r="28" fill="#f2ede1" stroke="#1a1508" stroke-width="3"/>
-  <text x="96" y="97" font-size="30" text-anchor="middle" dominant-baseline="central">&#127922;</text>
+  <!-- Dice badge in the app's own color: tells the PIKO apps apart when
+       pinned side by side. -->
+  <circle cx="96" cy="96" r="29" fill="#4aa8ff" stroke="#0a0c16" stroke-width="4"/>
+  <rect x="80" y="80" width="32" height="32" rx="7" fill="#ffffff"/>
+  <circle cx="88" cy="88" r="3.6" fill="#0a0c16"/>
+  <circle cx="96" cy="96" r="3.6" fill="#0a0c16"/>
+  <circle cx="104" cy="104" r="3.6" fill="#0a0c16"/>
 </svg>
