@@ -523,3 +523,27 @@ section.block > h2 .live-pill,
     font-size: 0.74rem;
   }
 }
+
+/* Dashboard (dashboard.html) */
+.dashboard-page .hero-figure {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.dashboard-page .hero-figure-sub {
+  color: var(--app-2);
+}
+.dashboard-page .hero-figure-label {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.dashboard-footnote {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.topbar .wallet-box a.button {
+  color: var(--text);
+  text-decoration: none;
+}
