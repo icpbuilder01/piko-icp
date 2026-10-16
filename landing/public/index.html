@@ -1,700 +1,777 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/piko-logo.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server. Play Dice or Blackjack, or paint on PikoPixel, with it -- provably fair, fully on-chain." />
-  <title>PIKO</title>
-  <style>
-    :root {
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PIKO -- a fair-launch, proof-of-on-chain-work token mined entirely inside canisters on the Internet Computer. No team allocation, no presale, no off-chain server. Play Dice or Blackjack, or paint on PikoPixel, with it -- provably fair, fully on-chain.">
+<link rel="icon" type="image/svg+xml" href="/piko-logo.svg">
+<title>PIKO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Silkscreen&family=VT323&display=swap">
+<style>
+  /* Layout: one centered column (max 1080px). Modern hero, then the rest of
+     the site as late-90s desktop "windows": title bars in the logo's
+     blue->violet, bevelled frames, hard offset shadows, pixel icons. */
+  :root {
+    color-scheme: dark;
+    --bg: #0b0d17;
+    --dot: #1c2140;
+    --surface: #141830;
+    --surface-2: #1c2140;
+    --sunken: #090b14;
+    --line: #2a3054;
+    --ink: #eef0fa;
+    --ink-2: #a9aecb;
+    --ink-3: #6d7398;
+    --brand: #5b7cfa;
+    --title-a: #2c55c9;
+    --title-b: #5b4bc4;
+    --title-ink: #ffffff;
+    --bevel-hi: #3a4170;
+    --bevel-lo: #000000;
+    --hard: rgba(0, 0, 0, 0.75);
+    --gold: #ffc35a;
+    --zero: #5cf0b0;
+    --dice: #5b9dff;
+    --felt: #ff6b5e;
+    --pixel: #d07af0;
+    --poker: #ffc35a;
+    --native: #5cf0b0;
+    --card: #fbfaf3;
+    --card-ink: #15172a;
+    --card-red: #c92a2a;
+    --felt-green: #17643f;
+    --felt-red: #7c1f1a;
+    --felt-blue: #1b3f86;
+    --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+    --font-body: "Instrument Sans", -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+    --font-pixel: "Silkscreen", "Courier New", monospace;
+    --font-crt: "VT323", "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
       color-scheme: light;
-
-      /* "Ledger paper" -- warm parchment, deep ink, gold leaf. Same palette
-         as mining/frontend and dice-frontend, so the three sites read as
-         one ecosystem. */
-      --bg: #f2ede1;
-      --surface: #fbf8f0;
-      --surface-2: #eae2cf;
-      --border: #ddd2b3;
-      --border-strong: #c9b98a;
-
-      --text: #1a1508;
-      --text-secondary: #5c5340;
-      --text-muted: #8f8468;
-
-      --accent: #b1550f;
-      --accent-strong: #8a4310;
-      --accent-soft: #f5ddc4;
-
-      --spark: #1a56b8;
-      --felt: #a3271d;
-      --pixel: #7a1e9f;
-      --native: #1a7a4a;
-      --poker: #a8790f;
-
-      --bevel-hi: #fffdf7;
-      --bevel-lo: #a8975f;
-      --hard-shadow: rgba(26, 21, 8, 0.4);
-
-      --font-display: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, "Liberation Mono", monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --bg: #eef0f8; --dot: #d3d7ea; --surface: #ffffff; --surface-2: #e6e9f5; --sunken: #f7f8fc;
+      --line: #c9cde3; --ink: #0f1330; --ink-2: #474d75; --ink-3: #7a80a6;
+      --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
+      --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
+      --gold: #b07a00; --zero: #0d9a63;
+      --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58;
     }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #eef0f8; --dot: #d3d7ea; --surface: #ffffff; --surface-2: #e6e9f5; --sunken: #f7f8fc;
+    --line: #c9cde3; --ink: #0f1330; --ink-2: #474d75; --ink-3: #7a80a6;
+    --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
+    --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
+    --gold: #b07a00; --zero: #0d9a63;
+    --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58;
+  }
 
-    @media (prefers-color-scheme: dark) {
-      :root {
-        color-scheme: dark;
+  * { box-sizing: border-box; }
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  a { color: inherit; }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+  .mono { font-family: var(--font-mono); }
+  :focus-visible { outline: 2px dashed var(--gold); outline-offset: 3px; }
 
-        /* "Terminal" -- near-black, molten orange, electric blue spark. */
-        --bg: #050403;
-        --surface: #0e0c09;
-        --surface-2: #17130f;
-        --border: #2a251d;
-        --border-strong: #3d3626;
+  /* ---------- nav + hero (unchanged direction) ---------- */
+  nav.top { padding-block: 18px; }
+  nav.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 1.25rem; text-decoration: none; }
+  .brand svg { width: 30px; height: 30px; }
+  .nav-links { display: flex; gap: 22px; font-size: 0.92rem; color: var(--ink-2); }
+  .nav-links a { text-decoration: none; }
+  .nav-links a:hover { color: var(--ink); }
+  @media (max-width: 640px) { .nav-links { display: none; } }
 
-        --text: #f5efdf;
-        --text-secondary: #b3a98f;
-        --text-muted: #756c58;
+  .hero { padding-block: 40px 56px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: center; }
+  @media (max-width: 860px) { .hero .wrap { grid-template-columns: 1fr; gap: 32px; } }
+  .eyebrow { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--zero); display: inline-flex; align-items: center; gap: 8px; }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--zero); box-shadow: 0 0 0 4px color-mix(in srgb, var(--zero) 22%, transparent); }
+  .hero h1 { font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.025em; margin: 14px 0 18px; }
+  .hero h1 em { font-style: normal; color: var(--gold); }
+  .hero p.lede { color: var(--ink-2); font-size: 1.08rem; max-width: 34em; margin: 0 0 26px; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px; font-weight: 600; font-size: 0.95rem; text-decoration: none; border: 1px solid var(--line); background: var(--surface); transition: transform .15s ease, border-color .15s ease; }
+  .btn:hover { transform: translateY(-1px); border-color: var(--ink-3); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .facts { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .fact b { display: block; font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fact span { font-size: 0.8rem; color: var(--ink-3); }
 
-        --accent: #f2803a;
-        --accent-strong: #ffa156;
-        --accent-soft: #3a2410;
+  /* ---------- the window kit ---------- */
+  .win {
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    box-shadow: 5px 5px 0 var(--hard);
+    min-width: 0;
+    text-decoration: none;
+  }
+  .tbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 4px 4px 4px 8px;
+    background: linear-gradient(90deg, var(--title-a), var(--title-b));
+    color: var(--title-ink);
+    font-family: var(--font-pixel); font-size: 0.72rem; letter-spacing: 0.04em;
+    white-space: nowrap; overflow: hidden;
+  }
+  .tbar .t { display: flex; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; }
+  .tbar .t svg { width: 12px; height: 12px; flex: none; }
+  .tb-btns { display: flex; gap: 3px; flex: none; }
+  .tb-btns i {
+    width: 16px; height: 14px; display: grid; place-items: center;
+    background: var(--surface-2); color: var(--ink);
+    border: 1px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    font: 400 0.6rem/1 var(--font-pixel); font-style: normal;
+  }
+  .status {
+    display: flex; gap: 3px; padding: 3px; margin-top: auto;
+    font-family: var(--font-pixel); font-size: 0.64rem; color: var(--ink-2);
+  }
+  .status span {
+    padding: 2px 7px;
+    border: 1px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+    white-space: nowrap;
+  }
+  .status span.grow { flex: 1; }
+  .sunken {
+    background: var(--sunken);
+    border: 2px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+  }
+  .bbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 600 0.88rem var(--font-body); color: var(--ink); text-decoration: none;
+    background: var(--surface-2);
+    border: 2px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    box-shadow: 2px 2px 0 var(--hard);
+    padding: 8px 14px; cursor: pointer;
+  }
+  .bbtn:hover { background: color-mix(in srgb, var(--brand) 18%, var(--surface-2)); }
+  .bbtn:active { border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo); box-shadow: none; transform: translate(2px, 2px); }
 
-        --spark: #3d9bff;
-        --felt: #ff5c4d;
-        --pixel: #c56ae0;
-        --native: #3ddb96;
-        --poker: #e0a83d;
+  .px { image-rendering: pixelated; shape-rendering: crispEdges; }
 
-        --bevel-hi: #56492c;
-        --bevel-lo: #000000;
-        --hard-shadow: rgba(0, 0, 0, 0.6);
-      }
-    }
+  /* hero rig as a window */
+  .rig-body { padding: 14px; }
+  .rig-lines { font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.85; overflow: hidden; padding: 8px 10px; }
+  .rig-line { display: flex; gap: 12px; white-space: nowrap; color: var(--ink-3); }
+  .rig-line .n { flex: none; width: 5.5ch; text-align: right; font-variant-numeric: tabular-nums; }
+  .rig-line .h { overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+  .rig-line .h i { font-style: normal; color: var(--zero); }
+  .rig-line.win-row { background: color-mix(in srgb, var(--zero) 12%, transparent); margin-inline: -10px; padding-inline: 10px; }
+  .rig-line.win-row .h { color: var(--ink); }
+  .rig-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
+  .rig-foot div { font-size: 0.74rem; color: var(--ink-3); }
+  .rig-foot b { display: block; font-family: var(--font-mono); font-weight: 500; color: var(--ink); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
 
-    * {
-      box-sizing: border-box;
-    }
+  /* ---------- marquee tape ---------- */
+  .tape {
+    overflow: hidden; white-space: nowrap;
+    border-block: 2px solid var(--ink);
+    background: var(--gold); color: #1a1300;
+    font-family: var(--font-pixel); font-size: 0.8rem; letter-spacing: 0.08em;
+    padding-block: 7px;
+  }
+  .tape-inner { display: inline-flex; animation: tape 40s linear infinite; }
+  .tape-inner span { padding-right: 2.5em; }
+  @keyframes tape { to { transform: translateX(-50%); } }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-    }
+  /* ---------- section headings ---------- */
+  section.band { padding-block: 64px 24px; }
+  .sec-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .sec-head svg { width: 34px; height: 34px; flex: none; }
+  .sec-head h2 { font-size: clamp(1.8rem, 3.6vw, 2.5rem); font-weight: 800; letter-spacing: -0.015em; }
+  .sec-head .rule { flex: 1; height: 0; border-top: 2px dotted var(--line); align-self: center; }
+  .sec-sub { color: var(--ink-2); margin: 0 0 28px 48px; max-width: 40em; font-size: 0.95rem; }
+  @media (max-width: 560px) { .sec-sub { margin-left: 0; } }
 
-    body {
-      background-color: var(--bg);
-      background-image: radial-gradient(var(--border) 1px, transparent 1px);
-      background-size: 26px 26px;
-      color: var(--text);
-      font-family: var(--font-sans);
-      -webkit-font-smoothing: antialiased;
-    }
+  /* ---------- games: bento of windows ---------- */
+  .games {
+    display: grid; gap: 22px;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-areas: "pk pk bj dc" "pk pk px px";
+  }
+  @media (max-width: 900px) { .games { grid-template-columns: 1fr 1fr; grid-template-areas: "pk pk" "bj dc" "px px"; } }
+  @media (max-width: 520px) { .games { grid-template-columns: 1fr; grid-template-areas: "pk" "bj" "dc" "px"; } }
+  .g-poker { grid-area: pk; } .g-bj { grid-area: bj; } .g-dice { grid-area: dc; } .g-pixel { grid-area: px; }
+  .game { color: var(--ink); transition: transform .14s ease, box-shadow .14s ease; }
+  .game:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--hard); }
+  .game:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--hard); }
+  .scene { margin: 6px 6px 0; overflow: hidden; position: relative; }
+  .scene svg, .scene canvas { display: block; width: 100%; height: 100%; }
+  .g-poker .scene { aspect-ratio: 16 / 8.5; }
+  .g-bj .scene, .g-dice .scene { aspect-ratio: 4 / 3; }
+  .g-pixel .scene { aspect-ratio: 16 / 6; }
+  .g-body { padding: 12px 12px 10px; display: grid; gap: 4px; }
+  .g-body h3 { font-size: 1.2rem; font-weight: 700; }
+  .g-poker .g-body h3 { font-size: 1.6rem; }
+  .g-body p { margin: 0; font-size: 0.88rem; color: var(--ink-2); }
+  .status .go { color: var(--gold); }
 
-    a {
-      color: var(--accent);
-    }
+  /* ---------- mine: installer wizard ---------- */
+  .mine { display: grid; grid-template-columns: 1.6fr 1fr; gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .mine { grid-template-columns: 1fr; } }
+  .wizard { display: grid; grid-template-columns: 150px 1fr; }
+  @media (max-width: 560px) { .wizard { grid-template-columns: 1fr; } .wiz-side { display: none !important; } }
+  .wiz-side {
+    margin: 6px 0 6px 6px;
+    background: linear-gradient(180deg, var(--title-a), var(--title-b));
+    display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+    padding: 18px 10px; color: #fff; text-align: center;
+  }
+  .wiz-side svg { width: 84px; height: 84px; }
+  .wiz-side small { font-family: var(--font-pixel); font-size: 0.62rem; opacity: .85; line-height: 1.5; }
+  .wiz-main { padding: 18px 20px 16px; display: grid; gap: 14px; min-width: 0; }
+  .wiz-main h3 { font-size: 1.45rem; font-weight: 800; }
+  .wiz-main > p { margin: 0; color: var(--ink-2); font-size: 0.92rem; }
+  .checks { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; font-size: 0.9rem; color: var(--ink-2); }
+  .checks li { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; }
+  .checks li::before {
+    content: "✓"; display: grid; place-items: center; width: 16px; height: 16px; margin-top: 3px;
+    font: 700 0.7rem/1 var(--font-mono); color: var(--native);
+    background: var(--sunken);
+    border: 1px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+  }
+  .rate { padding: 10px 12px; display: grid; gap: 8px; }
+  .rate-row { display: grid; grid-template-columns: 70px 1fr 56px; gap: 10px; align-items: center; font-family: var(--font-pixel); font-size: 0.64rem; color: var(--ink-2); }
+  .rate-row b { font-weight: 400; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .blocks { height: 14px; display: flex; gap: 2px; }
+  .blocks i { flex: 0 0 auto; width: calc((100% - 38px) / 20); background: var(--ink-3); }
+  .blocks.nat i { background: var(--native); }
+  .blocks.nat i.maybe { background: color-mix(in srgb, var(--native) 35%, transparent); }
+  .rate-cap { font-size: 0.72rem; color: var(--ink-3); margin: 0; }
+  .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  @media (max-width: 640px) { .dl { grid-template-columns: 1fr 1fr; } }
+  .dl .bbtn { flex-direction: column; gap: 0; padding: 9px 8px; }
+  .dl .bbtn small { font: 400 0.68rem var(--font-pixel); color: var(--ink-3); }
+  .fine { font-size: 0.78rem; color: var(--ink-3); margin: 0; }
 
-    main {
-      max-width: 640px;
-      margin: 0 auto;
-      padding: 56px 20px 40px;
-    }
+  .bminer .g-body { gap: 10px; }
+  .prog { height: 20px; padding: 2px; display: flex; gap: 2px; overflow: hidden; }
+  .prog i { flex: 0 0 10px; background: var(--brand); }
+  .bminer ul { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 0.88rem; display: grid; gap: 4px; }
+  .bminer .bbtn { justify-self: start; }
 
-    .hero {
-      text-align: center;
-      margin-bottom: 40px;
-    }
+  /* ---------- wallet: properties dialog ---------- */
+  .props { max-width: 760px; }
+  .props-body { padding: 16px; display: grid; gap: 16px; }
+  fieldset {
+    margin: 0; padding: 14px 14px 12px; min-width: 0;
+    border: 2px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo);
+  }
+  legend { font-family: var(--font-pixel); font-size: 0.72rem; padding: 0 6px; color: var(--ink-2); }
+  .idrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+  .idrow code { font-family: var(--font-mono); font-size: 0.95rem; padding: 8px 12px; word-break: break-all; min-width: 0; flex: 1 1 260px; }
+  .spec { display: grid; grid-template-columns: 110px 1fr; gap: 8px 16px; margin: 0; font-size: 0.9rem; }
+  @media (max-width: 480px) { .spec { grid-template-columns: 1fr; gap: 2px; } .spec dd { margin-bottom: 8px !important; } }
+  .spec dt { color: var(--ink-3); font-family: var(--font-pixel); font-size: 0.68rem; padding-top: 4px; }
+  .spec dd { margin: 0; }
+  .props .fine { margin-top: 10px; }
 
-    .hero img {
-      width: 56px;
-      height: 56px;
-      display: block;
-      margin: 0 auto 16px;
-    }
+  /* ---------- 88x31 badges ---------- */
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+  .b88 {
+    width: 88px; height: 31px; display: flex; text-decoration: none; overflow: hidden;
+    border: 1px solid; border-color: var(--bevel-hi) var(--bevel-lo) var(--bevel-lo) var(--bevel-hi);
+    font-family: var(--font-pixel); font-size: 8px; line-height: 1.05; letter-spacing: 0.02em;
+    box-shadow: 2px 2px 0 var(--hard);
+  }
+  .b88:hover { filter: brightness(1.15); }
+  .b88 .l { width: 30px; display: grid; place-items: center; background: #111; color: #fff; flex: none; }
+  .b88 .l svg { width: 18px; height: 18px; }
+  .b88 .r { flex: 1; display: grid; place-items: center; text-align: center; color: #fff; padding: 0 3px; }
+  .b88.icp .r { background: linear-gradient(135deg, #29abe2, #522785); }
+  .b88.src .r { background: #2a2a2a; color: #9cff9c; }
+  .b88.wp .r { background: #f6efd8; color: #3a2a00; }
+  .b88.oc .r { background: linear-gradient(135deg, #ff7a45, #c4307a); }
+  .b88.dash .r { background: #002b1a; color: #5cf0b0; }
 
-    .hero h1 {
-      font-family: var(--font-display);
-      font-size: 2.2rem;
-      letter-spacing: 0.02em;
-      margin: 0 0 10px;
-    }
+  /* ---------- footer ---------- */
+  footer { padding-block: 56px 60px; margin-top: 40px; border-top: 2px dotted var(--line); }
+  footer .wrap { display: grid; grid-template-columns: auto 1fr; gap: 20px 30px; align-items: center; }
+  @media (max-width: 600px) { footer .wrap { grid-template-columns: 1fr; } }
+  .counter { display: grid; gap: 6px; justify-items: start; }
+  .odo { display: flex; gap: 2px; padding: 3px; background: #000; border: 2px solid; border-color: var(--bevel-lo) var(--bevel-hi) var(--bevel-hi) var(--bevel-lo); }
+  .odo span { width: 18px; height: 26px; display: grid; place-items: center; background: linear-gradient(#1d1d1d 0 48%, #000 52%); color: #5cf0b0; font: 400 1.5rem/1 var(--font-crt); }
+  .counter small { font-family: var(--font-pixel); font-size: 0.62rem; color: var(--ink-3); }
+  footer p { margin: 0; font-size: 0.82rem; color: var(--ink-3); max-width: 46em; }
+  footer .best { font-family: var(--font-pixel); font-size: 0.64rem; margin-top: 8px; }
 
-    .hero p {
-      color: var(--text-secondary);
-      font-size: 1rem;
-      line-height: 1.6;
-      max-width: 480px;
-      margin: 0 auto;
-    }
+  .mock-tag { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font: 400 0.68rem var(--font-pixel); background: var(--gold); color: #1a1300; padding: 5px 10px; border: 2px solid #1a1300; }
 
-    .tag-row {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 18px 0 0;
-    }
 
-    .tag {
-      font-family: var(--font-display);
-      font-size: 0.68rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--text-secondary);
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      padding: 4px 9px;
-    }
-
-    .tag.spark {
-      color: var(--spark);
-      border-color: color-mix(in srgb, var(--spark) 45%, var(--border-strong));
-    }
-
-    .about {
-      background: var(--surface);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 20px 22px;
-      margin-bottom: 28px;
-      box-shadow: 3px 3px 0 var(--hard-shadow);
-    }
-
-    .about p {
-      color: var(--text-secondary);
-      font-size: 0.9rem;
-      line-height: 1.65;
-      margin: 0;
-    }
-
-    .about p + p {
-      margin-top: 12px;
-    }
-
-    .about strong {
-      color: var(--text);
-    }
-
-    h2.section-label {
-      font-family: var(--font-display);
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-      margin: 0 0 12px 2px;
-    }
-
-    .links {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-bottom: 28px;
-    }
-
-    .link-card {
-      display: block;
-      background: var(--surface);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 14px 16px;
-      text-decoration: none;
-      color: var(--text);
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
-      box-shadow: 2px 2px 0 var(--hard-shadow);
-    }
-
-    .link-card:hover {
-      transform: translate(-1px, -1px);
-      box-shadow: 4px 4px 0 var(--hard-shadow);
-    }
-
-    .link-card .link-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 700;
-      font-size: 0.95rem;
-    }
-
-    .link-card .link-title .icon {
-      font-size: 1.1rem;
-    }
-
-    .link-card .link-desc {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      margin-top: 5px;
-      line-height: 1.5;
-    }
-
-    .link-card.cta .link-title {
-      color: var(--accent);
-    }
-
-    .link-card.dice .link-title {
-      color: var(--spark);
-    }
-
-    .link-card.blackjack .link-title {
-      color: var(--felt);
-    }
-
-    .link-card.pixel .link-title {
-      color: var(--pixel);
-    }
-
-    .link-card.native .link-title {
-      color: var(--native);
-    }
-
-    .link-card.poker .link-title {
-      color: var(--poker);
-    }
-
-    .mining-compare {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-
-    .compare-card {
-      flex: 1 1 240px;
-      align-self: flex-start;
-      display: flex;
-      flex-direction: column;
-      background: var(--surface);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 18px 18px 16px;
-      box-shadow: 2px 2px 0 var(--hard-shadow);
-    }
-
-    .compare-card h3 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 1rem;
-      margin: 0 0 4px;
-    }
-
-    .compare-card.browser h3 {
-      color: var(--accent);
-    }
-
-    .compare-card.native h3 {
-      color: var(--native);
-    }
-
-    .compare-badge {
-      display: inline-block;
-      font-family: var(--font-display);
-      font-size: 0.62rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--native);
-      background: color-mix(in srgb, var(--native) 14%, var(--surface));
-      border: 1px solid color-mix(in srgb, var(--native) 45%, var(--border-strong));
-      padding: 2px 7px;
-      margin: 0 0 10px;
-    }
-
-    .compare-card ul {
-      list-style: none;
-      margin: 0 0 14px;
-      padding: 0;
-      color: var(--text-secondary);
-      font-size: 0.82rem;
-      line-height: 1.7;
-    }
-
-    .compare-card ul li::before {
-      content: "-- ";
-      color: var(--text-muted);
-    }
-
-    .compare-cta {
-      display: inline-block;
-      align-self: flex-start;
-      margin-top: auto;
-      font-family: var(--font-sans);
-      font-size: 0.82rem;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--text);
-      background: var(--surface-2);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 8px 14px;
-      box-shadow: 2px 2px 0 var(--hard-shadow);
-    }
-
-    .compare-card.native .compare-cta {
-      background: color-mix(in srgb, var(--native) 16%, var(--surface-2));
-    }
-
-    .download-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .download-btn {
-      flex: 1 1 auto;
-      text-align: center;
-      font-family: var(--font-sans);
-      font-size: 0.8rem;
-      font-weight: 700;
-      text-decoration: none;
-      color: var(--text);
-      background: var(--surface-2);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 8px 10px;
-      box-shadow: 2px 2px 0 var(--hard-shadow);
-    }
-
-    .download-btn.detected {
-      background: color-mix(in srgb, var(--native) 20%, var(--surface-2));
-      border-color: color-mix(in srgb, var(--native) 55%, var(--border-strong));
-      color: var(--native);
-    }
-
-    .download-btn .os-sub {
-      display: block;
-      font-weight: 400;
-      font-size: 0.68rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .download-note {
-      color: var(--text-muted);
-      font-size: 0.76rem;
-      line-height: 1.6;
-      margin: 0;
-    }
-
-    .download-note a {
-      color: var(--text-muted);
-    }
-
-    .ledger-box {
-      background: var(--surface);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 16px 18px;
-      margin-bottom: 28px;
-      box-shadow: 2px 2px 0 var(--hard-shadow);
-    }
-
-    .ledger-label {
-      font-size: 0.78rem;
-      color: var(--text-secondary);
-      margin-bottom: 8px;
-    }
-
-    .ledger-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .ledger-id {
-      font-family: var(--font-display);
-      font-size: 0.88rem;
-      background: var(--surface-2);
-      border: 1px solid var(--border-strong);
-      padding: 6px 10px;
-      color: var(--text);
-      word-break: break-all;
-    }
-
-    .copy-btn {
-      font-family: var(--font-sans);
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--text);
-      background: var(--surface-2);
-      border-style: solid;
-      border-width: 2px;
-      border-top-color: var(--bevel-hi);
-      border-left-color: var(--bevel-hi);
-      border-bottom-color: var(--bevel-lo);
-      border-right-color: var(--bevel-lo);
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-
-    .copy-btn:hover {
-      background: var(--accent-soft);
-    }
-
-    .ledger-hint {
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      line-height: 1.5;
-      margin: 10px 0 0;
-    }
-
-    footer {
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.76rem;
-      line-height: 1.7;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-
-    footer a {
-      color: var(--text-muted);
-      text-decoration: underline;
-    }
-
-    footer a:hover {
-      color: var(--text-secondary);
-    }
-  </style>
+  /* ---------- network background (from Fresh) + 3D coin window ---------- */
+  .page { position: relative; z-index: 1; }
+  .hero-desk { display: grid; gap: 18px; }
+  .hero-desk .rig-win .rig-lines { height: calc(5.55em + 16px); }
+  .coin-view { position: relative; height: 280px; display: grid; place-items: center; perspective: 1000px; overflow: hidden;
+    background: radial-gradient(circle at 50% 45%, rgba(91,75,196,.45), rgba(44,85,201,.12) 45%, transparent 70%), var(--sunken); }
+  .coin-view::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px); }
+  .coin-view .orbit-ring { position: absolute; width: 300px; height: 300px; border-radius: 50%; border: 1px dashed rgba(140,160,255,.35); transform: rotateX(72deg); }
+  .coin-view .floor { position: absolute; bottom: 38px; width: 170px; height: 18px; border-radius: 50%; background: rgba(0,0,0,.45); filter: blur(4px); }
+  .tilt { transform-style: preserve-3d; transition: transform .25s ease-out; }
+  .coin3d { position: relative; width: 190px; height: 190px; transform-style: preserve-3d; animation: spin 9s linear infinite; }
+  @keyframes spin { to { transform: rotateY(360deg); } }
+  .coin3d .layer { position: absolute; inset: 0; border-radius: 50%; background: #2b3fc7; }
+  .coin3d .face { position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center; backface-visibility: hidden;
+    background: radial-gradient(circle at 30% 25%, #8fb0ff 0%, #4a6cff 35%, #5b3fd6 75%, #3a24a0 100%);
+    box-shadow: inset 0 0 0 6px rgba(255,255,255,.18), inset 0 0 40px rgba(255,255,255,.15); }
+  .coin3d .face::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.35) 45%, transparent 60%); mix-blend-mode: overlay; }
+  .coin3d .face svg { width: 68%; height: 68%; filter: drop-shadow(0 4px 10px rgba(0,0,0,.3)); }
+  .coin3d .back { transform: rotateY(180deg); }
+  .coin-hud { position: absolute; left: 10px; top: 8px; font-family: var(--font-crt); font-size: 1.05rem; color: var(--zero); line-height: 1.1; text-shadow: 0 0 6px rgba(92,240,176,.5); }
+  .coin-hud.r { left: auto; right: 10px; text-align: right; color: var(--gold); text-shadow: 0 0 6px rgba(255,195,90,.45); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before { transition: none !important; animation: none !important; }
+  }
+</style>
 </head>
-
 <body>
-  <main>
-    <section class="hero">
-      <img src="/piko-logo.svg" alt="" />
-      <h1>PIKO</h1>
-      <p>
-        A fair-launch, proof-of-on-chain-work token -- real SHA-256 proof-of-work, mined and
-        verified entirely inside canisters on the Internet Computer, no off-chain pool or server.
-        No team allocation, no presale -- the only way any PIKO comes into existence is by paying
-        the same on-chain cost everyone else pays.
-      </p>
-      <div class="tag-row">
-        <span class="tag">Fixed supply, 21M</span>
-        <span class="tag">No premine</span>
-        <span class="tag spark">100% on-chain</span>
-      </div>
-    </section>
 
-    <div class="about">
-      <p>
-        <strong>This page is the hub, not an app.</strong> It doesn't ask you to log in or
-        approve anything -- it just explains PIKO and links out to the things you can
-        actually do: mine, or play. Each of those lives on its own separate canister below.
-      </p>
-      <p>
-        <strong>Mine it</strong> right in your browser -- no wallet software or CLI, just Internet
-        Identity -- or install <strong>PikoNativeMiner</strong>, a native desktop app for Windows,
-        macOS and Linux that hashes directly on your CPU's own hardware instructions (optional GPU
-        mining too) for a significantly higher rate than a browser tab can reach. Every accepted
-        proof costs a small, non-refundable ICP fee: mostly burned permanently, a share converted to
-        cycles to keep the protocol's own canisters funded. Don't want to chase a rare solo jackpot?
-        <strong>PikoPool</strong>, built into the native miner, lets you group up with everyone else
-        mining and split rewards proportionally instead. See the comparison and downloads below.
-      </p>
-      <p>
-        <strong>PIKO Dice</strong> and <strong>PikoBlackjack</strong> are companion games, each
-        deliberately hosted on its own separate site with its own login/approval flow -- opting
-        into betting is never bundled with mining. Both are provably fair, resolved by the
-        Internet Computer's own on-chain randomness, giving mined PIKO somewhere to actually be
-        spent: Dice is a simple 1% house edge roll, Blackjack is a full interactive single-deck
-        game (Hit/Stand/Double/Split) against the same kind of on-chain-escrowed bankroll.
-      </p>
-      <p>
-        <strong>PikoPixel</strong> is a third companion, and a different kind of one: a shared,
-        r/place-style pixel canvas, not a bet. Burn a small, fixed amount of PIKO to paint one cell
-        a color of your choosing, visible to everyone in real time -- no payout, no bankroll,
-        nothing to win back, just a permanent ICRC-1 burn and a piece of collective art.
-      </p>
-      <p>
-        Independent project. Mining is inspired by the publicly described "proof-of-on-chain-work"
-        mechanics of bob.fun, but this is an original codebase, token, and brand --
-        <strong>not affiliated with, endorsed by, or connected to bob.fun or BOB in any way.</strong>
-      </p>
+<div class="page">
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 128 128" aria-hidden="true"><defs><linearGradient id="pk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3987e5"/><stop offset="1" stop-color="#5b4bc4"/></linearGradient></defs><circle cx="64" cy="64" r="62" fill="url(#pk)"/><rect x="40" y="34" width="16" height="60" rx="5" fill="#fff"/><circle cx="65" cy="51" r="23" fill="#fff"/><circle cx="65" cy="51" r="11.5" fill="url(#pk)"/></svg>
+      PIKO
+    </a>
+    <div class="nav-links">
+      <a href="#play">Play</a>
+      <a href="#mine">Mine</a>
+      <a href="#wallet">Wallet &amp; devs</a>
+      <a href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">Whitepaper</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow">Proof-of-work on the Internet Computer</span>
+      <h1>Mined by people.<br>Played <em>on-chain.</em></h1>
+      <p class="lede">PIKO is a fair-launch token with real SHA-256 proof-of-work, verified entirely inside ICP canisters. No team allocation, no presale. Mine it, then spend it at the tables.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="#play">Play with PIKO</a>
+        <a class="btn" href="#mine">Start mining</a>
+      </div>
+      <div class="facts">
+        <div class="fact"><b>21,000,000</b><span>max supply</span></div>
+        <div class="fact"><b>0</b><span>premine</span></div>
+        <div class="fact"><b>100%</b><span>on-chain</span></div>
+      </div>
     </div>
 
-    <h2 class="section-label">Two ways to mine</h2>
-    <div class="mining-compare">
-      <div class="compare-card browser">
-        <h3><span class="icon">&#127760;</span>Browser Miner</h3>
-        <ul>
-          <li>Nothing to install -- mines right in the tab</li>
-          <li>Just needs Internet Identity to log in</li>
-          <li>Lower hashrate: a browser can't reach your CPU's hardware hashing instructions</li>
-          <li>Good for casual, occasional mining</li>
-        </ul>
-        <a class="compare-cta" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/" target="_blank" rel="noopener noreferrer">Start mining in browser</a>
+    <div class="hero-desk">
+    <div class="win coin-win" id="stage" aria-label="Spinning 3D PIKO coin">
+      <div class="tbar"><span class="t"><svg class="px" data-px="coin" viewBox="0 0 10 10"></svg>PIKO.3D — coin viewer</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+      <div class="coin-view sunken" aria-hidden="true">
+        <div class="coin-hud">ROT Y<br>AUTO</div>
+        <div class="coin-hud r">21,000,000<br>MAX</div>
+        <div class="orbit-ring"></div>
+        <div class="floor"></div>
+        <div class="tilt" id="tilt"><div class="coin3d" id="coin"></div></div>
       </div>
-      <div class="compare-card native">
-        <div class="compare-badge">New</div>
-        <h3><span class="icon">&#9935;&#65039;</span>Native Miner</h3>
-        <ul>
-          <li>10-20x higher hashrate -- uses your CPU's real hardware hashing instructions</li>
-          <li>Optional GPU mining, alongside your CPU threads</li>
-          <li>PikoPool built in -- group up and split rewards instead of soloing a rare jackpot</li>
-          <li>Keeps mining in the background, no browser tab needed</li>
-          <li>Windows, macOS &amp; Linux -- free, open-source</li>
-          <li>One app for mining, balances, and sending PIKO/ICP</li>
-        </ul>
-        <div class="download-row">
-          <a class="download-btn" id="dl-windows" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.11/pikonativeminer_0.1.11_x64-setup.exe">Windows<span class="os-sub">.exe installer</span></a>
-          <a class="download-btn" id="dl-mac" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.11/pikonativeminer_0.1.11_universal.dmg">macOS<span class="os-sub">.dmg, Intel &amp; Apple Silicon</span></a>
-          <a class="download-btn" id="dl-linux-deb" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.11/pikonativeminer_0.1.11_amd64.deb">Linux (Ubuntu/Debian)<span class="os-sub">.deb, adds menu icon</span></a>
-          <a class="download-btn" id="dl-linux-appimage" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.11/pikonativeminer_0.1.11_amd64.AppImage">Linux (any distro)<span class="os-sub">.AppImage, no install</span></a>
+      <div class="status"><span class="grow">Move your pointer here to tilt</span><span>1 PIKO = 10⁸ e8s</span></div>
+    </div>
+    <div class="win rig-win" aria-label="Illustration of proof-of-work hashing">
+        <div class="tbar"><span class="t"><svg class="px" data-px="pick" viewBox="0 0 10 10"></svg>sha256 nonce search</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+        <div class="rig-body">
+          <div class="rig-lines sunken" id="rig-lines"></div>
+          <div class="rig-foot">
+            <div><b id="rig-tries">0</b>hashes tried</div>
+            <div><b>37 bits</b>difficulty</div>
+            <div><b>0.25 ICP</b>fee per proof</div>
+          </div>
         </div>
-        <p class="download-note">
-          Not code-signed yet, so Windows/macOS will warn about an unrecognized publisher --
-          that's expected for independent software, click through to run it. On Fedora/RHEL,
-          grab the <code>.rpm</code> instead, or want to check the source first? See
-          <a href="https://github.com/icpbuilder01/pikonativeminer/releases/latest" target="_blank" rel="noopener noreferrer">all installers &amp; source on GitHub</a>.
-        </p>
+        <div class="status"><span class="grow">Illustration: a block needs enough leading zero bits</span><span id="rig-rate">— H/s</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="tape" aria-hidden="true">
+  <div class="tape-inner">
+    <span>★ NO PREMINE</span><span>★ 21,000,000 MAX SUPPLY</span><span>★ SHA-256 PROOF-OF-WORK</span><span>★ PROVABLY FAIR GAMES</span><span>★ 100% ON-CHAIN</span><span>★ OPEN SOURCE</span>
+    <span>★ NO PREMINE</span><span>★ 21,000,000 MAX SUPPLY</span><span>★ SHA-256 PROOF-OF-WORK</span><span>★ PROVABLY FAIR GAMES</span><span>★ 100% ON-CHAIN</span><span>★ OPEN SOURCE</span>
+  </div>
+</div>
+
+<section class="band" id="play">
+  <div class="wrap">
+    <div class="sec-head"><svg class="px" data-px="spade" viewBox="0 0 10 10" style="color:var(--poker)"></svg><h2>Play</h2><span class="rule"></span></div>
+    <p class="sec-sub">Each game runs on its own canister with its own login. Outcomes come from the Internet Computer's on-chain randomness.</p>
+
+    <div class="games">
+      <a class="win game g-poker" href="https://2uuxi-qyaaa-aaaac-qhbyq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="tbar"><span class="t"><svg class="px" data-px="spade" viewBox="0 0 10 10"></svg>PIKOPOKER.EXE</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+        <div class="scene sunken">
+          <svg viewBox="0 0 480 255" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="480" height="255" fill="var(--felt-blue)" opacity=".35"/>
+            <ellipse cx="240" cy="132" rx="222" ry="108" fill="#5a3a1c"/>
+            <ellipse cx="240" cy="132" rx="206" ry="94" fill="var(--felt-green)"/>
+            <ellipse cx="240" cy="132" rx="150" ry="58" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="2"/>
+            <g font-family="IBM Plex Mono, monospace" font-weight="500" font-size="17">
+              <g transform="translate(135 102)"><rect width="38" height="54" rx="4" fill="var(--card)"/><text x="6" y="21" fill="var(--card-ink)">A</text><text x="17" y="44" fill="var(--card-ink)">♠</text></g>
+              <g transform="translate(179 102)"><rect width="38" height="54" rx="4" fill="var(--card)"/><text x="6" y="21" fill="var(--card-red)">K</text><text x="17" y="44" fill="var(--card-red)">♥</text></g>
+              <g transform="translate(223 102)"><rect width="38" height="54" rx="4" fill="var(--card)"/><text x="6" y="21" fill="var(--card-ink)">Q</text><text x="17" y="44" fill="var(--card-ink)">♣</text></g>
+              <g transform="translate(267 102)"><rect width="38" height="54" rx="4" fill="var(--card)"/><text x="6" y="21" fill="var(--card-red)">J</text><text x="17" y="44" fill="var(--card-red)">♦</text></g>
+              <g transform="translate(311 102)"><rect width="38" height="54" rx="4" fill="#2c55c9" stroke="var(--card)" stroke-width="3"/><path d="M8 8h22v38H8z" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-dasharray="3 3"/></g>
+            </g>
+            <g>
+              <circle cx="240" cy="190" r="11" fill="#ffc35a" stroke="#7a5200" stroke-width="2" stroke-dasharray="4 3"/>
+              <circle cx="256" cy="196" r="11" fill="#e8463a" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 3"/>
+              <circle cx="224" cy="196" r="11" fill="#2c55c9" stroke="#ffffff" stroke-width="2" stroke-dasharray="4 3"/>
+            </g>
+            <g font-family="Silkscreen, monospace" font-size="11" fill="#ffffff">
+              <rect x="196" y="58" width="88" height="20" fill="#000" opacity=".45"/>
+              <text x="240" y="72" text-anchor="middle">POT 1,240</text>
+            </g>
+            <g fill="#000" opacity=".5">
+              <circle cx="60" cy="132" r="15"/><circle cx="420" cy="132" r="15"/><circle cx="130" cy="44" r="15"/><circle cx="350" cy="44" r="15"/><circle cx="130" cy="222" r="15"/><circle cx="350" cy="222" r="15"/>
+            </g>
+          </svg>
+        </div>
+        <div class="g-body">
+          <h3>PikoPoker</h3>
+          <p>No-Limit Hold'em at 6-seat tables. Play for real PIKO or on free-play tables.</p>
+        </div>
+        <div class="status"><span>0% rake</span><span>6 seats</span><span class="grow">beta</span><span class="go">Open ▸</span></div>
+      </a>
+
+      <a class="win game g-bj" href="https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="tbar"><span class="t">BLACKJACK.EXE</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>×</i></span></div>
+        <div class="scene sunken">
+          <svg viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="200" height="150" fill="var(--felt-red)"/>
+            <path d="M-10 128 Q100 70 210 128" fill="none" stroke="#ffffff" stroke-opacity=".18" stroke-width="2"/>
+            <g font-family="IBM Plex Mono, monospace" font-weight="500" font-size="16">
+              <g transform="translate(62 36) rotate(-8)"><rect width="40" height="56" rx="4" fill="var(--card)"/><text x="6" y="20" fill="var(--card-ink)">A</text><text x="18" y="46" fill="var(--card-ink)">♠</text></g>
+              <g transform="translate(96 32) rotate(7)"><rect width="40" height="56" rx="4" fill="var(--card)"/><text x="6" y="20" fill="var(--card-red)">K</text><text x="18" y="46" fill="var(--card-red)">♥</text></g>
+            </g>
+            <rect x="80" y="104" width="42" height="18" fill="#000" opacity=".5"/>
+            <text x="101" y="117" text-anchor="middle" font-family="Silkscreen, monospace" font-size="11" fill="#ffc35a">21!</text>
+          </svg>
+        </div>
+        <div class="g-body"><h3>PikoBlackjack</h3><p>Single deck. Hit, stand, double, split.</p></div>
+        <div class="status"><span class="grow">1 deck</span><span class="go">Open ▸</span></div>
+      </a>
+
+      <a class="win game g-dice" href="https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="tbar"><span class="t">DICE.EXE</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>×</i></span></div>
+        <div class="scene sunken">
+          <svg viewBox="0 0 200 150" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+            <rect width="200" height="150" fill="var(--felt-blue)"/>
+            <g transform="translate(48 40) rotate(-12 28 28)"><rect width="56" height="56" rx="10" fill="var(--card)"/><g fill="var(--card-ink)"><circle cx="15" cy="15" r="5"/><circle cx="41" cy="15" r="5"/><circle cx="28" cy="28" r="5"/><circle cx="15" cy="41" r="5"/><circle cx="41" cy="41" r="5"/></g></g>
+            <g transform="translate(104 56) rotate(14 25 25)"><rect width="50" height="50" rx="9" fill="var(--card)"/><g fill="var(--card-red)"><circle cx="14" cy="14" r="4.5"/><circle cx="36" cy="36" r="4.5"/></g></g>
+            <text x="100" y="138" text-anchor="middle" font-family="Silkscreen, monospace" font-size="10" fill="#ffffff" opacity=".8">ROLL UNDER 49.50</text>
+          </svg>
+        </div>
+        <div class="g-body"><h3>PIKO Dice</h3><p>Pick your odds and roll.</p></div>
+        <div class="status"><span class="grow">1% edge</span><span class="go">Open ▸</span></div>
+      </a>
+
+      <a class="win game g-pixel" href="https://cglm2-byaaa-aaaac-bf4aq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+        <div class="tbar"><span class="t">PAINT - pikopixel.bmp</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+        <div class="scene sunken"><canvas id="pixel-canvas" class="px" width="64" height="24" aria-hidden="true"></canvas></div>
+        <div class="g-body"><h3>PikoPixel</h3><p>A shared canvas. Burn a little PIKO to paint a pixel everyone sees, live. Nothing to win, just collective art.</p></div>
+        <div class="status"><span>burn, no bet</span><span class="grow">ad slots too</span><span class="go">Open ▸</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="mine">
+  <div class="wrap">
+    <div class="sec-head"><svg class="px" data-px="pick" viewBox="0 0 10 10" style="color:var(--native)"></svg><h2>Mine</h2><span class="rule"></span></div>
+    <p class="sec-sub">Every accepted block costs a small ICP fee. Most of it is burned, and the rest pays for the canisters' cycles.</p>
+
+    <div class="mine">
+      <div class="win">
+        <div class="tbar"><span class="t"><svg class="px" data-px="pick" viewBox="0 0 10 10"></svg>PikoNativeMiner Setup</span><span class="tb-btns" aria-hidden="true"><i>×</i></span></div>
+        <div class="wizard">
+          <div class="wiz-side">
+            <svg viewBox="0 0 128 128" aria-hidden="true"><circle cx="64" cy="64" r="62" fill="#ffffff" fill-opacity=".15"/><rect x="40" y="34" width="16" height="60" rx="5" fill="#fff"/><circle cx="65" cy="51" r="23" fill="#fff"/><circle cx="65" cy="51" r="11.5" fill="var(--title-a)"/></svg>
+            <small>WINDOWS<br>MACOS<br>LINUX</small>
+          </div>
+          <div class="wiz-main">
+            <h3>Mine on your own hardware</h3>
+            <p>The desktop app hashes on your CPU's built-in SHA instructions, so it runs far faster than a browser tab.</p>
+            <ul class="checks">
+              <li>Optional GPU mining alongside your CPU threads</li>
+              <li>PikoPool built in: share rewards instead of waiting for a solo block</li>
+              <li>Wallet for PIKO and ICP, updates itself</li>
+            </ul>
+            <div class="rate sunken">
+              <div class="rate-row"><span>browser</span><div class="blocks" id="bar-browser"></div><b>1×</b></div>
+              <div class="rate-row"><span>native</span><div class="blocks nat" id="bar-native"></div><b>10–20×</b></div>
+              <p class="rate-cap">Relative hashrate on the same machine.</p>
+            </div>
+            <div class="dl">
+              <a class="bbtn" id="dl-windows" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.13/pikonativeminer_0.1.13_x64-setup.exe">Windows<small>.exe</small></a>
+              <a class="bbtn" id="dl-mac" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.13/pikonativeminer_0.1.13_universal.dmg">macOS<small>.dmg</small></a>
+              <a class="bbtn" id="dl-deb" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.13/pikonativeminer_0.1.13_amd64.deb">Debian<small>.deb</small></a>
+              <a class="bbtn" id="dl-appimage" href="https://github.com/icpbuilder01/pikonativeminer/releases/download/app-v0.1.13/pikonativeminer_0.1.13_amd64.AppImage">Linux<small>.AppImage</small></a>
+            </div>
+            <p class="fine">Open source. Not code-signed yet, so Windows and macOS warn about an unknown publisher.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="win bminer">
+        <div class="tbar"><span class="t">browser_miner.htm</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>×</i></span></div>
+        <div class="g-body">
+          <h3>Or just use a tab</h3>
+          <div class="prog sunken" id="prog" aria-hidden="true"></div>
+          <ul>
+            <li>Nothing to install</li>
+            <li>Log in with Internet Identity</li>
+            <li>Slower, good for trying it out</li>
+          </ul>
+          <a class="bbtn" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/" target="_blank" rel="noopener noreferrer">Open browser miner</a>
+        </div>
+        <div class="status"><span class="grow">Internet Identity</span><span>no install</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="wallet">
+  <div class="wrap">
+    <div class="sec-head"><svg class="px" data-px="coin" viewBox="0 0 10 10" style="color:var(--gold)"></svg><h2>Wallet &amp; developers</h2><span class="rule"></span></div>
+    <p class="sec-sub">Add PIKO to the NNS dapp, Plug or any ICRC-1 wallet. Building a game? Accept PIKO the same way you accept ICP.</p>
+
+    <div class="win props">
+      <div class="tbar"><span class="t"><svg class="px" data-px="coin" viewBox="0 0 10 10"></svg>PIKO Properties</span><span class="tb-btns" aria-hidden="true"><i>?</i><i>×</i></span></div>
+      <div class="props-body">
+        <fieldset>
+          <legend>Ledger canister</legend>
+          <div class="idrow">
+            <code class="sunken" id="ledger-id">56aad-fiaaa-aaaaj-qsefa-cai</code>
+            <button type="button" class="bbtn" id="copy-ledger">Copy</button>
+          </div>
+          <p class="fine">Check it against the canister list in the whitepaper before you trust it.</p>
+        </fieldset>
+        <fieldset>
+          <legend>For integrators</legend>
+          <dl class="spec">
+            <dt>STANDARDS</dt><dd>ICRC-1, ICRC-2, ICRC-3</dd>
+            <dt>DECIMALS</dt><dd>8, same as ICP</dd>
+            <dt>FEE</dt><dd>0.0001 PIKO (10,000 e8s), same as ICP</dd>
+            <dt>HEADS UP</dt><dd>Use the <span class="mono">icrc1_*</span> / <span class="mono">icrc2_*</span> methods. The legacy ICP <span class="mono">transfer</span> and AccountIdentifier calls are not available.</dd>
+          </dl>
+        </fieldset>
       </div>
     </div>
 
-    <h2 class="section-label">Get started</h2>
-    <div class="links">
-      <a class="link-card dice" href="https://77zu2-baaaa-aaaaj-qseiq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#127922;</span>Play PIKO Dice</div>
-        <div class="link-desc">Provably-fair, 1% house edge, PIKO-only on-chain dice.</div>
-      </a>
-      <a class="link-card blackjack" href="https://bcd2h-5iaaa-aaaai-ax4hq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#127183;</span>Play PikoBlackjack</div>
-        <div class="link-desc">Interactive single-deck Blackjack (Hit/Stand/Double/Split), bet in PIKO, fully on-chain.</div>
-      </a>
-      <a class="link-card pixel" href="https://cglm2-byaaa-aaaac-bf4aq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#127912;</span>Paint on PikoPixel</div>
-        <div class="link-desc">Shared r/place-style canvas, PIKO burned per pixel, live and real-time.</div>
-      </a>
-      <a class="link-card poker" href="https://2uuxi-qyaaa-aaaac-qhbyq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#9824;</span>Play PikoPoker</div>
-        <div class="link-desc">On-chain No-Limit Hold'em, real PIKO or free-play tables, 0% commission. Still in beta.</div>
-      </a>
-      <a class="link-card" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/dashboard.html" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#9638;</span>Live chain dashboard</div>
-        <div class="link-desc">Real-time supply, difficulty, and burn stats, read straight from the chain.</div>
-      </a>
-      <a class="link-card" href="https://oc.app/community/wmyvh-faaaa-aaaaf-br6za-cai" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#128172;</span>Join the OpenChat community</div>
-        <div class="link-desc">Updates, bug reports, and direct access to whoever's actually building this.</div>
-      </a>
+    <div class="badges">
+      <a class="b88 icp" href="https://internetcomputer.org" target="_blank" rel="noopener noreferrer" title="Internet Computer"><span class="l"><svg class="px" data-px="coin" viewBox="0 0 10 10" style="color:#29abe2"></svg></span><span class="r">RUNS ON ICP</span></a>
+      <a class="b88 dash" href="https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/dashboard.html" target="_blank" rel="noopener noreferrer" title="Live chain dashboard"><span class="l"><svg class="px" data-px="chart" viewBox="0 0 10 10" style="color:#5cf0b0"></svg></span><span class="r">LIVE CHAIN STATS</span></a>
+      <a class="b88 src" href="https://github.com/icpbuilder01/piko-icp" target="_blank" rel="noopener noreferrer" title="Source code"><span class="l"><svg class="px" data-px="code" viewBox="0 0 10 10" style="color:#9cff9c"></svg></span><span class="r">VIEW SOURCE</span></a>
+      <a class="b88 wp" href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer" title="Whitepaper"><span class="l"><svg class="px" data-px="doc" viewBox="0 0 10 10" style="color:#f6efd8"></svg></span><span class="r">READ THE PAPER</span></a>
+      <a class="b88 oc" href="https://oc.app/community/wmyvh-faaaa-aaaaf-br6za-cai" target="_blank" rel="noopener noreferrer" title="OpenChat community"><span class="l"><svg class="px" data-px="chat" viewBox="0 0 10 10" style="color:#ff7a45"></svg></span><span class="r">CHAT ON OPENCHAT</span></a>
     </div>
+  </div>
+</section>
 
-    <h2 class="section-label">Read &amp; verify</h2>
-    <div class="links">
-      <a class="link-card" href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&#128220;</span>Whitepaper</div>
-        <div class="link-desc">Tokenomics, mining mechanics, trust model, and risk disclosure.</div>
-      </a>
-      <a class="link-card" href="https://github.com/icpbuilder01/piko-icp" target="_blank" rel="noopener noreferrer">
-        <div class="link-title"><span class="icon">&lt;/&gt;</span>Source code</div>
-        <div class="link-desc">Every canister's code, open-source on GitHub.</div>
-      </a>
+<footer>
+  <div class="wrap">
+    <div class="counter">
+      <div class="odo" aria-label="21,000,000"><span>2</span><span>1</span><span>0</span><span>0</span><span>0</span><span>0</span><span>0</span><span>0</span></div>
+      <small>MAX SUPPLY, FOREVER</small>
     </div>
-
-    <h2 class="section-label">Add PIKO to your wallet</h2>
-    <div class="ledger-box">
-      <div class="ledger-label">PIKO's ICRC-1 ledger canister ID -- add it to the NNS dapp or any ICRC-1-aware wallet (Plug, etc.) to track your balance:</div>
-      <div class="ledger-row">
-        <code class="ledger-id" id="ledger-id">56aad-fiaaa-aaaaj-qsefa-cai</code>
-        <button type="button" class="copy-btn" id="copy-ledger">Copy</button>
-      </div>
-      <p class="ledger-hint">
-        This is the same canister the mining, dice, and blackjack sites transfer PIKO through --
-        verify it yourself against the whitepaper's canister reference before trusting it.
-      </p>
+    <div>
+      <p>Independent project, not affiliated with bob.fun or BOB. Not investment advice. Mine and bet only what you can afford to lose.</p>
+      <p class="best">Best viewed with Internet Identity · ledger 56aad-fiaaa-aaaaj-qsefa-cai</p>
     </div>
+  </div>
+</footer>
 
-    <footer>
-      PIKO is an independent, non-affiliated project. Not investment advice -- mine and bet only
-      with what you're fully prepared to lose. See the whitepaper's canister reference for every
-      deployed principal.
-    </footer>
-  </main>
-  <script>
-    document.getElementById("copy-ledger").addEventListener("click", async function () {
-      var btn = this;
-      var text = document.getElementById("ledger-id").textContent;
-      try {
-        await navigator.clipboard.writeText(text);
-        var original = btn.textContent;
-        btn.textContent = "Copied";
-        setTimeout(function () { btn.textContent = original; }, 1500);
-      } catch (err) {
-        console.error("Copy failed", err);
+
+</div>
+
+<script>
+  var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Build the 3D coin: stacked edge layers + two faces
+  (function () {
+    var coin = document.getElementById("coin");
+    var logo = '<svg viewBox="24 21 80 80"><rect x="40" y="34" width="16" height="60" rx="5" fill="#fff"/><circle cx="65" cy="51" r="23" fill="#fff"/><circle cx="65" cy="51" r="11.5" fill="#5068ff"/></svg>';
+    var T = 10;
+    for (var i = 0; i < T; i++) {
+      var l = document.createElement("div"); l.className = "layer";
+      var z = (i - T / 2) * 2;
+      l.style.transform = "translateZ(" + z + "px)";
+      l.style.background = i % 3 === 0 ? "#2a39b8" : "#3446d6";
+      coin.appendChild(l);
+    }
+    var front = document.createElement("div"); front.className = "face"; front.innerHTML = logo; front.style.transform = "translateZ(" + (T / 2 * 2 + .5) + "px)";
+    var back = document.createElement("div"); back.className = "face back"; back.innerHTML = logo; back.style.transform = "rotateY(180deg) translateZ(" + (T / 2 * 2 + .5) + "px)";
+    coin.appendChild(front); coin.appendChild(back);
+  })();
+
+  // Tilt toward the pointer
+  (function () {
+    var stage = document.getElementById("stage"), tilt = document.getElementById("tilt");
+    if (reduce) return;
+    stage.addEventListener("pointermove", function (e) {
+      var r = stage.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      tilt.style.transform = "rotateX(" + (-y * 22) + "deg) rotateY(" + (x * 22) + "deg)";
+    });
+    stage.addEventListener("pointerleave", function () { tilt.style.transform = ""; });
+  })();
+
+
+  // Pixel icons (10x10 maps, X = filled)
+  var PX = {
+    spade: ["....XX....","...XXXX...","..XXXXXX..",".XXXXXXXX.","XXXXXXXXXX","XXXXXXXXXX",".XX.XX.XX.","....XX....","...XXXX...",".........."],
+    pick:  ["..XXXXX...",".X....XX..","......XXX.",".....X.XX.","....X...X.","...X......","..X.......",".X........","X.........",".........."],
+    coin:  ["...XXXX...",".XXXXXXXX.",".XX....XX.","XX..XX..XX","XX..XX..XX","XX..XX..XX","XX..XX..XX",".XX....XX.",".XXXXXXXX.","...XXXX..."],
+    chart: ["..........","........X.","........X.",".....X..X.",".....X..X.","..X..X..X.","..X..X..X.","..X..X..X.","XXXXXXXXXX",".........."],
+    code:  ["..........","..X....X..",".X......X.","X....X...X","X...X....X",".X.X....X.","..X....X..","..........","..........",".........."],
+    doc:   [".XXXXXX...",".X....XX..",".X.....XX.",".X.XXX..X.",".X......X.",".X.XXXX.X.",".X......X.",".X.XXXX.X.",".X......X.",".XXXXXXXX."],
+    chat:  ["..........","XXXXXXXXX.","X.......X.","X.XX.XX.X.","X.......X.","XXXXXXXXX.","..XX......","..X.......","..........",".........."]
+  };
+  document.querySelectorAll("svg[data-px]").forEach(function (svg) {
+    var map = PX[svg.getAttribute("data-px")]; if (!map) return;
+    var ns = "http://www.w3.org/2000/svg";
+    svg.setAttribute("aria-hidden", "true");
+    map.forEach(function (row, y) {
+      for (var x = 0; x < row.length; x++) if (row[x] === "X") {
+        var r = document.createElementNS(ns, "rect");
+        r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1); r.setAttribute("height", 1);
+        r.setAttribute("fill", "currentColor"); r.setAttribute("shape-rendering", "crispEdges");
+        svg.appendChild(r);
       }
     });
+  });
 
-    (function highlightDetectedOs() {
-      var ua = navigator.userAgent || "";
-      var ids = [];
-      if (/Windows/i.test(ua)) ids = ["dl-windows"];
-      else if (/Macintosh|Mac OS X/i.test(ua)) ids = ["dl-mac"];
-      else if (/Linux/i.test(ua) && !/Android/i.test(ua)) ids = ["dl-linux-deb", "dl-linux-appimage"];
-      ids.forEach(function (id) {
-        var btn = document.getElementById(id);
-        if (btn) btn.classList.add("detected");
+  // PikoPixel canvas: a little collective-art scene with PIKO written in it
+  (function pixel() {
+    var c = document.getElementById("pixel-canvas"); if (!c) return;
+    var ctx = c.getContext("2d"), W = 64, H = 24;
+    var pal = ["#1b3f86", "#2c55c9", "#5b4bc4", "#d07af0", "#ff6b5e", "#ffc35a", "#5cf0b0", "#5b9dff", "#fbfaf3"];
+    var seed = 7; function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    ctx.fillStyle = "#0e1124"; ctx.fillRect(0, 0, W, H);
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      if (y > 17 && rnd() < 0.85) { ctx.fillStyle = y > 20 ? "#17643f" : "#2e8a5a"; ctx.fillRect(x, y, 1, 1); continue; }
+      if (rnd() < 0.06) { ctx.fillStyle = pal[(rnd() * pal.length) | 0]; ctx.fillRect(x, y, 1, 1); }
+    }
+    // sun
+    ctx.fillStyle = "#ffc35a"; [[54,3],[55,3],[53,4],[54,4],[55,4],[56,4],[53,5],[54,5],[55,5],[56,5],[54,6],[55,6]].forEach(function (p) { ctx.fillRect(p[0], p[1], 1, 1); });
+    var F = { P: ["XXX","X.X","XXX","X..","X.."], I: ["XXX",".X.",".X.",".X.","XXX"], K: ["X.X","XX.","X..","XX.","X.X"], O: ["XXX","X.X","X.X","X.X","XXX"] };
+    var ox = 8, oy = 4, s = 2;
+    "PIKO".split("").forEach(function (ch, i) {
+      F[ch].forEach(function (row, ry) {
+        for (var rx = 0; rx < 3; rx++) if (row[rx] === "X") {
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(ox + i * 8 + rx * s + 1, oy + ry * s + 1, s, s);
+          ctx.fillStyle = ["#5b9dff", "#d07af0", "#ff6b5e", "#5cf0b0"][i]; ctx.fillRect(ox + i * 8 + rx * s, oy + ry * s, s, s);
+        }
       });
-    })();
+    });
+    if (reduce) return;
+    setInterval(function () {
+      var x = (Math.random() * W) | 0, y = (Math.random() * 16) | 0;
+      if (x >= ox - 1 && x <= ox + 32 && y >= oy - 1 && y <= oy + 11) return;
+      ctx.fillStyle = pal[(Math.random() * pal.length) | 0]; ctx.fillRect(x, y, 1, 1);
+    }, 220);
+  })();
 
-    // The 4 download buttons above hardcode a specific release version as a
-    // fallback (in case this fetch fails), but that fallback has already
-    // gone stale twice across real releases (0.1.0 -> 0.1.1 -> 0.1.2) since
-    // nothing forced anyone to remember to bump it here too. Fetching the
-    // real latest release's asset URLs at load time makes this self-
-    // correcting instead of relying on that discipline every time.
-    (function pointDownloadsAtLatestRelease() {
-      var suffixToId = {
-        "_x64-setup.exe": "dl-windows",
-        "_universal.dmg": "dl-mac",
-        "_amd64.deb": "dl-linux-deb",
-        "_amd64.AppImage": "dl-linux-appimage",
-      };
-      fetch("https://api.github.com/repos/icpbuilder01/pikonativeminer/releases/latest")
-        .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
-        .then(function (release) {
-          (release.assets || []).forEach(function (asset) {
-            for (var suffix in suffixToId) {
-              if (asset.name.endsWith(suffix)) {
-                var btn = document.getElementById(suffixToId[suffix]);
-                if (btn) btn.href = asset.browser_download_url;
-              }
-            }
-          });
-        })
-        .catch(function (err) {
-          console.error("Could not fetch the latest PikoNativeMiner release, falling back to the hardcoded version in the download links", err);
-        });
-    })();
-  </script>
+  // Hashrate bars (20 segments; native shows 10 solid + 10 "up to")
+  (function bars() {
+    var b = document.getElementById("bar-browser"), n = document.getElementById("bar-native");
+    b.appendChild(document.createElement("i"));
+    for (var i = 0; i < 20; i++) { var s = document.createElement("i"); if (i >= 10) s.className = "maybe"; n.appendChild(s); }
+  })();
+
+  // Browser-miner progress bar
+  (function prog() {
+    var p = document.getElementById("prog"); if (!p) return;
+    var k = 0, max = Math.floor((p.clientWidth - 4) / 12) || 20;
+    function draw() { p.innerHTML = ""; for (var i = 0; i < k; i++) p.appendChild(document.createElement("i")); }
+    k = Math.floor(max * 0.6); draw();
+    if (reduce) return;
+    setInterval(function () { k = k >= max ? 0 : k + 1; draw(); }, 260);
+  })();
+
+  document.getElementById("copy-ledger").addEventListener("click", function () {
+    var btn = this, el = document.getElementById("ledger-id");
+    navigator.clipboard.writeText(el.textContent).then(function () {
+      btn.textContent = "Copied";
+      setTimeout(function () { btn.textContent = "Copy"; }, 1500);
+    }).catch(function () {
+      var r = document.createRange(); r.selectNodeContents(el);
+      var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+  });
+
+  (function rig() {
+    var lines = document.getElementById("rig-lines");
+    var triesEl = document.getElementById("rig-tries");
+    var rateEl = document.getElementById("rig-rate");
+    var hex = "0123456789abcdef";
+    var tries = 0, nonce = 48213, count = 0, ROWS = 7;
+    function rnd(n) { var s = ""; for (var i = 0; i < n; i++) s += hex[(Math.random() * 16) | 0]; return s; }
+    function row(win) {
+      var zeros = win ? 10 : (Math.random() * 3) | 0;
+      var h = "0".repeat(zeros) + rnd(64 - zeros);
+      var d = document.createElement("div");
+      d.className = "rig-line" + (win ? " win-row" : "");
+      var n = document.createElement("span"); n.className = "n"; n.textContent = (nonce++).toString(16);
+      var hs = document.createElement("span"); hs.className = "h";
+      var z = document.createElement("i"); z.textContent = h.slice(0, zeros);
+      hs.appendChild(z); hs.appendChild(document.createTextNode(h.slice(zeros)));
+      d.appendChild(n); d.appendChild(hs);
+      lines.appendChild(d);
+      while (lines.children.length > ROWS) lines.removeChild(lines.firstChild);
+    }
+    for (var i = 0; i < ROWS - 1; i++) row(false);
+    row(true);
+    triesEl.textContent = "137,438,953,472";
+    rateEl.textContent = "112 MH/s";
+    if (reduce) return;
+    setInterval(function () {
+      count++;
+      row(count % 24 === 0);
+      tries += 13000000 + ((Math.random() * 2e6) | 0);
+      triesEl.textContent = tries.toLocaleString("en-US");
+      rateEl.textContent = (104 + ((Math.random() * 16) | 0)) + " MH/s";
+    }, 140);
+  })();
+</script>
+
+<script>
+  // Point the download buttons at the newest release (the hardcoded links are the fallback).
+  (function () {
+    var map = { "_x64-setup.exe": "dl-windows", "_universal.dmg": "dl-mac", "_amd64.deb": "dl-deb", "_amd64.AppImage": "dl-appimage" };
+    fetch("https://api.github.com/repos/icpbuilder01/pikonativeminer/releases/latest")
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (rel) { (rel.assets || []).forEach(function (a) { for (var s in map) if (a.name.endsWith(s)) { var b = document.getElementById(map[s]); if (b) b.href = a.browser_download_url; } }); })
+      .catch(function (e) { console.error("Could not fetch latest PikoNativeMiner release, keeping fallback links", e); });
+  })();
+</script>
+
 </body>
-
 </html>
