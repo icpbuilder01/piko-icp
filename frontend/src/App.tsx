@@ -776,7 +776,7 @@ function App() {
 
       <div className="app-title">
         <h1>
-          Mine PIKO. <em>Win the block.</em>
+          Mine PIKO. ⛏️ <em>Win the block.</em>
         </h1>
         <p className="app-sub">
           {stats ? (
