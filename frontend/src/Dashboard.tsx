@@ -3,6 +3,8 @@ import { getMotherActor } from "./lib/actors";
 import { formatPiko, formatIcp, formatHashrate, shortPrincipal, timeAgo } from "./lib/format";
 import HashrateChart, { type HashratePoint } from "./components/HashrateChart";
 import "./Dashboard.css";
+import "./theme.css";
+import { AppNav } from "./components/AppNav";
 
 const POLL_MS = 4000;
 
@@ -149,28 +151,32 @@ function Dashboard() {
   }
 
   return (
-    <main className="page dashboard-page">
-      <header className="header">
-        <div className="brand">
-          <img src="/piko-logo.svg" alt="" className="brand-logo" />
-          <div className="brand-text">
-            <span className="brand-name">PIKO Dashboard</span>
-            <span className="brand-ticker">
-              {stats ? (
-                <>
-                  <span className="pulse-dot" /> Block #{stats.height.toLocaleString()} live
-                </>
-              ) : (
-                "Loading on-chain state..."
-              )}
-            </span>
-          </div>
-        </div>
-        <a className="button secondary" href="/">
-          &larr; Main site
+    <main className="page app-shell dashboard-page">
+      <AppNav current="mine">
+        <a className="button secondary small" href="/">
+          &larr; Mine
         </a>
-      </header>
+      </AppNav>
 
+      <div className="app-title">
+        <h1>
+          Chain <em>dashboard.</em>
+        </h1>
+        <p className="app-sub">
+          {stats ? (
+            <>
+              <span className="pulse-dot" /> Block #{stats.height.toLocaleString()} live
+            </>
+          ) : (
+            "Loading on-chain state..."
+          )}
+          <span className="tag">Read-only</span>
+          <span className="tag spark">Straight from mother</span>
+        </p>
+      </div>
+
+      <div className="app-grid">
+        <div className="app-main">
       <section className="block">
         <h2>
           Chain <span className="section-icon">⛓️</span>
@@ -288,6 +294,8 @@ function Dashboard() {
         <HashrateChart points={chartPoints} />
       </section>
 
+        </div>
+        <aside className="app-side">
       <section className="block">
         <div className="miner-panel-head">
           <h2 className="spark">
@@ -311,7 +319,7 @@ function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {blocks.map((b) => (
+                {blocks.slice(0, 15).map((b) => (
                   <tr key={b.height.toString()}>
                     <td>{b.height.toString()}</td>
                     <td className="mono">{shortPrincipal(b.miner.toText())}</td>
@@ -326,6 +334,9 @@ function Dashboard() {
           <div className="empty-state">No blocks mined yet.</div>
         )}
       </section>
+
+        </aside>
+      </div>
 
       <p className="dashboard-footnote">
         Est. network hashrate is inferred, not measured -- `mother` only ever sees the
