@@ -10,6 +10,8 @@ import { Wallet } from "./components/Wallet";
 import { Confetti } from "./components/Confetti";
 import { SponsoredBanner } from "./components/SponsoredBanner";
 import "./App.css";
+import "./theme.css";
+import { AppNav } from "./components/AppNav";
 
 const POLL_MS = 5000;
 // Default for the user-editable "how many blocks to approve at once" input
@@ -751,43 +753,44 @@ function App() {
   }, [mining, feeApproved, insufficientIcpBalance]);
 
   return (
-    <main className="page">
+    <main className="page app-shell">
       <Confetti trigger={confettiTrigger} />
 
-      <header className="header">
-        <div className="brand">
-          <img src="/piko-logo.svg" alt="" className={`brand-logo ${mining ? "spin" : ""}`} />
-          <div className="brand-text">
-            <span className="brand-name">PIKO</span>
-            <span className="brand-ticker">
-              {stats ? (
-                <>
-                  <span className="pulse-dot" /> Block #{stats.height.toLocaleString()} live
-                </>
-              ) : (
-                "Proof-of-work · Internet Computer"
-              )}
+      <AppNav current="mine">
+        {identity ? (
+          <>
+            <span className="principal-pill">
+              {shortPrincipal(identity.getPrincipal().toText())}
+              {balance !== null ? ` · ${formatPiko(balance)} PIKO` : ""}
             </span>
-          </div>
-        </div>
-        <div className="wallet-box">
-          {identity ? (
+            <button className="button secondary small" onClick={handleLogout}>
+              Log out
+            </button>
+          </>
+        ) : (
+          <button className="button" onClick={handleLogin}>
+            Log in
+          </button>
+        )}
+      </AppNav>
+
+      <div className="app-title">
+        <h1>
+          Mine PIKO. <em>Win the block.</em>
+        </h1>
+        <p className="app-sub">
+          {stats ? (
             <>
-              <span className="principal-pill">
-                {shortPrincipal(identity.getPrincipal().toText())}
-                {balance !== null ? ` · ${formatPiko(balance)} PIKO` : ""}
-              </span>
-              <button className="button secondary" onClick={handleLogout}>
-                Log out
-              </button>
+              <span className="pulse-dot" /> Block #{stats.height.toLocaleString()} live
             </>
           ) : (
-            <button className="button" onClick={handleLogin}>
-              Log in with Internet Identity
-            </button>
+            "Proof-of-work · Internet Computer"
           )}
-        </div>
-      </header>
+          <span className="tag">No premine</span>
+          <span className="tag">No VC</span>
+          <span className="tag spark">100% on-chain</span>
+        </p>
+      </div>
 
       <SponsoredBanner />
 
@@ -815,7 +818,7 @@ function App() {
         </div>
       )}
 
-      <div className="disclaimer disclaimer-strong">
+      <div className="disclaimer disclaimer-strong slim">
         <strong>Mining costs real ICP.</strong> {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
         per block, non-refundable the moment a proof is accepted. PIKO is
         experimental, no-premine, and has no established market yet. Only
@@ -823,387 +826,383 @@ function App() {
         BOB.
       </div>
 
-      <section className="hero">
-        {stats && (
-          <span className="hero-ghost">#{stats.height.toString().padStart(6, "0")}</span>
-        )}
-        <div className="tag-row">
-          <span className="tag">No premine</span>
-          <span className="tag">No VC</span>
-          <span className="tag spark">100% on-chain</span>
-        </div>
-        <h1>Mine PIKO. ⛏️ Win the block.</h1>
-        <p>
-          Hashing runs in your browser. The first valid proof wins the block
-          — the reward is minted straight to your principal, verified
-          on-chain, with no server in between.
-        </p>
-      </section>
 
-      <section className="block story-block">
-        <h2>
-          About <span className="section-icon">ℹ️</span>
-        </h2>
-        <p>
-          PIKO is a fixed-supply, no-premine token minted entirely through
-          proof-of-work. Every PIKO in circulation was mined by racing the
-          same difficulty target everyone else races — on infrastructure with
-          no off-chain component at all.
-        </p>
-        <p className="pull-quote">
-          No team allocation, no VC round, no presale — just a browser tab
-          and the same odds as everyone else.
-        </p>
-      </section>
 
-      <section className={`block miner-panel ${mining ? "is-mining" : ""}`}>
-        <div className="miner-panel-head">
-          <h2 className="spark">
-            Mine <span className="section-icon">⛏️</span>
-          </h2>
-          {mining && (
-            <span className="live-pill">
-              <span className="live-dot" /> mining live
-            </span>
-          )}
-        </div>
-        {!identity ? (
-          <p className="empty-state">
-            Log in to mine — blocks mint straight to your own principal.
-          </p>
-        ) : (
-          <>
-            <div className="stat-grid">
-              <div className="stat-tile">
-                <div className="stat-label">Hashrate</div>
-                <div className={`stat-value ${mining ? "hot" : ""}`}>{formatHashrate(hashrate)}</div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Attempts this session</div>
-                <div className="stat-value">{formatCount(sessionAttempts)}</div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Blocks won this session</div>
-                <div className="stat-value">{sessionBlocks}</div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Blocks won in total</div>
-                <div className="stat-value">
-                  {totalBlocksWon !== null ? totalBlocksWon.toString() : "..."}
-                </div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Cost per block</div>
-                <div className="stat-value token-label">
-                  <img src="/icp-logo.svg" alt="" className="token-icon" />
-                  {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
-                </div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label token-label">
-                  <img src="/icp-logo.svg" alt="" className="token-icon" />
-                  ICP allowance
-                </div>
-                <div className="stat-value">
-                  {allowance !== null ? formatIcp(allowance) : "..."}
-                  {affordableBlocks && (
-                    <span className="stat-value-suffix">
-                      {" "}
-                      (~{affordableBlocks.blocks.toString()} blocks
-                      {affordableBlocks.limitedByBalance ? ", limited by balance" : ""})
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="miner-controls">
-              <div className="power-row">
-                <span className="power-label">Power:</span>
-                <div className="power-buttons">
-                  {(["low", "high", "max"] as const).map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      className={`button small power-btn ${power === level ? "active" : ""}`}
-                      onClick={() => setPower(level)}
-                    >
-                      {level === "low" ? "Low" : level === "high" ? "High" : "Max"}
-                    </button>
-                  ))}
-                </div>
-                <span className="power-hint">
-                  {power === "max"
-                    ? "full CPU speed"
-                    : power === "high"
-                      ? "~75% CPU, cooler"
-                      : "~30% CPU, quiet"}
+
+      <div className="app-grid">
+        <div className="app-main">
+          <section className={`block miner-panel game-panel ${mining ? "is-mining" : ""}`}>
+            <div className="miner-panel-head">
+              <h2 className="spark">
+                Mine <span className="section-icon">⛏️</span>
+              </h2>
+              {mining && (
+                <span className="live-pill">
+                  <span className="live-dot" /> mining live
                 </span>
-              </div>
-              <div className="approve-row">
-                <label className="approve-blocks-label">
-                  {feeApproved ? "Approve more:" : "Approve for"}
-                  <input
-                    className="input approve-blocks-input"
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={approveBlocks}
-                    onChange={(e) => setApproveBlocks(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
-                    disabled={approving}
-                  />
-                  block{approveBlocks === 1 ? "" : "s"}
-                </label>
-                <button className="button secondary small" onClick={handleApprove} disabled={approving || !work}>
-                  {approving
-                    ? "Approving..."
-                    : `Approve ${work ? formatIcp((work.miningFeeE8s + ICP_LEDGER_FEE_E8S) * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP`}
-                </button>
-              </div>
-              {mining ? (
-                <button className="button secondary" onClick={handleStopMining}>
-                  Stop mining
-                </button>
-              ) : (
-                <button
-                  className="button button-cta"
-                  onClick={handleStartMining}
-                  disabled={!work || insufficientIcpBalance || !feeApproved}
-                >
-                  Start mining
-                </button>
               )}
-              {miningMessage && (
-                <div className="mining-message-row">
-                  <span className={`mining-message ${miningMessageKind ?? ""}`}>{miningMessage}</span>
-                  {lastWinReward !== null && (
-                    <button className="button secondary small" onClick={handleShare}>
-                      Share the win
+            </div>
+            {!identity ? (
+              <div className="login-gate">
+                <button type="button" className="button button-cta" onClick={handleLogin}>
+                  Log in to mine
+                </button>
+                <span>Blocks mint straight to your own principal.</span>
+              </div>
+            ) : (
+              <>
+                <div className="stat-grid">
+                  <div className="stat-tile">
+                    <div className="stat-label">Hashrate</div>
+                    <div className={`stat-value ${mining ? "hot" : ""}`}>{formatHashrate(hashrate)}</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Attempts this session</div>
+                    <div className="stat-value">{formatCount(sessionAttempts)}</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Blocks won this session</div>
+                    <div className="stat-value">{sessionBlocks}</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Blocks won in total</div>
+                    <div className="stat-value">
+                      {totalBlocksWon !== null ? totalBlocksWon.toString() : "..."}
+                    </div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Cost per block</div>
+                    <div className="stat-value token-label">
+                      <img src="/icp-logo.svg" alt="" className="token-icon" />
+                      {work ? formatIcp(work.miningFeeE8s) : "..."} ICP
+                    </div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label token-label">
+                      <img src="/icp-logo.svg" alt="" className="token-icon" />
+                      ICP allowance
+                    </div>
+                    <div className="stat-value">
+                      {allowance !== null ? formatIcp(allowance) : "..."}
+                      {affordableBlocks && (
+                        <span className="stat-value-suffix">
+                          {" "}
+                          (~{affordableBlocks.blocks.toString()} blocks
+                          {affordableBlocks.limitedByBalance ? ", limited by balance" : ""})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="miner-controls">
+                  <div className="power-row">
+                    <span className="power-label">Power:</span>
+                    <div className="power-buttons">
+                      {(["low", "high", "max"] as const).map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          className={`button small power-btn ${power === level ? "active" : ""}`}
+                          onClick={() => setPower(level)}
+                        >
+                          {level === "low" ? "Low" : level === "high" ? "High" : "Max"}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="power-hint">
+                      {power === "max"
+                        ? "full CPU speed"
+                        : power === "high"
+                          ? "~75% CPU, cooler"
+                          : "~30% CPU, quiet"}
+                    </span>
+                  </div>
+                  <div className="approve-row">
+                    <label className="approve-blocks-label">
+                      {feeApproved ? "Approve more:" : "Approve for"}
+                      <input
+                        className="input approve-blocks-input"
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={approveBlocks}
+                        onChange={(e) => setApproveBlocks(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
+                        disabled={approving}
+                      />
+                      block{approveBlocks === 1 ? "" : "s"}
+                    </label>
+                    <button className="button secondary small" onClick={handleApprove} disabled={approving || !work}>
+                      {approving
+                        ? "Approving..."
+                        : `Approve ${work ? formatIcp((work.miningFeeE8s + ICP_LEDGER_FEE_E8S) * BigInt(Math.max(1, Math.trunc(approveBlocks) || 1))) : "..."} ICP`}
+                    </button>
+                  </div>
+                  {mining ? (
+                    <button className="button secondary" onClick={handleStopMining}>
+                      Stop mining
+                    </button>
+                  ) : (
+                    <button
+                      className="button button-cta"
+                      onClick={handleStartMining}
+                      disabled={!work || insufficientIcpBalance || !feeApproved}
+                    >
+                      Start mining
                     </button>
                   )}
+                  {miningMessage && (
+                    <div className="mining-message-row">
+                      <span className={`mining-message ${miningMessageKind ?? ""}`}>{miningMessage}</span>
+                      {lastWinReward !== null && (
+                        <button className="button secondary small" onClick={handleShare}>
+                          Share the win
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
+                {insufficientIcpBalance && (
+                  <p className="wallet-hint warning">
+                    Not enough ICP to mine — you have {formatIcp(icpBalance ?? 0n)} ICP, but each
+                    submission costs {work ? formatIcp(work.miningFeeE8s) : "..."} ICP. Top up your
+                    wallet to start mining.
+                  </p>
+                )}
+                <p className="wallet-hint">
+                  Hashing itself is free (it's your own CPU) — the{" "}
+                  {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee (plus the ICP ledger's own{" "}
+                  {formatIcp(ICP_LEDGER_FEE_E8S)} ICP transfer fee) is only charged each time you{" "}
+                  <em>submit</em> a valid proof, win or lose. The "ICP allowance" tile above shows
+                  exactly how much you have left; pick how many blocks' worth to approve and hit
+                  Approve any time, even before it hits zero, to avoid "insufficient ICP allowance"
+                  interrupting a mining session. Approving always sets a fresh total rather than
+                  adding to what's left, so any small leftover isn't stuck or wasted -- it's simply
+                  replaced by whatever you approve next.
+                </p>
+              </>
+            )}
+          </section>
+          {identity && <Wallet identity={identity} />}
+          <section className="block">
+            <h2>
+              Getting started <span className="section-icon">🚀</span>
+            </h2>
+            <ul className="tech-list">
+              <li>Log in with Internet Identity (top right).</li>
+              <li>Add ICP to your wallet, then approve some for mining fees.</li>
+              <li>Click "Start mining" — hashing runs right in your browser.</li>
+              <li>Win a block, PIKO mints straight to your principal. You're done!</li>
+            </ul>
+          </section>
+          <section className="block">
+            <h2>
+              Top miners <span className="section-icon">🏆</span>
+            </h2>
+            {leaderboard.length > 0 ? (
+              <div className="table-scroll">
+                <table className="blocks">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Miner</th>
+                      <th>Blocks</th>
+                      <th>Total PIKO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {leaderboard.map((entry, i) => (
+                      <tr key={entry.miner.toText()}>
+                        <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
+                        <td className="mono">{shortPrincipal(entry.miner.toText())}</td>
+                        <td>{entry.blocksFound.toString()}</td>
+                        <td>{formatPiko(entry.totalReward)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state">
+                No one's on the board yet — mine a block and claim the top spot.
+              </div>
+            )}
+          </section>
+        </div>
+        <aside className="app-side">
+          <section className="block chain-status">
+            <h2 className="spark">
+              Chain status <span className="section-icon">⛓️</span>
+            </h2>
+            {stats ? (
+              <>
+                <div className="stat-grid">
+                  <div className="stat-tile">
+                    <div className="stat-label">Block height</div>
+                    <div className="stat-value">{stats.height.toLocaleString()}</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Current reward</div>
+                    <div className="stat-value token-label">
+                      <img src="/piko-logo.svg" alt="" className="token-icon" />
+                      {formatPiko(stats.currentReward)}
+                    </div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Difficulty</div>
+                    <div className="stat-value">{stats.difficultyBits.toString()} bits</div>
+                  </div>
+                  <div className="stat-tile">
+                    <div className="stat-label">Next halving</div>
+                    <div className="stat-value">
+                      {stats.nextHalvingHeight.toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="stat-tile stat-tile-wide">
+                    <div className="stat-label">ICP spent mining (real-time)</div>
+                    <div className="stat-value stat-value-small">
+                      {formatIcp(stats.totalIcpFeesCollectedE8s)} ICP
+                    </div>
+                  </div>
+                  <div className="stat-tile stat-tile-wide">
+                    <div className="stat-label">ICP burned (confirmed, updates every sweep)</div>
+                    <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
+                  </div>
+                  <div className="stat-tile stat-tile-wide">
+                    <div className="stat-label">ICP converted to cycles (funds this project, not a bug)</div>
+                    <div className="stat-value stat-value-small">
+                      {formatIcp(stats.totalIcpConvertedToCyclesE8s)} ICP
+                    </div>
+                  </div>
+                </div>
+                <div className="meter">
+                  <div className="meter-track">
+                    <div
+                      className="meter-fill"
+                      style={{ width: `${Math.min(100, mintedPct)}%` }}
+                    />
+                  </div>
+                  <div className="meter-caption">
+                    <span>{formatPiko(stats.totalMinted)} PIKO minted</span>
+                    <span>{formatPiko(stats.maxSupply)} PIKO max supply</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="empty-state">Loading chain status...</div>
+            )}
+          </section>
+          <section className="block">
+            <div className="miner-panel-head">
+              <h2 className="spark">
+                Recent blocks <span className="section-icon">🧱</span>
+              </h2>
+              {blocks.length > 0 && (
+                <span className="live-pill">
+                  <span className="live-dot" /> live feed
+                </span>
               )}
             </div>
-            {insufficientIcpBalance && (
-              <p className="wallet-hint warning">
-                Not enough ICP to mine — you have {formatIcp(icpBalance ?? 0n)} ICP, but each
-                submission costs {work ? formatIcp(work.miningFeeE8s) : "..."} ICP. Top up your
-                wallet to start mining.
-              </p>
+            {blocks.length > 0 ? (
+              <div className="table-scroll">
+                <table className="blocks">
+                  <thead>
+                    <tr>
+                      <th>Height</th>
+                      <th>Miner</th>
+                      <th>Reward</th>
+                      <th>When</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {blocks.slice(0, 12).map((b) => (
+                      <tr key={b.height.toString()}>
+                        <td>{b.height.toString()}</td>
+                        <td className="mono">{shortPrincipal(b.miner.toText())}</td>
+                        <td>{formatPiko(b.reward)}</td>
+                        <td>{timeAgo(b.timestamp)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state">
+                No blocks mined yet — be the first, see "Mine" above.
+              </div>
             )}
-            <p className="wallet-hint">
-              Hashing itself is free (it's your own CPU) — the{" "}
-              {work ? formatIcp(work.miningFeeE8s) : "..."} ICP fee (plus the ICP ledger's own{" "}
-              {formatIcp(ICP_LEDGER_FEE_E8S)} ICP transfer fee) is only charged each time you{" "}
-              <em>submit</em> a valid proof, win or lose. The "ICP allowance" tile above shows
-              exactly how much you have left; pick how many blocks' worth to approve and hit
-              Approve any time, even before it hits zero, to avoid "insufficient ICP allowance"
-              interrupting a mining session. Approving always sets a fresh total rather than
-              adding to what's left, so any small leftover isn't stuck or wasted -- it's simply
-              replaced by whatever you approve next.
+          </section>
+          <section className="block">
+            <h2>
+              Piko ledger ID <span className="section-icon">🔖</span>
+            </h2>
+            <p className="section-intro">
+              Not your wallet address (that's above ↑) — this is PIKO's ledger
+              canister ID. Add it to the NNS dapp, or any other ICRC-1-aware
+              wallet, to see and manage your PIKO there too.
             </p>
-          </>
-        )}
-      </section>
-
-      {identity && <Wallet identity={identity} />}
-
-      <section className="block">
-        <h2>
-          Piko ledger ID <span className="section-icon">🔖</span>
-        </h2>
-        <p className="section-intro">
-          Not your wallet address (that's above ↑) — this is PIKO's ledger
-          canister ID. Add it to the NNS dapp, or any other ICRC-1-aware
-          wallet, to see and manage your PIKO there too.
-        </p>
-        <div className="wallet-address-row">
-          <code className="wallet-address">{ledgerCanisterId}</code>
-          <button type="button" className="button secondary small" onClick={handleCopyLedger}>
-            {copiedLedger ? "Copied" : "Copy"}
-          </button>
-        </div>
-      </section>
-
-      <section className="block chain-status">
-        <h2 className="spark">
-          Chain status <span className="section-icon">⛓️</span>
-        </h2>
-        {stats ? (
-          <>
-            <div className="stat-grid">
-              <div className="stat-tile">
-                <div className="stat-label">Block height</div>
-                <div className="stat-value">{stats.height.toLocaleString()}</div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Current reward</div>
-                <div className="stat-value token-label">
-                  <img src="/piko-logo.svg" alt="" className="token-icon" />
-                  {formatPiko(stats.currentReward)}
-                </div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Difficulty</div>
-                <div className="stat-value">{stats.difficultyBits.toString()} bits</div>
-              </div>
-              <div className="stat-tile">
-                <div className="stat-label">Next halving</div>
-                <div className="stat-value">
-                  {stats.nextHalvingHeight.toLocaleString()}
-                </div>
-              </div>
-              <div className="stat-tile stat-tile-wide">
-                <div className="stat-label">ICP spent mining (real-time)</div>
-                <div className="stat-value stat-value-small">
-                  {formatIcp(stats.totalIcpFeesCollectedE8s)} ICP
-                </div>
-              </div>
-              <div className="stat-tile stat-tile-wide">
-                <div className="stat-label">ICP burned (confirmed, updates every sweep)</div>
-                <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
-              </div>
-              <div className="stat-tile stat-tile-wide">
-                <div className="stat-label">ICP converted to cycles (funds this project, not a bug)</div>
-                <div className="stat-value stat-value-small">
-                  {formatIcp(stats.totalIcpConvertedToCyclesE8s)} ICP
-                </div>
-              </div>
+            <div className="wallet-address-row">
+              <code className="wallet-address">{ledgerCanisterId}</code>
+              <button type="button" className="button secondary small" onClick={handleCopyLedger}>
+                {copiedLedger ? "Copied" : "Copy"}
+              </button>
             </div>
-            <div className="meter">
-              <div className="meter-track">
-                <div
-                  className="meter-fill"
-                  style={{ width: `${Math.min(100, mintedPct)}%` }}
-                />
-              </div>
-              <div className="meter-caption">
-                <span>{formatPiko(stats.totalMinted)} PIKO minted</span>
-                <span>{formatPiko(stats.maxSupply)} PIKO max supply</span>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="empty-state">Loading chain status...</div>
-        )}
-      </section>
+          </section>
+        </aside>
+      </div>
 
-      <section className="block">
-        <h2>
-          Top miners <span className="section-icon">🏆</span>
-        </h2>
-        {leaderboard.length > 0 ? (
-          <div className="table-scroll">
-            <table className="blocks">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Miner</th>
-                  <th>Blocks</th>
-                  <th>Total PIKO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.map((entry, i) => (
-                  <tr key={entry.miner.toText()}>
-                    <td className={i < 3 ? `rank-${i + 1}` : ""}>{i + 1}</td>
-                    <td className="mono">{shortPrincipal(entry.miner.toText())}</td>
-                    <td>{entry.blocksFound.toString()}</td>
-                    <td>{formatPiko(entry.totalReward)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state">
-            No one's on the board yet — mine a block and claim the top spot.
-          </div>
-        )}
-      </section>
+      <div className="app-more">
+          <section className="block story-block">
+            <h2>
+              About <span className="section-icon">ℹ️</span>
+            </h2>
+            <p>
+              PIKO is a fixed-supply, no-premine token minted entirely through
+              proof-of-work. Every PIKO in circulation was mined by racing the
+              same difficulty target everyone else races — on infrastructure with
+              no off-chain component at all.
+            </p>
+            <p className="pull-quote">
+              No team allocation, no VC round, no presale — just a browser tab
+              and the same odds as everyone else.
+            </p>
+          </section>
+          <section className="block tech-block">
+            <h2>
+              How it works <span className="section-icon">⚙️</span>
+            </h2>
+            <p className="section-intro">
+              Every step below is enforced on-chain — nothing here is simulated
+              off-chain.
+            </p>
+            <ul className="tech-list">
+              <li>
+                Hashing runs <strong>in your browser</strong> via the Web Crypto
+                API (<code>crypto.subtle.digest</code>) — real SHA-256, computed
+                on your device.
+              </li>
+              <li>
+                The <code>mother</code> canister independently re-verifies every
+                submitted proof; it never trusts a client-supplied hash.
+              </li>
+              <li>
+                PIKO's ledger is the official, DFINITY-maintained ICRC-1 ledger
+                canister — the same code other ICP tokens run.
+              </li>
+              <li>
+                Most of the mining fee is burned on-chain to the ICP ledger's
+                minting account; a small share funds the protocol's own compute.
+                Both happen automatically, in batches, verifiable on-chain.
+              </li>
+              <li>No backend, no database — everything here is a canister.</li>
+            </ul>
+          </section>
+      </div>
 
-      <section className="block">
-        <div className="miner-panel-head">
-          <h2 className="spark">
-            Recent blocks <span className="section-icon">🧱</span>
-          </h2>
-          {blocks.length > 0 && (
-            <span className="live-pill">
-              <span className="live-dot" /> live feed
-            </span>
-          )}
-        </div>
-        {blocks.length > 0 ? (
-          <div className="table-scroll">
-            <table className="blocks">
-              <thead>
-                <tr>
-                  <th>Height</th>
-                  <th>Miner</th>
-                  <th>Reward</th>
-                  <th>When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {blocks.map((b) => (
-                  <tr key={b.height.toString()}>
-                    <td>{b.height.toString()}</td>
-                    <td className="mono">{shortPrincipal(b.miner.toText())}</td>
-                    <td>{formatPiko(b.reward)}</td>
-                    <td>{timeAgo(b.timestamp)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state">
-            No blocks mined yet — be the first, see "Mine" above.
-          </div>
-        )}
-      </section>
 
-      <section className="block">
-        <h2>
-          Getting started <span className="section-icon">🚀</span>
-        </h2>
-        <ul className="tech-list">
-          <li>Log in with Internet Identity (top right).</li>
-          <li>Add ICP to your wallet, then approve some for mining fees.</li>
-          <li>Click "Start mining" — hashing runs right in your browser.</li>
-          <li>Win a block, PIKO mints straight to your principal. You're done!</li>
-        </ul>
-      </section>
 
-      <section className="block tech-block">
-        <h2>
-          How it works <span className="section-icon">⚙️</span>
-        </h2>
-        <p className="section-intro">
-          Every step below is enforced on-chain — nothing here is simulated
-          off-chain.
-        </p>
-        <ul className="tech-list">
-          <li>
-            Hashing runs <strong>in your browser</strong> via the Web Crypto
-            API (<code>crypto.subtle.digest</code>) — real SHA-256, computed
-            on your device.
-          </li>
-          <li>
-            The <code>mother</code> canister independently re-verifies every
-            submitted proof; it never trusts a client-supplied hash.
-          </li>
-          <li>
-            PIKO's ledger is the official, DFINITY-maintained ICRC-1 ledger
-            canister — the same code other ICP tokens run.
-          </li>
-          <li>
-            Most of the mining fee is burned on-chain to the ICP ledger's
-            minting account; a small share funds the protocol's own compute.
-            Both happen automatically, in batches, verifiable on-chain.
-          </li>
-          <li>No backend, no database — everything here is a canister.</li>
-        </ul>
-      </section>
+
+
+
 
       <div className="badge-row">
         <span className="badge">NO PREMINE</span>
