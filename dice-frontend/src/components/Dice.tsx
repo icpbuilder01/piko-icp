@@ -10,6 +10,7 @@ import { DiceStage, type HistoryEntry, type Outcome } from "./DiceStage";
 
 interface DiceProps {
   identity: Identity | null;
+  onLogin?: () => void;
 }
 
 // This site only ever bets PIKO -- the `dice` canister itself still
@@ -78,7 +79,7 @@ function betErrorMessage(err: BetError, attemptedPayout: bigint | null): string 
   }
 }
 
-export function Dice({ identity }: DiceProps) {
+export function Dice({ identity, onLogin }: DiceProps) {
   const [config, setConfig] = useState<Config | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [target, setTarget] = useState(50);
@@ -229,24 +230,15 @@ export function Dice({ identity }: DiceProps) {
   }
 
   return (
-    <section className={`block dice-panel ${rolling ? "is-rolling" : ""}`}>
+    <section className={`block dice-panel game-panel ${rolling ? "is-rolling" : ""}`}>
       <Confetti trigger={confettiTrigger} />
       <div className="miner-panel-head">
         <h2 className="spark">
           Dice <span className={`section-icon dice-icon ${rolling ? "spin" : ""}`}>&#127922;</span>
         </h2>
-        <span className="dice-edge-pill">1% house edge, same odds as any provably-fair dice site</span>
+        <span className="dice-edge-pill">1% house edge</span>
       </div>
-      <p className="section-intro">
-        Pick a target, roll under it to win. Resolved by <code>raw_rand()</code> on-chain, after your
-        stake is already pulled -- there's no point where the house (or you) can see the result and
-        back out. Payout capped against this game's real, live bankroll -- see "Bet too large" below if
-        you hit it.
-      </p>
 
-      {!identity ? (
-        <p className="empty-state">Log in to play -- winnings pay out straight to your own principal.</p>
-      ) : (
         <>
           <DiceStage
             spinning={awaiting}
@@ -274,6 +266,14 @@ export function Dice({ identity }: DiceProps) {
               />
             </label>
 
+            {!identity ? (
+              <div className="login-gate">
+                <button type="button" className="button button-cta" onClick={onLogin}>
+                  Log in to play
+                </button>
+                <span>Winnings pay out straight to your own principal.</span>
+              </div>
+            ) : (
             <div className="wallet-send-row">
               <input
                 className="input"
@@ -300,8 +300,9 @@ export function Dice({ identity }: DiceProps) {
                 </button>
               )}
             </div>
+            )}
 
-            {potentialPayout !== null && (
+            {identity && potentialPayout !== null && (
               <p className="wallet-hint">
                 If you win: +{formatPiko(potentialPayout)} PIKO. If you lose: -{formatPiko(amount ?? 0n)} PIKO,
                 non-refundable, same as mining's fee -- see the disclaimer at the top of the site.
@@ -310,7 +311,12 @@ export function Dice({ identity }: DiceProps) {
             {message && <p className={`mining-message ${lastWon === true ? "good" : lastWon === false ? "critical" : ""}`}>{message}</p>}
           </div>
         </>
-      )}
+
+      <p className="section-intro dice-fine">
+        Resolved by <code>raw_rand()</code> on-chain, after your stake is already pulled -- there's no
+        point where the house (or you) can see the result and back out. Payout capped against this
+        game's real, live bankroll -- see "Bet too large" if you hit it.
+      </p>
     </section>
   );
 }
