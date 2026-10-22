@@ -38,6 +38,7 @@
     --pixel: #d07af0;
     --poker: #ffc35a;
     --native: #5cf0b0;
+    --legacy: #f5b94a;
     --card: #fbfaf3;
     --card-ink: #15172a;
     --card-red: #c92a2a;
@@ -58,7 +59,7 @@
       --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
       --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
       --gold: #b07a00; --zero: #0d9a63;
-      --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58;
+      --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200;
     }
   }
   :root[data-theme="light"] {
@@ -68,7 +69,7 @@
     --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
     --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
     --gold: #b07a00; --zero: #0d9a63;
-    --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58;
+    --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200;
   }
 
   * { box-sizing: border-box; }
@@ -230,6 +231,17 @@
   .g-body p { margin: 0; font-size: 0.88rem; color: var(--ink-2); }
   .status .go { color: var(--gold); }
 
+  /* ---------- keep: PIKO Legacy ---------- */
+  .keep { display: grid; grid-template-columns: 1.1fr 1fr; color: var(--ink); }
+  @media (max-width: 760px) { .keep { grid-template-columns: 1fr; } }
+  .keep .scene { aspect-ratio: 16 / 9; margin: 6px; }
+  .keep .k-body { padding: 16px 16px 12px; display: grid; gap: 8px; align-content: start; }
+  .keep .k-body h3 { font-size: 1.6rem; font-weight: 800; }
+  .keep .k-body p { margin: 0; color: var(--ink-2); font-size: 0.92rem; }
+  .keep ol { margin: 4px 0 0; padding-left: 1.2em; color: var(--ink-2); font-size: 0.9rem; display: grid; gap: 2px; }
+  .keep .status { grid-column: 1 / -1; flex-wrap: wrap; }
+  .keep > * { min-width: 0; }
+
   /* ---------- mine: installer wizard ---------- */
   .mine { display: grid; grid-template-columns: 1.6fr 1fr; gap: 22px; align-items: start; }
   @media (max-width: 860px) { .mine { grid-template-columns: 1fr; } }
@@ -360,6 +372,7 @@
     </a>
     <div class="nav-links">
       <a href="#play">Play</a>
+      <a href="#keep">Keep</a>
       <a href="#mine">Mine</a>
       <a href="#wallet">Wallet &amp; devs</a>
       <a href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">Whitepaper</a>
@@ -500,6 +513,44 @@
         <div class="status"><span>burn, no bet</span><span class="grow">ad slots too</span><span class="go">Open ▸</span></div>
       </a>
     </div>
+  </div>
+</section>
+
+<section class="band" id="keep">
+  <div class="wrap">
+    <div class="sec-head"><svg class="px" data-px="lock" viewBox="0 0 10 10" style="color:var(--legacy)"></svg><h2>Keep</h2><span class="rule"></span></div>
+    <p class="sec-sub">Not a game: a safe for what your family would need if something happened to you.</p>
+
+    <a class="win game keep" href="https://vnwxz-wiaaa-aaaak-qzk6a-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+      <div class="tbar" style="grid-column: 1 / -1"><span class="t"><svg class="px" data-px="lock" viewBox="0 0 10 10"></svg>LEGACY.EXE — dead man's switch</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+      <div class="scene sunken">
+        <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <rect width="320" height="180" fill="#1a1406"/>
+          <g transform="translate(70 40)">
+            <rect width="180" height="104" rx="4" fill="var(--card)"/>
+            <path d="M0 4 L90 62 L180 4" fill="none" stroke="#c9c2a8" stroke-width="3"/>
+            <g transform="translate(70 30)">
+              <path d="M10 26 V16 a10 10 0 0 1 20 0 V26" fill="none" stroke="#f5b94a" stroke-width="6"/>
+              <rect x="0" y="24" width="40" height="32" rx="5" fill="#f5b94a" stroke="#7a4f00" stroke-width="2"/>
+              <circle cx="20" cy="37" r="4" fill="#1f1300"/><rect x="18" y="38" width="4" height="9" fill="#1f1300"/>
+            </g>
+          </g>
+          <rect x="88" y="152" width="144" height="20" fill="#000" opacity=".55"/>
+          <text x="160" y="166" text-anchor="middle" font-family="Silkscreen, monospace" font-size="10" fill="#f5b94a">CHECK-IN DUE: 89 DAYS</text>
+        </svg>
+      </div>
+      <div class="k-body">
+        <h3>PIKO Legacy</h3>
+        <p>Seed phrases, passwords, a last message: lock them for the people you choose. If you stop checking in, they can open it. Until then, nobody can.</p>
+        <ol>
+          <li>Write your secret, name your heirs</li>
+          <li>Give each heir their private link</li>
+          <li>Click "I'm still here" from time to time</li>
+        </ol>
+        <p>Encrypted in your browser, unlocked by ICP's vetKeys only after the deadline.</p>
+      </div>
+      <div class="status"><span>1,000 PIKO once</span><span class="grow">fee → game bankrolls</span><span class="go">Open ▸</span></div>
+    </a>
   </div>
 </section>
 
@@ -652,6 +703,7 @@
     chart: ["..........","........X.","........X.",".....X..X.",".....X..X.","..X..X..X.","..X..X..X.","..X..X..X.","XXXXXXXXXX",".........."],
     code:  ["..........","..X....X..",".X......X.","X....X...X","X...X....X",".X.X....X.","..X....X..","..........","..........",".........."],
     doc:   [".XXXXXX...",".X....XX..",".X.....XX.",".X.XXX..X.",".X......X.",".X.XXXX.X.",".X......X.",".X.XXXX.X.",".X......X.",".XXXXXXXX."],
+    lock:  ["...XXXX...","..X....X..","..X....X..","..X....X..",".XXXXXXXX.",".XXXXXXXX.",".XXX..XXX.",".XXXX.XXX.",".XXXXXXXX.",".XXXXXXXX."],
     chat:  ["..........","XXXXXXXXX.","X.......X.","X.XX.XX.X.","X.......X.","XXXXXXXXX.","..XX......","..X.......","..........",".........."]
   };
   document.querySelectorAll("svg[data-px]").forEach(function (svg) {
