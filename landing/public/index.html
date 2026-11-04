@@ -415,7 +415,7 @@
           <div class="rig-lines sunken" id="rig-lines"></div>
           <div class="rig-foot">
             <div><b id="rig-tries">0</b>hashes tried</div>
-            <div><b>37 bits</b>difficulty</div>
+            <div><b id="rig-diff">41 bits</b>difficulty</div>
             <div><b>0.25 ICP</b>fee per proof</div>
           </div>
         </div>
@@ -823,6 +823,24 @@
       .then(function (rel) { (rel.assets || []).forEach(function (a) { for (var s in map) if (a.name.endsWith(s)) { var b = document.getElementById(map[s]); if (b) b.href = a.browser_download_url; } }); })
       .catch(function (e) { console.error("Could not fetch latest PikoNativeMiner release, keeping fallback links", e); });
   })();
+</script>
+
+<script type="module">
+  // Live network difficulty from mother.getWork() (it changes on its own now: -1 bit per 4 h
+  // without a block). The static "41 bits" in the markup is the fallback if this fails.
+  try {
+    const { HttpAgent, Actor } = await import("https://esm.sh/@dfinity/agent@2.1.3");
+    const idl = ({ IDL }) => IDL.Service({
+      getWork: IDL.Func([], [IDL.Record({ difficultyBits: IDL.Nat })], ["query"]),
+    });
+    const agent = await HttpAgent.create({ host: "https://icp-api.io" });
+    const mother = Actor.createActor(idl, { agent, canisterId: "45mjf-rqaaa-aaaaj-qsedq-cai" });
+    const work = await mother.getWork();
+    const el = document.getElementById("rig-diff");
+    if (el) el.textContent = String(work.difficultyBits) + " bits";
+  } catch (e) {
+    console.error("Could not fetch live difficulty, keeping fallback", e);
+  }
 </script>
 
 </body>
