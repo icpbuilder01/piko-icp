@@ -100,15 +100,15 @@ the same height is accepted.
 | Difficulty target | 18 bits (starting point and floor; retargets automatically) |
 | Retarget interval | 10 blocks |
 | Target block time | 5 minutes |
-| Max retarget step | &plusmn;2 bits (4x work) per window |
-| Idle decay | &minus;1 bit (half the work) per full hour without a block, down to the 18-bit floor |
+| Max retarget step | +4 bits (16x work) up, &minus;2 bits (4x) down per window; early +up to 4 bits after 3 blocks 16x faster than target |
+| Idle decay | &minus;1 bit (half the work) per full 4 hours without a block, down to the 18-bit floor |
 
 The reward halves every 17,500 blocks, the same shape as bitcoin's emission
 curve, converging toward the 21,000,000 cap without ever formally reaching
 it. Difficulty retargets itself automatically, bitcoin-style: every 10
 blocks, the coordinator compares how long that window actually took against
 the 5-minute-per-block target and adjusts `difficultyBits` up or down to
-compensate, capped at &plusmn;2 bits per window so one unusually fast or
+compensate, capped at +4/&minus;2 bits per window so one unusually fast or
 slow window on a small sample of miners can't swing it wildly, and never
 drops below the 18-bit starting point -- a floor that only matters when
 long idle gaps between mining sessions (not slow real hashing) would
@@ -124,16 +124,19 @@ blackholed (&sect;14); the automatic version has no such dead end.
 Because that window only closes when blocks are actually found, a sudden
 hashrate exodus could otherwise leave the remaining miners facing a
 difficulty sized for hashrate that is gone, for days. So the effective
-difficulty also decays by 1 bit for every full hour without a block, down to
-the 18-bit floor, measured from the coordinator's own clock (not a
+difficulty also decays by 1 bit for every full 4 hours without a block, down
+to the 18-bit floor (about 4 days of total silence from 41 bits), measured from the coordinator's own clock (not a
 miner-supplied timestamp, so it can't be gamed by faking time). It is
 gradual by design -- bitcoin's testnet uses an abrupt "minimum difficulty
 after 20 minutes" rule that is known to produce bursts of near-free blocks,
 while Bitcoin Cash eventually replaced its 2017 emergency adjustment with
 ASERT (2020), a smooth time-based rule, for the same kind of problem. A block mined at a
 decayed difficulty sets the new stored difficulty and restarts the 10-block
-window, from which normal retargeting climbs back up if hashrate returns.
-With blocks arriving near the 5-minute target, the decay never triggers.
+window, from which retargeting climbs back up if hashrate returns -- fast:
+up to +4 bits per retarget, and early, as soon as 3 blocks arrive 16x faster
+than target, so a large miner returning at a low difficulty can't harvest
+dozens of near-free blocks. With blocks arriving near the 5-minute target,
+the decay never triggers.
 
 ## 4. The burn -- and the cycles that keep the lights on
 

@@ -480,7 +480,8 @@ actor self {
   // and the chain can crawl for days before 10 more blocks close the window.
   //
   // Fix: the *effective* difficulty drops by 1 bit (= halves the expected
-  // work) for every full DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE without a
+  // work) for every full DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE (4 hours)
+  // without a
   // block, never below MIN_DIFFICULTY_BITS_LIVE. Gradual on purpose -- not
   // bitcoin testnet's "reset straight to minimum after 20 minutes" rule,
   // which is known to cause bursts of near-free blocks. While blocks keep
@@ -497,9 +498,32 @@ actor self {
   // becomes the new stored difficultyBits and the retarget window restarts
   // from that block (see applyIdleDecayOnBlock): the idle time has already
   // been "spent" lowering difficulty, so the 10-block window must not count
-  // it a second time. From there the normal retarget moves it back up (max
-  // +MAX_RETARGET_STEP_BITS per window) if real hashrate returns.
-  transient let DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE : Nat = 60 * 60 * 1_000_000_000; // 1 hour
+  // it a second time. From there the retarget moves it back up (max
+  // +MAX_RETARGET_UP_STEP_BITS_LIVE per window, and early -- see
+  // maybeRetarget) if real hashrate returns.
+  //
+  // 4 hours rather than 1: slow enough that one quiet night can't walk the
+  // chain all the way down to the floor (41 -> 18 bits takes ~4 days of
+  // total silence), fast enough that a single CPU miner left alone still
+  // finds a block within hours instead of days.
+  transient let DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE : Nat = 4 * 60 * 60 * 1_000_000_000; // 4 hours
+
+  // Upward retarget cap, asymmetric on purpose: difficulty may rise by up to
+  // 4 bits (16x) per retarget but still only fall by MAX_RETARGET_STEP_BITS
+  // (2). Falling is already covered by the idle decay; rising fast is what
+  // limits a burst of cheap blocks when big hashrate shows up at a low
+  // difficulty. New transient declaration because MAX_RETARGET_STEP_BITS is
+  // a plain `let`, i.e. frozen at its first-install value across upgrades
+  // (see MIN_DIFFICULTY_BITS's comment) -- editing it would do nothing.
+  transient let MAX_RETARGET_UP_STEP_BITS_LIVE : Nat = 4;
+  // Early retarget: once at least this many blocks are in the current
+  // window and they came at least 16x faster than target, raise difficulty
+  // right away instead of waiting for the 10th block. Normal variance at the
+  // right difficulty essentially never triggers it (3 blocks in under ~56 s
+  // when 15 min are expected: ~0.1% chance), so it only fires on a real
+  // hashrate surge.
+  transient let EARLY_RETARGET_MIN_BLOCKS_LIVE : Nat = 3;
+  transient let EARLY_RETARGET_SPEEDUP_LIVE : Nat = 16;
   // Time of the most recently accepted block. New field: at the upgrade that
   // introduces it it starts at 0, which is harmless -- decay is measured
   // from max(lastBlockAt, retargetAnchorTime), and postupgrade re-anchors
@@ -576,18 +600,42 @@ actor self {
   // found (by anyone), difficulty keeps tracking real block times on its
   // own, with no external caller or keeper required.
   func maybeRetarget(now : Time.Time) {
-    if (height < retargetAnchorHeight + RETARGET_INTERVAL_BLOCKS) { return };
-
+    let blocksInWindow = height - retargetAnchorHeight; // height >= anchor always
     let elapsed = now - retargetAnchorTime; // Int, expected positive
     // Guards a clock/anchor anomaly (elapsed <= 0) by treating the window
     // as having taken ~0 time -- reads as "extremely fast", which clamps
-    // to the same MAX_RETARGET_STEP_BITS increase as any other fast
-    // window, rather than trapping or under/overflowing a Nat conversion.
+    // to the same upward cap as any other fast window, rather than
+    // trapping or under/overflowing a Nat conversion.
     let actualNanos = if (elapsed > 0) { Int.toNat(elapsed) } else { 1 };
+
+    if (blocksInWindow < RETARGET_INTERVAL_BLOCKS) {
+      // Early retarget on a clear hashrate surge only (see
+      // EARLY_RETARGET_*_LIVE); otherwise wait for the full window.
+      let expectedNanos = blocksInWindow * TARGET_BLOCK_TIME_NANOS;
+      if (
+        blocksInWindow < EARLY_RETARGET_MIN_BLOCKS_LIVE or
+        actualNanos * EARLY_RETARGET_SPEEDUP_LIVE >= expectedNanos
+      ) { return };
+      let steps = log2FloorClamped(expectedNanos, actualNanos, MAX_RETARGET_UP_STEP_BITS_LIVE);
+      let newBits = Nat.min(difficultyBits + steps, MAX_DIFFICULTY_BITS);
+      pushRetargetWindow({
+        startHeight = retargetAnchorHeight;
+        endHeight = height;
+        startTime = retargetAnchorTime;
+        endTime = now;
+        difficultyBits;
+        newDifficultyBits = newBits;
+      });
+      difficultyBits := newBits;
+      retargetAnchorHeight := height;
+      retargetAnchorTime := now;
+      lastRetargetAt := now;
+      return;
+    };
 
     let newBits = if (actualNanos < RETARGET_TARGET_WINDOW_NANOS) {
       // blocks came faster than target -> harder
-      let steps = log2FloorClamped(RETARGET_TARGET_WINDOW_NANOS, actualNanos, MAX_RETARGET_STEP_BITS);
+      let steps = log2FloorClamped(RETARGET_TARGET_WINDOW_NANOS, actualNanos, MAX_RETARGET_UP_STEP_BITS_LIVE);
       Nat.min(difficultyBits + steps, MAX_DIFFICULTY_BITS);
     } else if (actualNanos > RETARGET_TARGET_WINDOW_NANOS) {
       // blocks came slower than target -> easier

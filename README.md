@@ -174,15 +174,25 @@ This mirrors the design the project was inspired by, with a few explicit
   miners could be stuck for days at a difficulty sized for hashrate that no
   longer exists. So the *effective* difficulty (what `getWork()` returns and
   `submitProof()` checks) drops by 1 bit -- half the expected work -- for
-  every full hour without a block (`DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE`),
-  never below the 18-bit floor. It's gradual on purpose (bitcoin testnet's
+  every full 4 hours without a block (`DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE`),
+  never below the 18-bit floor (41 -> 18 bits would take ~4 days of total
+  silence). It's gradual on purpose (bitcoin testnet's
   "reset to minimum after 20 minutes" rule is known to cause bursts of
   near-free blocks), and it uses the canister's own clock, never a
   miner-supplied timestamp, so it can't be triggered by faking time. When a
   block lands at a decayed difficulty, that value becomes the stored
   difficulty and the 10-block window restarts there; normal retargeting
   moves it back up if hashrate returns. While blocks keep coming near the
-  5-minute target it never kicks in. `getStats()` exposes
+  5-minute target it never kicks in.
+- **Fast upward retarget.** To limit the burst of cheap blocks when big
+  hashrate shows up at a low difficulty, retargeting is asymmetric: up to
+  **+4 bits** (16x) per retarget (`MAX_RETARGET_UP_STEP_BITS_LIVE`) but still
+  only -2 down, and an **early retarget** fires as soon as at least 3 blocks
+  in the current window came 16x faster than target, without waiting for
+  the 10th block (`EARLY_RETARGET_*_LIVE`). At the right difficulty, normal
+  variance essentially never triggers it (~0.1%). Simulated: a 4 GH/s miner
+  arriving at the 18-bit floor gets ~30 cheap blocks before block times are
+  back near target, versus ~115 with the plain +2-per-10-blocks rule. `getStats()` exposes
   `storedDifficultyBits`, `difficultyDecayIntervalNanos` and
   `difficultyDecayAnchor` (last block, or last upgrade if later).
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
