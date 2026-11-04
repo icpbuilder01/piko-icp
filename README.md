@@ -169,6 +169,22 @@ This mirrors the design the project was inspired by, with a few explicit
   below): a hand-picked difficulty that could never be revisited again would
   either stall the chain or blow through the supply cap in days if real
   participation ended up far from the initial guess.
+- **Idle difficulty decay.** The window retarget above only runs when a
+  block is found, so if most of the hashrate leaves at once the remaining
+  miners could be stuck for days at a difficulty sized for hashrate that no
+  longer exists. So the *effective* difficulty (what `getWork()` returns and
+  `submitProof()` checks) drops by 1 bit -- half the expected work -- for
+  every full hour without a block (`DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE`),
+  never below the 18-bit floor. It's gradual on purpose (bitcoin testnet's
+  "reset to minimum after 20 minutes" rule is known to cause bursts of
+  near-free blocks), and it uses the canister's own clock, never a
+  miner-supplied timestamp, so it can't be triggered by faking time. When a
+  block lands at a decayed difficulty, that value becomes the stored
+  difficulty and the 10-block window restarts there; normal retargeting
+  moves it back up if hashrate returns. While blocks keep coming near the
+  5-minute target it never kicks in. `getStats()` exposes
+  `storedDifficultyBits`, `difficultyDecayIntervalNanos` and
+  `difficultyDecayAnchor` (last block, or last upgrade if later).
 - **Mining is pay-to-play, not play-to-win.** Every *submitted* proof pulls
   `miningFeeE8s` (**0.25 ICP**, raised from 0.15 ICP -- started at 0.05 ICP
   during early solo testing, admin-adjustable via `setMiningFeeE8s`; check

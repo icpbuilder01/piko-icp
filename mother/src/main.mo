@@ -471,6 +471,89 @@ actor self {
   var retargetAnchorHeight : Nat = 0;
   var lastRetargetAt : Time.Time = retargetAnchorTime;
 
+  // ---- Idle difficulty decay ----
+  // The windowed retarget above only ever runs from submitProof, i.e. only
+  // once someone actually finds a block. If most of the hashrate leaves at
+  // once (it has, more than once: big miners arrive when PIKO's price is
+  // high, then unplug when it falls back toward the mining fee), the miners
+  // left behind face a difficulty sized for hashrate that no longer exists,
+  // and the chain can crawl for days before 10 more blocks close the window.
+  //
+  // Fix: the *effective* difficulty drops by 1 bit (= halves the expected
+  // work) for every full DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE without a
+  // block, never below MIN_DIFFICULTY_BITS_LIVE. Gradual on purpose -- not
+  // bitcoin testnet's "reset straight to minimum after 20 minutes" rule,
+  // which is known to cause bursts of near-free blocks. While blocks keep
+  // coming at roughly the 5-minute target this never kicks in at all (an
+  // hour without a block is far outside normal variance), so it only
+  // changes anything during a real hashrate drought.
+  //
+  // Time comes from the canister's own clock (Time.now()), never from a
+  // miner-supplied timestamp, so a miner cannot fake "it's been a long
+  // time" to unlock a lower difficulty -- the classic attack on
+  // time-based difficulty rules elsewhere doesn't apply here.
+  //
+  // When a block is accepted at a decayed difficulty, that decayed value
+  // becomes the new stored difficultyBits and the retarget window restarts
+  // from that block (see applyIdleDecayOnBlock): the idle time has already
+  // been "spent" lowering difficulty, so the 10-block window must not count
+  // it a second time. From there the normal retarget moves it back up (max
+  // +MAX_RETARGET_STEP_BITS per window) if real hashrate returns.
+  transient let DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE : Nat = 60 * 60 * 1_000_000_000; // 1 hour
+  // Time of the most recently accepted block. New field: at the upgrade that
+  // introduces it it starts at 0, which is harmless -- decay is measured
+  // from max(lastBlockAt, retargetAnchorTime), and postupgrade re-anchors
+  // retargetAnchorTime to the upgrade time, so the decay clock starts at the
+  // upgrade itself (no sudden multi-bit drop the moment new code lands).
+  var lastBlockAt : Time.Time = 0;
+
+  func idleDecayAnchor() : Time.Time {
+    if (lastBlockAt > retargetAnchorTime) { lastBlockAt } else {
+      retargetAnchorTime;
+    };
+  };
+
+  // Difficulty actually required right now: stored difficultyBits minus one
+  // bit per full idle interval since the decay anchor, floored.
+  func effectiveDifficultyBits(now : Time.Time) : Nat {
+    let idle = now - idleDecayAnchor();
+    if (idle <= 0) { return difficultyBits };
+    let steps = Int.toNat(idle) / DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE;
+    if (steps == 0 or difficultyBits <= MIN_DIFFICULTY_BITS_LIVE) {
+      return difficultyBits;
+    };
+    if (steps >= difficultyBits - MIN_DIFFICULTY_BITS_LIVE) {
+      MIN_DIFFICULTY_BITS_LIVE;
+    } else { difficultyBits - steps };
+  };
+
+  // Called from submitProof once a block is accepted (height already
+  // advanced), before maybeRetarget. If the block was mined at a decayed
+  // difficulty, make that the stored difficulty and restart the retarget
+  // window at this block -- recording the shortened window in
+  // retargetHistory so the drop is visible on-chain like any retarget.
+  // Returns true if it did so (maybeRetarget then has nothing to do: the
+  // new window has 0 blocks in it).
+  func applyIdleDecayOnBlock(requiredBits : Nat, now : Time.Time) : Bool {
+    if (requiredBits >= difficultyBits) { return false };
+    pushRetargetWindow({
+      startHeight = retargetAnchorHeight;
+      endHeight = height;
+      startTime = retargetAnchorTime;
+      endTime = now;
+      // The blocks in this window were not all mined at one difficulty
+      // (the last one met only requiredBits); record the lower value so a
+      // hashrate estimate from this entry errs low, never high.
+      difficultyBits = requiredBits;
+      newDifficultyBits = requiredBits;
+    });
+    difficultyBits := requiredBits;
+    retargetAnchorHeight := height;
+    retargetAnchorTime := now;
+    lastRetargetAt := now;
+    true;
+  };
+
   // floor(log2(numerator / denominator)), clamped to [0, cap]. Integer-only
   // (no Float) so this is trivially reproducible and auditable: it just
   // doubles `denominator` at most `cap` times rather than doing real
@@ -606,7 +689,7 @@ actor self {
     {
       height;
       previousHash;
-      difficultyBits;
+      difficultyBits = effectiveDifficultyBits(Time.now());
       reward = clampToSupplyCap(rewardForHeight(height));
       miningFeeE8s;
     };
@@ -617,7 +700,7 @@ actor self {
       height;
       totalMinted;
       maxSupply = MAX_SUPPLY;
-      difficultyBits;
+      difficultyBits = effectiveDifficultyBits(Time.now());
       currentReward = clampToSupplyCap(rewardForHeight(height));
       nextHalvingHeight = (height / HALVING_INTERVAL + 1) * HALVING_INTERVAL;
       ledgerId;
@@ -635,6 +718,9 @@ actor self {
       totalIcpBurnedE8s = totalIcpBurned;
       totalIcpFeesCollectedE8s = totalIcpFeesCollected;
       totalIcpConvertedToCyclesE8s = totalIcpConvertedToCycles;
+      storedDifficultyBits = difficultyBits;
+      difficultyDecayIntervalNanos = DIFFICULTY_DECAY_INTERVAL_NANOS_LIVE;
+      difficultyDecayAnchor = idleDecayAnchor();
     };
   };
 
@@ -712,7 +798,10 @@ actor self {
 
     let submittedHeight = height;
     let candidateHash = computeHash(previousHash, submittedHeight, nonce);
-    if (leadingZeroBits(candidateHash) < difficultyBits) {
+    // Checked against the effective (idle-decayed) difficulty at the moment
+    // this submission arrived -- the same value getWork() is advertising.
+    let requiredBits = effectiveDifficultyBits(now);
+    if (leadingZeroBits(candidateHash) < requiredBits) {
       return #Err(#InvalidProof);
     };
 
@@ -763,7 +852,10 @@ actor self {
     });
     recordMinerStats(caller, reward);
     totalMinted += reward; // reserve against the cap now, regardless of whether the transfer below succeeds
-    maybeRetarget(confirmedNow);
+    if (not applyIdleDecayOnBlock(requiredBits, confirmedNow)) {
+      maybeRetarget(confirmedNow);
+    };
+    lastBlockAt := confirmedNow;
 
     if (reward > 0) {
       await payReward(caller, reward);

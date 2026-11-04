@@ -209,5 +209,14 @@ module {
     /// totalIcpBurnedE8s: it's cyclesFundRatioBps's permanent share, not a
     /// bug or a pending sweep.
     totalIcpConvertedToCyclesE8s : Nat;
+    /// Idle difficulty decay -- see main.mo. difficultyBits above is the
+    /// *effective* difficulty right now (what getWork() returns and
+    /// submitProof() checks); storedDifficultyBits is the value the windowed
+    /// retarget last set. Effective = stored minus 1 bit per full
+    /// difficultyDecayIntervalNanos elapsed since difficultyDecayAnchor
+    /// (the last block, or the last upgrade if later), floored at 18.
+    storedDifficultyBits : Nat;
+    difficultyDecayIntervalNanos : Nat;
+    difficultyDecayAnchor : Time.Time;
   };
 }

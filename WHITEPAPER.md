@@ -1,4 +1,4 @@
-# PIKO Protocol Paper (v1.6)
+# PIKO Protocol Paper (v1.7)
 
 *A fair-launch, proof-of-on-chain-work token, mined entirely inside canisters on the Internet Computer.*
 
@@ -101,6 +101,7 @@ the same height is accepted.
 | Retarget interval | 10 blocks |
 | Target block time | 5 minutes |
 | Max retarget step | &plusmn;2 bits (4x work) per window |
+| Idle decay | &minus;1 bit (half the work) per full hour without a block, down to the 18-bit floor |
 
 The reward halves every 17,500 blocks, the same shape as bitcoin's emission
 curve, converging toward the 21,000,000 cap without ever formally reaching
@@ -119,6 +120,20 @@ controller call involved -- difficulty was set by hand in an earlier
 version of this design, which worked day-to-day but would have frozen
 permanently at whatever value it last held once the coordinator is
 blackholed (&sect;14); the automatic version has no such dead end.
+
+Because that window only closes when blocks are actually found, a sudden
+hashrate exodus could otherwise leave the remaining miners facing a
+difficulty sized for hashrate that is gone, for days. So the effective
+difficulty also decays by 1 bit for every full hour without a block, down to
+the 18-bit floor, measured from the coordinator's own clock (not a
+miner-supplied timestamp, so it can't be gamed by faking time). It is
+gradual by design -- bitcoin's testnet uses an abrupt "minimum difficulty
+after 20 minutes" rule that is known to produce bursts of near-free blocks,
+while Bitcoin Cash eventually replaced its 2017 emergency adjustment with
+ASERT (2020), a smooth time-based rule, for the same kind of problem. A block mined at a
+decayed difficulty sets the new stored difficulty and restarts the 10-block
+window, from which normal retargeting climbs back up if hashrate returns.
+With blocks arriving near the 5-minute target, the decay never triggers.
 
 ## 4. The burn -- and the cycles that keep the lights on
 
@@ -767,4 +782,4 @@ to track your PIKO balance outside this site.
 
 ---
 
-*PIKO Protocol Paper v1.6 -- independent, non-affiliated project -- source code published alongside this paper.*
+*PIKO Protocol Paper v1.7 -- independent, non-affiliated project -- source code published alongside this paper.*

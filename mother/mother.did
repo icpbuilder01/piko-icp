@@ -58,6 +58,8 @@ type Stats =
    cyclesFundRatioBps: nat;
    cyclesFundRatioLocked: bool;
    difficultyBits: nat;
+   difficultyDecayAnchor: Time;
+   difficultyDecayIntervalNanos: nat;
    height: nat;
    icpBurnOwner: principal;
    icpFeeTargetLocked: bool;
@@ -68,6 +70,7 @@ type Stats =
    miningFeeE8s: nat;
    nextHalvingHeight: nat;
    retargetIntervalBlocks: nat;
+   storedDifficultyBits: nat;
    targetBlockTimeNanos: nat;
    totalIcpBurnedE8s: nat;
    totalIcpConvertedToCyclesE8s: nat;
