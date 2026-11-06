@@ -1059,18 +1059,23 @@ function App() {
                   </div>
                   <div className="stat-tile stat-tile-wide">
                     <div className="stat-label">ICP spent mining (real-time)</div>
-                    <div className="stat-value stat-value-small">
+                    <div className="stat-value stat-value-small token-label">
                       {formatIcp(stats.totalIcpFeesCollectedE8s)} ICP
+                      <img src="/icp-logo.svg" alt="" className="token-icon" />
                     </div>
                   </div>
                   <div className="stat-tile stat-tile-wide">
                     <div className="stat-label">ICP burned (confirmed, updates every sweep)</div>
-                    <div className="stat-value stat-value-small">{formatIcp(stats.totalIcpBurnedE8s)} ICP</div>
+                    <div className="stat-value stat-value-small token-label">
+                      {formatIcp(stats.totalIcpBurnedE8s)} ICP
+                      <img src="/icp-logo.svg" alt="" className="token-icon" />
+                    </div>
                   </div>
                   <div className="stat-tile stat-tile-wide">
                     <div className="stat-label">ICP converted to cycles (funds this project, not a bug)</div>
-                    <div className="stat-value stat-value-small">
+                    <div className="stat-value stat-value-small token-label">
                       {formatIcp(stats.totalIcpConvertedToCyclesE8s)} ICP
+                      <img src="/icp-logo.svg" alt="" className="token-icon" />
                     </div>
                   </div>
                 </div>
