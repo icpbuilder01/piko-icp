@@ -156,6 +156,7 @@ service : {
       toLedger: nat;
       toLegacy: nat;
       toLegacyFrontend: nat;
+   toMonitor: nat;
       toMiner: nat;
       toPikopoker: nat;
       toPikopokerFrontend: nat;

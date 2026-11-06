@@ -144,6 +144,9 @@ actor self {
   // below. Added 2026-10-22.
   let legacyId : ?Principal = ?Principal.fromText("vkxrn-3qaaa-aaaak-qzk6q-cai");
   let legacyFrontendId : ?Principal = ?Principal.fromText("vnwxz-wiaaa-aaaak-qzk6a-cai");
+  // PIKO Monitor (`~/piko-monitor/`), the public dashboard. Has no income of
+  // its own, and must keep running once the ecosystem is blackholed.
+  transient let monitorId : ?Principal = ?Principal.fromText("k6tpq-iqaaa-aaaaa-qhpfq-cai");
   // index (the official ic-icrc1-index-ng canister, see ../index/
   // canister.yaml) is same-workspace, so PUBLIC_CANISTER_ID:index is
   // auto-injected exactly like frontend/miner/dice above. It has no income
@@ -1345,38 +1348,44 @@ actor self {
   // cycles/day, keep a 2T reserve and relay the rest to their frontends
   // (already at 64T and 34T), while pikopoker is the most expensive game
   // backend to run. transient so the weights stay editable on upgrade.
-  transient let TOP_UP_WEIGHT_DEFAULT : Nat = 10;
+  // Rebalanced 2026-11-06 towards what canisters actually burn: index alone
+  // burns ~212B/day, while the frontends sit on decades of cycles.
+  transient let TOP_UP_WEIGHT_DEFAULT : Nat = 1;
+  transient let TOP_UP_WEIGHT_INDEX : Nat = 30;
+  transient let TOP_UP_WEIGHT_LEDGER : Nat = 10;
+  transient let TOP_UP_WEIGHT_PIKOPOOL : Nat = 8;
+  transient let TOP_UP_WEIGHT_PLACE : Nat = 8;
   transient let TOP_UP_WEIGHT_DICE : Nat = 7;
-  transient let TOP_UP_WEIGHT_PLACE : Nat = 7;
-  transient let TOP_UP_WEIGHT_PIKOPOKER : Nat = 20;
-  transient let TOP_UP_WEIGHT_PIKOPOKER_FRONTEND : Nat = 5;
-  transient let TOP_UP_WEIGHT_LEGACY : Nat = 3;
-  transient let TOP_UP_WEIGHT_LEGACY_FRONTEND : Nat = 1;
+  transient let TOP_UP_WEIGHT_BLACKJACK : Nat = 7;
+  transient let TOP_UP_WEIGHT_PIKOPOKER : Nat = 2;
+  transient let TOP_UP_WEIGHT_MONITOR : Nat = 2;
   func topUpWeight(target : Principal) : Nat {
-    if (?target == diceId) { TOP_UP_WEIGHT_DICE } else if (?target == placeId) {
+    if (?target == indexId) { TOP_UP_WEIGHT_INDEX } else if (target == ledgerId) {
+      TOP_UP_WEIGHT_LEDGER;
+    } else if (?target == pikopoolId) { TOP_UP_WEIGHT_PIKOPOOL } else if (?target == placeId) {
       TOP_UP_WEIGHT_PLACE;
-    } else if (?target == pikopokerId) { TOP_UP_WEIGHT_PIKOPOKER } else if (?target == pikopokerFrontendId) {
-      TOP_UP_WEIGHT_PIKOPOKER_FRONTEND;
-    } else if (?target == legacyId) { TOP_UP_WEIGHT_LEGACY } else if (?target == legacyFrontendId) {
-      TOP_UP_WEIGHT_LEGACY_FRONTEND;
+    } else if (?target == diceId) { TOP_UP_WEIGHT_DICE } else if (?target == blackjackId) {
+      TOP_UP_WEIGHT_BLACKJACK;
+    } else if (?target == pikopokerId) { TOP_UP_WEIGHT_PIKOPOKER } else if (?target == monitorId) {
+      TOP_UP_WEIGHT_MONITOR;
     } else { TOP_UP_WEIGHT_DEFAULT };
   };
 
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat; toLegacy : Nat; toLegacyFrontend : Nat } {
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat; toLegacy : Nat; toLegacyFrontend : Nat; toMonitor : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0 } };
+    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 } };
 
     let surplus = balance - CYCLES_RESERVE_LIVE;
     var totalWeight = 0;
@@ -1396,6 +1405,7 @@ actor self {
     var sentToPikopokerFrontend = 0;
     var sentToLegacy = 0;
     var sentToLegacyFrontend = 0;
+    var sentToMonitor = 0;
     for (target in targets.vals()) {
       let share = surplus * topUpWeight(target) / totalWeight;
       let _outcome = try {
@@ -1417,11 +1427,12 @@ actor self {
           if (?target == pikopokerFrontendId) { sentToPikopokerFrontend += share };
           if (?target == legacyId) { sentToLegacy += share };
           if (?target == legacyFrontendId) { sentToLegacyFrontend += share };
+          if (?target == monitorId) { sentToMonitor += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool; toPikopokerFrontend = sentToPikopokerFrontend; toLegacy = sentToLegacy; toLegacyFrontend = sentToLegacyFrontend };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool; toPikopokerFrontend = sentToPikopokerFrontend; toLegacy = sentToLegacy; toLegacyFrontend = sentToLegacyFrontend; toMonitor = sentToMonitor };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
