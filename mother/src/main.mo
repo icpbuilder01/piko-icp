@@ -1353,15 +1353,19 @@ actor self {
   // backend to run. transient so the weights stay editable on upgrade.
   // Rebalanced 2026-11-06 towards what canisters actually burn: index alone
   // burns ~212B/day, while the frontends sit on decades of cycles.
-  transient let TOP_UP_WEIGHT_DEFAULT : Nat = 1;
-  transient let TOP_UP_WEIGHT_INDEX : Nat = 30;
-  transient let TOP_UP_WEIGHT_LEDGER : Nat = 10;
-  transient let TOP_UP_WEIGHT_PIKOPOOL : Nat = 8;
-  transient let TOP_UP_WEIGHT_PLACE : Nat = 8;
-  transient let TOP_UP_WEIGHT_DICE : Nat = 7;
-  transient let TOP_UP_WEIGHT_BLACKJACK : Nat = 7;
-  transient let TOP_UP_WEIGHT_PIKOPOKER : Nat = 2;
-  transient let TOP_UP_WEIGHT_MONITOR : Nat = 2;
+  // Rebalanced 2026-11-07 after index and pikopool stopped polling so often.
+  // These double as each canister's starting burn estimate, in B cycles/day,
+  // until a real measurement replaces it (see allocateByRunway below), and as
+  // the split used whenever the balances can't be read.
+  transient let TOP_UP_WEIGHT_DEFAULT : Nat = 4; // frontends, landing, monitor
+  transient let TOP_UP_WEIGHT_INDEX : Nat = 13;
+  transient let TOP_UP_WEIGHT_LEDGER : Nat = 20;
+  transient let TOP_UP_WEIGHT_PIKOPOOL : Nat = 10;
+  transient let TOP_UP_WEIGHT_PLACE : Nat = 14;
+  transient let TOP_UP_WEIGHT_DICE : Nat = 8;
+  transient let TOP_UP_WEIGHT_BLACKJACK : Nat = 22;
+  transient let TOP_UP_WEIGHT_PIKOPOKER : Nat = 8;
+  transient let TOP_UP_WEIGHT_MINIMAL : Nat = 1; // reference miner, legacy
   func topUpWeight(target : Principal) : Nat {
     if (?target == indexId) { TOP_UP_WEIGHT_INDEX } else if (target == ledgerId) {
       TOP_UP_WEIGHT_LEDGER;
@@ -1369,30 +1373,158 @@ actor self {
       TOP_UP_WEIGHT_PLACE;
     } else if (?target == diceId) { TOP_UP_WEIGHT_DICE } else if (?target == blackjackId) {
       TOP_UP_WEIGHT_BLACKJACK;
-    } else if (?target == pikopokerId) { TOP_UP_WEIGHT_PIKOPOKER } else if (?target == monitorId) {
-      TOP_UP_WEIGHT_MONITOR;
+    } else if (?target == pikopokerId) { TOP_UP_WEIGHT_PIKOPOKER } else if (?target == referenceMinerId or ?target == legacyId) {
+      TOP_UP_WEIGHT_MINIMAL;
     } else { TOP_UP_WEIGHT_DEFAULT };
+  };
+
+  // ---- Dynamic allocation: the surplus goes where the runway is shortest ----
+  //
+  // Each pass reads every target's balance through the public blackhole
+  // canister (a co-controller of all of them, and their only controller once
+  // blackholed), measures what each one really burns, and raises the shortest
+  // runways first until the surplus is used up. No constant to keep up to
+  // date: this keeps adjusting on its own after the canisters are frozen. If
+  // any read fails, the pass falls back to the fixed split above, so the loop
+  // never depends on the reader being alive.
+  transient let cyclesReaderId : Principal = Principal.fromText("e3mmv-5qaaa-aaaah-aadma-cai");
+  transient let TOP_UP_B : Nat = 1_000_000_000;
+  // A pass makes up to two calls per target, far slower than the 60s used by
+  // the other maintenance calls, and a second pass must not start meanwhile.
+  transient let TOP_UP_MIN_INTERVAL_NANOS : Int = 600_000_000_000; // 10 min
+  // Not worth the calls below this: the leftover waits for the next block.
+  transient let TOP_UP_MIN_SURPLUS : Nat = 20 * TOP_UP_B;
+  transient let TOP_UP_MIN_DEPOSIT : Nat = TOP_UP_B;
+  // No single canister takes more than this share of a pass, so one being
+  // drained on purpose can't starve all the others.
+  transient let TOP_UP_MAX_SHARE_PERCENT : Nat = 50;
+  transient let TOP_UP_BURN_FLOOR : Nat = TOP_UP_B;
+  // Long enough to smooth out a balance read during an outstanding call, which
+  // can look lower by ~166B (the cycles reserved for that call's reply).
+  transient let TOP_UP_BURN_WINDOW_NANOS : Int = 24 * 60 * 60 * 1_000_000_000;
+  transient let TOP_UP_DAY_NANOS : Nat = 24 * 60 * 60 * 1_000_000_000;
+  transient let TOP_UP_MAX_LEVEL_HOURS : Nat = 24 * 365 * 1_000;
+
+  let topUpObservations : Map.Map<Principal, Types.TopUpObservation> = Map.empty<Principal, Types.TopUpObservation>();
+  var lastTopUpUsedRunway : Bool = false;
+
+  public query func getTopUpObservations() : async {
+    usedRunway : Bool;
+    observations : [(Principal, Types.TopUpObservation)];
+  } {
+    { usedRunway = lastTopUpUsedRunway; observations = Iter.toArray(Map.entries(topUpObservations)) };
+  };
+
+  // Returns the target's current burn estimate, in cycles/day. `baseline` is
+  // the balance the target would have had if it burned nothing since `at`,
+  // which is why successful deposits are added to it (see topUpProject).
+  func observeTopUpTarget(target : Principal, cycles : Nat, now : Int) : Nat {
+    switch (Map.get(topUpObservations, Principal.compare, target)) {
+      case null {
+        let burnPerDay = topUpWeight(target) * TOP_UP_B;
+        Map.add(topUpObservations, Principal.compare, target, { baseline = cycles; at = now; burnPerDay });
+        burnPerDay;
+      };
+      case (?o) {
+        let elapsed = now - o.at;
+        if (elapsed < TOP_UP_BURN_WINDOW_NANOS) { return o.burnPerDay };
+        // A balance above the baseline means someone else topped it up, which
+        // says nothing about its burn: keep the estimate, restart the window.
+        let burnPerDay = if (cycles >= o.baseline) { o.burnPerDay } else {
+          let sample = (o.baseline - cycles) * TOP_UP_DAY_NANOS / Int.abs(elapsed);
+          // Clamped so one odd reading can't take over; a real rise still
+          // gets through within a few windows.
+          let clamped = Nat.min(sample, 3 * o.burnPerDay);
+          Nat.max((o.burnPerDay + clamped) / 2, TOP_UP_BURN_FLOOR);
+        };
+        Map.add(topUpObservations, Principal.compare, target, { baseline = cycles; at = now; burnPerDay });
+        burnPerDay;
+      };
+    };
+  };
+
+  func recordTopUpDeposit(target : Principal, amount : Nat) {
+    switch (Map.get(topUpObservations, Principal.compare, target)) {
+      case (?o) {
+        Map.add(topUpObservations, Principal.compare, target, { o with baseline = o.baseline + amount });
+      };
+      case null {};
+    };
+  };
+
+  // Finds the highest common runway the surplus can bring every canister up
+  // to, and gives each one what it lacks to reach it (never more than the
+  // per-canister cap). Canisters already above that level get nothing.
+  func allocateByRunway(balances : [Nat], burns : [Nat], surplus : Nat) : [Nat] {
+    let cap = surplus * TOP_UP_MAX_SHARE_PERCENT / 100;
+    func shareAt(i : Nat, hours : Nat) : Nat {
+      let wanted = burns[i] * hours / 24;
+      if (wanted <= balances[i]) { 0 } else { Nat.min(wanted - balances[i], cap) };
+    };
+    func totalAt(hours : Nat) : Nat {
+      var total = 0;
+      var i = 0;
+      while (i < balances.size()) { total += shareAt(i, hours); i += 1 };
+      total;
+    };
+    var low = 0;
+    var high = TOP_UP_MAX_LEVEL_HOURS;
+    if (totalAt(high) <= surplus) {
+      low := high;
+    } else {
+      while (high - low > 1) {
+        let middle = (low + high) / 2;
+        if (totalAt(middle) <= surplus) { low := middle } else { high := middle };
+      };
+    };
+    let level = low;
+    Array.tabulate<Nat>(balances.size(), func(i) { shareAt(i, level) });
   };
 
   public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat; toLegacy : Nat; toLegacyFrontend : Nat; toMonitor : Nat; toLanding : Nat } {
     let now = Time.now();
-    if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 };
-    };
+    let nothing = { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 };
+    if (now - lastTopUpProjectAt < TOP_UP_MIN_INTERVAL_NANOS) { return nothing };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
-    let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 } };
+    if (Cycles.balance() < CYCLES_RESERVE_LIVE + TOP_UP_MIN_SURPLUS) { return nothing };
 
     let targets = Array.filterMap<?Principal, Principal>(
       [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 } };
+    if (targets.size() == 0) { return nothing };
 
+    // One read at a time: each outstanding call reserves cycles for its reply,
+    // and the balance has to be final by the time the surplus is computed.
+    let Reader : Types.CyclesReaderActor = actor (Principal.toText(cyclesReaderId));
+    var balances : [Nat] = [];
+    var allRead = true;
+    label reading for (target in targets.vals()) {
+      try {
+        let status = await Reader.canister_status({ canister_id = target });
+        balances := Array.concat(balances, [status.cycles]);
+      } catch (_e) {
+        allRead := false;
+        break reading;
+      };
+    };
+
+    let balance = Cycles.balance();
+    if (balance < CYCLES_RESERVE_LIVE + TOP_UP_MIN_SURPLUS) { return nothing };
     let surplus = balance - CYCLES_RESERVE_LIVE;
-    var totalWeight = 0;
-    for (target in targets.vals()) { totalWeight += topUpWeight(target) };
+
+    let readAt = Time.now();
+    let shares : [Nat] = if (allRead) {
+      let burns = Array.tabulate<Nat>(targets.size(), func(i) { observeTopUpTarget(targets[i], balances[i], readAt) });
+      allocateByRunway(balances, burns, surplus);
+    } else {
+      var totalWeight = 0;
+      for (target in targets.vals()) { totalWeight += topUpWeight(target) };
+      Array.map<Principal, Nat>(targets, func(t) { surplus * topUpWeight(t) / totalWeight });
+    };
+    lastTopUpUsedRunway := allRead;
+
     let Management : Types.ManagementActor = actor (Principal.toText(Principal.fromText("aaaaa-aa")));
 
     var sentToLedger = 0;
@@ -1410,14 +1542,19 @@ actor self {
     var sentToLegacyFrontend = 0;
     var sentToMonitor = 0;
     var sentToLanding = 0;
+    var targetIndex = 0;
     for (target in targets.vals()) {
-      let share = surplus * topUpWeight(target) / totalWeight;
-      let _outcome = try {
-        await (with cycles = share) Management.deposit_cycles({ canister_id = target });
-        ?();
-      } catch (_e) { null };
+      let share = shares[targetIndex];
+      targetIndex += 1;
+      let _outcome = if (share < TOP_UP_MIN_DEPOSIT) { null } else {
+        try {
+          await (with cycles = share) Management.deposit_cycles({ canister_id = target });
+          ?();
+        } catch (_e) { null };
+      };
       switch (_outcome) {
         case (?()) {
+          recordTopUpDeposit(target, share);
           if (target == ledgerId) { sentToLedger += share };
           if (?target == frontendId) { sentToFrontend += share };
           if (?target == referenceMinerId) { sentToMiner += share };

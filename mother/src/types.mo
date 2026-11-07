@@ -97,6 +97,19 @@ module {
     deposit_cycles : ({ canister_id : Principal }) -> async ();
   };
 
+  /// The public blackhole canister: only the field topUpProject() needs from
+  /// its reply (Candid ignores the others).
+  public type CyclesReaderActor = actor {
+    canister_status : ({ canister_id : Principal }) -> async { cycles : Nat };
+  };
+
+  /// One top-up target's burn measurement, see observeTopUpTarget in main.mo.
+  public type TopUpObservation = {
+    baseline : Nat;
+    at : Int;
+    burnPerDay : Nat;
+  };
+
   /// Result of one sweepTreasury() call -- see main.mo for why this is
   /// stateless (every field is derived fresh from the live ICP balance,
   /// nothing here is a running counter that could drift).

@@ -477,9 +477,11 @@ Two independent, permissionless sweep loops close that gap, each on its own
 hourly-ish recurring timer:
 
 - **`mother`** burns/converts its mining-fee income via `sweepTreasury()`,
-  then shares whatever cycles surplus it has above `CYCLES_RESERVE` (2T)
+  then shares whatever cycles surplus it has above its 10T reserve
   with the rest of the ecosystem, including `landing`, via `topUpProject()`.
-  Shares are weighted by each canister's real burn (`topUpWeight`).
+  It reads each balance through the public blackhole canister, measures each
+  burn, and raises the shortest runways first (at most 50% of a pass to one
+  canister). If a read fails, that pass uses the fixed split in `topUpWeight`.
 - **`dice`** converts its house-edge ICP profit via `sweepIcpProfit()`, then
   shares its own cycles surplus above the same 2T reserve with
   `dice-frontend` via `topUpDiceFrontend()` -- added after an internal

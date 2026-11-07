@@ -136,6 +136,18 @@ service : {
   getRetargetHistory: () -> (vec RetargetWindow) query;
   getStats: () -> (Stats) query;
   getTotalPendingRewards: () -> (nat) query;
+  getTopUpObservations: () ->
+   (record {
+      observations: vec record {
+                          principal;
+                          record {
+                            at: int;
+                            baseline: nat;
+                            burnPerDay: nat;
+                          };
+                        };
+      usedRunway: bool;
+    }) query;
   getWork: () -> (Work) query;
   lockCyclesFundRatio: () -> ();
   lockIcpFeeTarget: () -> ();
