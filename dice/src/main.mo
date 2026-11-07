@@ -247,7 +247,10 @@ actor self {
   // claimPendingPayout() -- mirrors payReward() in mother/src/main.mo
   // exactly, same reasoning: a failed transfer must never mean a won bet
   // silently loses its payout.
-  func pay(token : Types.TokenKind, to : Principal, amount : Nat) : async () {
+  // async* (not async): runs inside the caller's message rather than as a
+  // self-call, which can fail to even be sent when the canister is short of
+  // cycles and would then skip the rest of the caller, losing the payout.
+  func pay(token : Types.TokenKind, to : Principal, amount : Nat) : async* () {
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
     let outcome = try {
       ?(
@@ -385,7 +388,7 @@ actor self {
     };
     if (owed == 0) { return #Err(#InvalidAmount) };
     Map.remove(m, Principal.compare, caller); // clear before await -- no double-claim
-    await pay(token, caller, owed);
+    await* pay(token, caller, owed);
     #Ok({ roll = 0; won = true; payoutAmount = owed });
   };
 
@@ -429,9 +432,18 @@ actor self {
     Map.add(pendingBets, Principal.compare, caller, true);
 
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
-    let bankroll = try {
-      await Ledger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
-    } catch (_e) { 0 };
+    let bankroll = switch (
+      try {
+        ?(await Ledger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null }));
+      } catch (_e) { null }
+    ) {
+      case (?b) { b };
+      case null {
+        // Used to fall back to 0, which told the player their bet was too large.
+        Map.remove(pendingBets, Principal.compare, caller);
+        return #Err(#TransferFailed(#TemporarilyUnavailable));
+      };
+    };
 
     let payoutAmount = amountE8s * PAYOUT_NUMERATOR / target;
     let maxPayoutAllowed = bankroll * riskConfig.maxPayoutBps / 10_000;
@@ -492,7 +504,7 @@ actor self {
     let roll = switch (randOutcome) {
       case (?bytes) { rollFromBytes(bytes) };
       case null {
-        await pay(token, caller, amountE8s); // refund
+        await* pay(token, caller, amountE8s); // refund
         return #Err(#RandomnessFailed);
       };
     };
@@ -527,7 +539,7 @@ actor self {
       timestamp = confirmedNow;
     });
 
-    if (won) { await pay(token, caller, actualPayout) };
+    if (won) { await* pay(token, caller, actualPayout) };
 
     #Ok({ roll; won; payoutAmount = actualPayout });
   };
