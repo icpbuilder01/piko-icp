@@ -153,6 +153,7 @@ service : {
       toDice: nat;
       toFrontend: nat;
       toIndex: nat;
+      toLanding: nat;
       toLedger: nat;
       toLegacy: nat;
       toLegacyFrontend: nat;

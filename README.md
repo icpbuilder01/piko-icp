@@ -106,8 +106,7 @@ top up before relying on them long-term:
 `icp canister top-up <name> --amount <cycles> -e ic`.
 `mother` and `dice` each now also automatically forward their own cycles
 surplus to the canisters that depend on them (see "Automatic cycle
-self-funding" below) -- `landing` is the one canister with no such path yet,
-still manual-top-up-only.
+self-funding" below).
 
 **Independent project.** PIKO is inspired by the publicly described
 "proof-of-on-chain-work" mining mechanics of bob.fun, but it is an original
@@ -479,19 +478,13 @@ hourly-ish recurring timer:
 
 - **`mother`** burns/converts its mining-fee income via `sweepTreasury()`,
   then shares whatever cycles surplus it has above `CYCLES_RESERVE` (2T)
-  three ways, evenly, with `ledger`, `frontend`, and `miner` (the reference
-  instance) via `topUpProject()`.
+  with the rest of the ecosystem, including `landing`, via `topUpProject()`.
+  Shares are weighted by each canister's real burn (`topUpWeight`).
 - **`dice`** converts its house-edge ICP profit via `sweepIcpProfit()`, then
   shares its own cycles surplus above the same 2T reserve with
   `dice-frontend` via `topUpDiceFrontend()` -- added after an internal
   security review noted `dice-frontend` had no self-funding path at all,
   unlike every other canister with a working canister behind it.
-
-**`landing` is the one canister still with no automatic path** -- it's pure
-marketing/entry-point, with no fee or bet flowing through it to convert into
-cycles, so it stays manual-top-up-only for now. Its cycle balance and burn
-rate are worth checking periodically (`icp canister status landing -e ic`)
-until/unless that changes.
 
 ## Security notes
 

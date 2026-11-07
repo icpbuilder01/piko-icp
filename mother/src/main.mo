@@ -147,6 +147,9 @@ actor self {
   // PIKO Monitor (`~/piko-monitor/`), the public dashboard. Has no income of
   // its own, and must keep running once the ecosystem is blackholed.
   transient let monitorId : ?Principal = ?Principal.fromText("k6tpq-iqaaa-aaaaa-qhpfq-cai");
+  // The landing site (www.piko.network) is a static site with no income of
+  // its own, so without this loop it stops once nobody tops it up by hand.
+  transient let landingId : ?Principal = ?Principal.fromText("7w27g-xiaaa-aaaaj-qseja-cai");
   // index (the official ic-icrc1-index-ng canister, see ../index/
   // canister.yaml) is same-workspace, so PUBLIC_CANISTER_ID:index is
   // auto-injected exactly like frontend/miner/dice above. It has no income
@@ -1371,21 +1374,21 @@ actor self {
     } else { TOP_UP_WEIGHT_DEFAULT };
   };
 
-  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat; toLegacy : Nat; toLegacyFrontend : Nat; toMonitor : Nat } {
+  public shared func topUpProject() : async { toLedger : Nat; toFrontend : Nat; toMiner : Nat; toDice : Nat; toBlackjack : Nat; toBlackjackFrontend : Nat; toPlace : Nat; toIndex : Nat; toPikopoker : Nat; toPikopool : Nat; toPikopokerFrontend : Nat; toLegacy : Nat; toLegacyFrontend : Nat; toMonitor : Nat; toLanding : Nat } {
     let now = Time.now();
     if (now - lastTopUpProjectAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 };
+      return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 };
     };
     lastTopUpProjectAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
 
     let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 } };
+    if (balance <= CYCLES_RESERVE_LIVE) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 } };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId],
+      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId],
       func(t) { t },
     );
-    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0 } };
+    if (targets.size() == 0) { return { toLedger = 0; toFrontend = 0; toMiner = 0; toDice = 0; toBlackjack = 0; toBlackjackFrontend = 0; toPlace = 0; toIndex = 0; toPikopoker = 0; toPikopool = 0; toPikopokerFrontend = 0; toLegacy = 0; toLegacyFrontend = 0; toMonitor = 0; toLanding = 0 } };
 
     let surplus = balance - CYCLES_RESERVE_LIVE;
     var totalWeight = 0;
@@ -1406,6 +1409,7 @@ actor self {
     var sentToLegacy = 0;
     var sentToLegacyFrontend = 0;
     var sentToMonitor = 0;
+    var sentToLanding = 0;
     for (target in targets.vals()) {
       let share = surplus * topUpWeight(target) / totalWeight;
       let _outcome = try {
@@ -1428,11 +1432,12 @@ actor self {
           if (?target == legacyId) { sentToLegacy += share };
           if (?target == legacyFrontendId) { sentToLegacyFrontend += share };
           if (?target == monitorId) { sentToMonitor += share };
+          if (?target == landingId) { sentToLanding += share };
         };
         case null {};
       };
     };
-    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool; toPikopokerFrontend = sentToPikopokerFrontend; toLegacy = sentToLegacy; toLegacyFrontend = sentToLegacyFrontend; toMonitor = sentToMonitor };
+    { toLedger = sentToLedger; toFrontend = sentToFrontend; toMiner = sentToMiner; toDice = sentToDice; toBlackjack = sentToBlackjack; toBlackjackFrontend = sentToBlackjackFrontend; toPlace = sentToPlace; toIndex = sentToIndex; toPikopoker = sentToPikopoker; toPikopool = sentToPikopool; toPikopokerFrontend = sentToPikopokerFrontend; toLegacy = sentToLegacy; toLegacyFrontend = sentToLegacyFrontend; toMonitor = sentToMonitor; toLanding = sentToLanding };
   };
 
   // Fires sweepTreasury() then topUpProject() on a timer so neither depends
