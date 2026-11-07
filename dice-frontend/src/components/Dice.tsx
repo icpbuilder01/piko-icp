@@ -96,6 +96,10 @@ export function Dice({ identity, onLogin }: DiceProps) {
   const [lastWon, setLastWon] = useState<boolean | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
+  // Winnings the canister couldn't send right away (it was busy or short of
+  // cycles) wait on the canister until the player claims them.
+  const [pendingPayout, setPendingPayout] = useState<bigint>(0n);
+  const [claiming, setClaiming] = useState(false);
   const rollButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -117,14 +121,45 @@ export function Dice({ identity, onLogin }: DiceProps) {
     }
   }, []);
 
+  const refreshPendingPayout = useCallback(async (id: Identity) => {
+    try {
+      setPendingPayout(await getDiceActor(id).getPendingPayout(TOKEN));
+    } catch (err) {
+      console.error("Failed to fetch pending payout", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (identity) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing with the ledger, not derived state
       refreshAllowance(identity);
+      refreshPendingPayout(identity);
     } else {
       setAllowance(null);
+      setPendingPayout(0n);
     }
-  }, [identity, refreshAllowance]);
+  }, [identity, refreshAllowance, refreshPendingPayout]);
+
+  async function handleClaim() {
+    if (!identity || claiming) return;
+    setClaiming(true);
+    try {
+      const result = (await getDiceActor(identity).claimPendingPayout(TOKEN)) as BetResult;
+      if (result.__kind__ === "Ok") {
+        setMessage("Winnings claimed, check your balance.");
+      } else if (result.Err.__kind__ === "TooSoon") {
+        setMessage("Slow down a little, try again in a moment.");
+      } else {
+        setMessage("Couldn't send your winnings yet, try again in a moment.");
+      }
+    } catch (err) {
+      console.error("claimPendingPayout failed", err);
+      setMessage("Couldn't send your winnings yet, try again in a moment.");
+    } finally {
+      setClaiming(false);
+      refreshPendingPayout(identity);
+    }
+  }
 
   // Space rolls again (unless typing in a field) -- quick re-rolls are most
   // of the fun of dice.
@@ -210,6 +245,7 @@ export function Dice({ identity, onLogin }: DiceProps) {
         // The stage animates the landing and calls handleSettled when done.
         setOutcome({ id: Date.now(), roll: Number(roll), won, target, stake: amount, payout: payoutAmount });
         refreshAllowance(identity);
+        if (won) refreshPendingPayout(identity);
       } else {
         setRolling(false);
         setMessage(betErrorMessage(result.Err, potentialPayout));
@@ -307,6 +343,17 @@ export function Dice({ identity, onLogin }: DiceProps) {
                 If you win: +{formatPiko(potentialPayout)} PIKO. If you lose: -{formatPiko(amount ?? 0n)} PIKO,
                 non-refundable, same as mining's fee -- see the disclaimer at the top of the site.
               </p>
+            )}
+            {identity && pendingPayout > 0n && (
+              <div className="wallet-send-row">
+                <p className="wallet-hint">
+                  {formatPiko(pendingPayout)} PIKO of winnings are waiting for you: the game was too busy to send them
+                  right away.
+                </p>
+                <button type="button" className="button button-cta" onClick={handleClaim} disabled={claiming}>
+                  {claiming ? "Claiming..." : "Claim"}
+                </button>
+              </div>
             )}
             {message && <p className={`mining-message ${lastWon === true ? "good" : lastWon === false ? "critical" : ""}`}>{message}</p>}
           </div>
