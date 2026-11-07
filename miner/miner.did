@@ -62,6 +62,7 @@ service : {
   setIcpLedger: (ledgerId: principal) -> ();
   setTickIntervalSeconds: (n: nat) -> ();
   start: () -> ();
+  renounceOwner: () -> ();
   stop: () -> ();
   withdrawIcp: (to: principal, amountE8s: nat) -> (TransferResult);
   withdrawPiko: (to: principal, amount: nat) -> (TransferResult);

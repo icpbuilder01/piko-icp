@@ -286,6 +286,15 @@ actor self {
     cancelTimer();
   };
 
+  // Gives up the owner role, so that once this canister is blackholed no key
+  // can operate it. `owner` goes back to the placeholder requireOwner already
+  // rejects. Withdraw any funds first: nothing can move them afterwards.
+  public shared ({ caller }) func renounceOwner() : async () {
+    requireOwner(caller);
+    if (mining) { Runtime.trap("stop mining first") };
+    owner := Principal.fromText("2vxsx-fae");
+  };
+
   public shared ({ caller }) func setBatchSizePerTick(n : Nat) : async () {
     requireOwner(caller);
     batchSizePerTick := n;
