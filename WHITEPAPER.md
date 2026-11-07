@@ -437,7 +437,7 @@ opens a message, and the canister stores only a hash of each link's
 secret. The vault's title and the heirs' first names are **not**
 encrypted; the app says so where they're entered.
 
-**Fee.** Creating a vault costs 1,000 PIKO. The fee is not burned: it is
+**Fee.** Creating a vault costs 6,000 PIKO. The fee is not burned: it is
 split 50/50 into the PIKO Dice and PikoBlackjack bankrolls (&sect;5,
 &sect;6), whose withdrawal paths are permanently locked, so it can't be
 taken out by anyone either.
