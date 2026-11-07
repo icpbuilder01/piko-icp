@@ -39,6 +39,7 @@
     --poker: #ffc35a;
     --native: #5cf0b0;
     --legacy: #f5b94a;
+    --monitor: #4fd6e8;
     --card: #fbfaf3;
     --card-ink: #15172a;
     --card-red: #c92a2a;
@@ -59,7 +60,7 @@
       --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
       --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
       --gold: #b07a00; --zero: #0d9a63;
-      --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200;
+      --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200; --monitor: #0b7f92;
     }
   }
   :root[data-theme="light"] {
@@ -69,7 +70,7 @@
     --brand: #3b5be0; --title-a: #2347b8; --title-b: #5b43c4;
     --bevel-hi: #ffffff; --bevel-lo: #8d93b8; --hard: rgba(15, 19, 48, 0.55);
     --gold: #b07a00; --zero: #0d9a63;
-    --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200;
+    --dice: #2463d6; --felt: #d23a2c; --pixel: #8b2fb3; --poker: #a06e00; --native: #0d8a58; --legacy: #9a6200; --monitor: #0b7f92;
   }
 
   * { box-sizing: border-box; }
@@ -374,9 +375,9 @@
     <div class="nav-links">
       <a href="#play">Play</a>
       <a href="#keep">Keep</a>
+      <a href="#monitor">Monitor</a>
       <a href="#mine">Mine</a>
       <a href="#wallet">Wallet &amp; devs</a>
-      <a href="https://k6tpq-iqaaa-aaaaa-qhpfq-cai.icp.net/" target="_blank" rel="noopener noreferrer">Monitor</a>
       <a href="https://github.com/icpbuilder01/piko-icp/blob/master/WHITEPAPER.md" target="_blank" rel="noopener noreferrer">Whitepaper</a>
     </div>
   </div>
@@ -552,6 +553,36 @@
         <p>Encrypted in your browser, unlocked by ICP's vetKeys only after the deadline.</p>
       </div>
       <div class="status"><span>1,000 PIKO once</span><span class="grow">fee → game bankrolls</span><span class="go">Open ▸</span></div>
+    </a>
+  </div>
+</section>
+
+<section class="band" id="monitor">
+  <div class="wrap">
+    <div class="sec-head"><svg class="px" data-px="chart" viewBox="0 0 10 10" style="color:var(--monitor)"></svg><h2>Monitor</h2><span class="rule"></span></div>
+    <p class="sec-sub">Not a game either: the live state of the whole ecosystem, in one public page.</p>
+
+    <a class="win game keep" href="https://k6tpq-iqaaa-aaaaa-qhpfq-cai.icp.net/" target="_blank" rel="noopener noreferrer">
+      <div class="tbar" style="grid-column: 1 / -1"><span class="t"><svg class="px" data-px="chart" viewBox="0 0 10 10"></svg>MONITOR.EXE — system status</span><span class="tb-btns" aria-hidden="true"><i>_</i><i>□</i><i>×</i></span></div>
+      <div class="scene sunken">
+        <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <rect width="320" height="180" fill="#06161a"/>
+          <g stroke="#4fd6e8" stroke-opacity=".12"><path d="M24 40H296M24 76H296M24 112H296"/></g>
+          <g fill="#4fd6e8">
+            <rect x="32" y="100" width="20" height="30"/><rect x="60" y="84" width="20" height="46"/><rect x="88" y="92" width="20" height="38"/><rect x="116" y="66" width="20" height="64"/><rect x="144" y="74" width="20" height="56"/>
+          </g>
+          <path d="M180 84 L204 100 L224 72 L248 92 L268 68 L292 88" fill="none" stroke="#5cf0b0" stroke-width="3"/>
+          <path d="M24 130H296" stroke="#4fd6e8" stroke-opacity=".5"/>
+          <rect x="82" y="148" width="156" height="20" fill="#000" opacity=".55"/>
+          <text x="160" y="162" text-anchor="middle" font-family="Silkscreen, monospace" font-size="10" fill="#4fd6e8">LIVE · READ-ONLY</text>
+        </svg>
+      </div>
+      <div class="k-body">
+        <h3>PIKO Monitor</h3>
+        <p>Mining, supply and burn, market price, game bankrolls, latest blocks, and the cycles left on each canister.</p>
+        <p>Open to anyone: no login, no wallet, nothing to sign.</p>
+      </div>
+      <div class="status"><span>no login</span><span class="grow">read-only</span><span class="go">Open ▸</span></div>
     </a>
   </div>
 </section>
