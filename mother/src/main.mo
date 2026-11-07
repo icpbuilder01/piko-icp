@@ -717,7 +717,13 @@ actor self {
   // (submitProof) the moment this reward was decided, precisely so the
   // supply cap doesn't depend on this transfer's success; see totalMinted's
   // own comment above.
-  func payReward(to : Principal, amount : Nat) : async () {
+
+  // async* (not async) on the helpers below that move funds: they run inside
+  // the caller's message instead of as self-calls. A self-call can fail to even
+  // be sent when the canister is short of cycles, and that failure would skip
+  // the rest of the caller (a payout or refund lost). Found by a load test on
+  // PikoBlackjack, 2026-11-07.
+  func payReward(to : Principal, amount : Nat) : async* () {
     let outcome = try {
       ?(
         await Ledger.icrc1_transfer({
@@ -912,7 +918,7 @@ actor self {
     lastBlockAt := confirmedNow;
 
     if (reward > 0) {
-      await payReward(caller, reward);
+      await* payReward(caller, reward);
     };
 
     #Ok({ height = submittedHeight; reward; hash = candidateHash });
@@ -978,7 +984,7 @@ actor self {
 
     // clear before await, so a second concurrent claim call can't double-pay
     Map.remove(pendingRewards, Principal.compare, caller);
-    await payReward(caller, owed);
+    await* payReward(caller, owed);
     #Ok({ height; reward = owed; hash = previousHash });
   };
 
