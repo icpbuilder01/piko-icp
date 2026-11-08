@@ -136,6 +136,7 @@ service : {
   getRetargetHistory: () -> (vec RetargetWindow) query;
   getStats: () -> (Stats) query;
   getTotalPendingRewards: () -> (nat) query;
+  getPendingCmcNotifies: () -> (vec record { nat; nat }) query;
   getTopUpObservations: () ->
    (record {
       observations: vec record {

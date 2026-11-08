@@ -1216,12 +1216,58 @@ actor self {
   // CMC calls (deployMiner.ts).
   let MEMO_TOP_UP_CANISTER : Blob = Blob.fromArray([0x54, 0x50, 0x55, 0x50, 0, 0, 0, 0]);
 
+  // CMC deposits whose notify_top_up hasn't come back #Ok yet, by ICP ledger
+  // block index, with the e8s sent. Once the transfer to the CMC succeeds, the
+  // ICP has left this canister, so re-reading the balance can't retry this
+  // leg: only notifying again with the same block index converts it. Kept
+  // only for the outcomes worth retrying (#Processing, or a call that never
+  // got an answer); retried at the start of every sweep. The CMC answers a
+  // repeated notify with the same result, so a retry can't mint twice.
+  let pendingCmcNotifies : Map.Map<Nat, Nat> = Map.empty<Nat, Nat>();
+  transient let MAX_PENDING_CMC_NOTIFIES : Nat = 100;
+
+  public query func getPendingCmcNotifies() : async [(Nat, Nat)] {
+    Iter.toArray(Map.entries(pendingCmcNotifies));
+  };
+
+  func retryPendingCmcNotifies() : async* () {
+    if (Map.size(pendingCmcNotifies) == 0) { return };
+    let Cmc : Types.CmcActor = actor (Principal.toText(cmcId));
+    let self_ : Principal = Principal.fromActor(self);
+    for ((blockIndex, _) in Iter.toArray(Map.entries(pendingCmcNotifies)).vals()) {
+      let outcome = try {
+        ?(await Cmc.notify_top_up({ block_index = Nat64.fromNat(blockIndex); canister_id = self_ }));
+      } catch (_e) { null };
+      switch (outcome) {
+        case (? #Ok(_)) {
+          switch (Map.take(pendingCmcNotifies, Nat.compare, blockIndex)) {
+            case (?amount) { totalIcpConvertedToCycles += amount };
+            case null {};
+          };
+        };
+        case (? #Err(#Processing)) {};
+        case null {};
+        // Refunded (the ICP came back here and gets swept again), too old or
+        // invalid: nothing left to retry.
+        case (? #Err(_)) { Map.remove(pendingCmcNotifies, Nat.compare, blockIndex) };
+      };
+    };
+  };
+
+  func rememberCmcNotify(blockIndex : Nat, amount : Nat) {
+    if (Map.size(pendingCmcNotifies) < MAX_PENDING_CMC_NOTIFIES) {
+      Map.add(pendingCmcNotifies, Nat.compare, blockIndex, amount);
+    };
+  };
+
   public shared func sweepTreasury() : async Types.SweepResult {
     let now = Time.now();
     if (now - lastSweepTreasuryAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
       return { swept = 0; burned = 0; cyclesFunded = 0; cyclesMinted = null; notifyError = null };
     };
     lastSweepTreasuryAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
+
+    await* retryPendingCmcNotifies();
 
     let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
     let self_ : Principal = Principal.fromActor(self);
@@ -1282,8 +1328,15 @@ actor self {
               cyclesMinted := ?cycles;
               totalIcpConvertedToCycles += cyclesAmount;
             };
+            case (? #Err(#Processing)) {
+              rememberCmcNotify(blockIndex, cyclesAmount);
+              notifyError := ?"notify_top_up still processing, retried on the next sweep";
+            };
             case (? #Err(e)) { notifyError := ?debug_show (e) };
-            case null { notifyError := ?"notify_top_up call failed" };
+            case null {
+              rememberCmcNotify(blockIndex, cyclesAmount);
+              notifyError := ?"notify_top_up call failed, retried on the next sweep";
+            };
           };
         };
         case (? #Err(e)) { notifyError := ?debug_show (e) };
