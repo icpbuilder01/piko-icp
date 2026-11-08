@@ -730,29 +730,12 @@ actor self {
   // either, for the same reason sweepIcpProfit keeps none: it just re-reads
   // Cycles.balance() fresh every call.
   public shared func topUpDiceFrontend() : async { sent : Nat } {
-    let now = Time.now();
-    if (now - lastTopUpDiceFrontendAt < MIN_MAINTENANCE_INTERVAL_NANOS) {
-      return { sent = 0 };
-    };
-    lastTopUpDiceFrontendAt := now; // set synchronously, before any await below, so a burst of concurrent calls only lets one through
-
-    let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE) { return { sent = 0 } };
-    switch (diceFrontendId) {
-      case null { { sent = 0 } };
-      case (?target) {
-        let surplus = balance - CYCLES_RESERVE;
-        let Management : Types.ManagementActor = actor ("aaaaa-aa");
-        let outcome = try {
-          await (with cycles = surplus) Management.deposit_cycles({ canister_id = target });
-          ?();
-        } catch (_e) { null };
-        switch (outcome) {
-          case (?()) { { sent = surplus } };
-          case null { { sent = 0 } };
-        };
-      };
-    };
+    // Disabled 2026-11-08: mother now tops up by measured burn, and cycles
+    // forwarded on from here would look to it like this canister burning
+    // them, so it would keep sending more, only for them to end up on a
+    // frontend that already holds decades of cycles. Kept as a no-op so the
+    // public interface doesn't change.
+    { sent = 0 };
   };
 
   // lastBetAttempt is transient and unbounded: any caller can add an entry
@@ -785,7 +768,6 @@ actor self {
       #seconds SWEEP_INTERVAL_SECONDS_LIVE,
       func() : async () {
         ignore (await sweepIcpProfit());
-        ignore (await topUpDiceFrontend());
         ignore (await pruneStaleBetAttempts());
       },
     );
