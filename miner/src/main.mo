@@ -295,6 +295,22 @@ actor self {
     owner := Principal.fromText("2vxsx-fae");
   };
 
+  // Mining is stopped and the owner renounced, so the cycles this canister
+  // holds have nothing left to pay for. A controller can send everything
+  // above MINER_CYCLES_KEEP to mother once, before blackholing, and mother
+  // shares it out by measured burn like the rest of its surplus. Nobody can
+  // call this once the canister is blackholed.
+  transient let MINER_CYCLES_KEEP : Nat = 2_000_000_000_000;
+  public shared ({ caller }) func sendSurplusCyclesToMother() : async Nat {
+    if (not Principal.isController(caller)) { Runtime.trap("controller only") };
+    let balance = Cycles.balance();
+    if (balance <= MINER_CYCLES_KEEP) { return 0 };
+    let amount = balance - MINER_CYCLES_KEEP;
+    let Management : actor { deposit_cycles : ({ canister_id : Principal }) -> async () } = actor ("aaaaa-aa");
+    await (with cycles = amount) Management.deposit_cycles({ canister_id = motherId });
+    amount;
+  };
+
   public shared ({ caller }) func setBatchSizePerTick(n : Nat) : async () {
     requireOwner(caller);
     batchSizePerTick := n;

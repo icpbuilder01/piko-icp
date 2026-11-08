@@ -63,6 +63,7 @@ service : {
   setTickIntervalSeconds: (n: nat) -> ();
   start: () -> ();
   renounceOwner: () -> ();
+  sendSurplusCyclesToMother: () -> (nat);
   stop: () -> ();
   withdrawIcp: (to: principal, amountE8s: nat) -> (TransferResult);
   withdrawPiko: (to: principal, amount: nat) -> (TransferResult);
