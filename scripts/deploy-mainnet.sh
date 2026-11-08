@@ -16,7 +16,6 @@ cd "$(dirname "$0")/.."
 # deploy (see README for the resulting canister ids). Each must exceed the
 # ~0.5T creation fee with enough left over to also cover code installation.
 CYCLES_MOTHER=1000000000000          # 1T
-CYCLES_MINER=1000000000000           # 1T
 CYCLES_DICE=1000000000000          # 1T
 CYCLES_FRONTEND=1000000000000        # 1T
 CYCLES_DICE_FRONTEND=1000000000000 # 1T -- PIKO Dice's own site, a separate
@@ -46,14 +45,12 @@ render_ledger_args "$PLACEHOLDER" "$PLACEHOLDER" # placeholder so the project lo
 
 echo "==> Creating canisters (mother first, to reserve its principal)..."
 MOTHER_ID=$(get_or_create mother "$CYCLES_MOTHER")
-MINER_ID=$(get_or_create miner "$CYCLES_MINER")
 DICE_ID=$(get_or_create dice "$CYCLES_DICE")
 FRONTEND_ID=$(get_or_create frontend "$CYCLES_FRONTEND")
 DICE_FRONTEND_ID=$(get_or_create dice-frontend "$CYCLES_DICE_FRONTEND")
 LEDGER_ID=$(get_or_create ledger "$CYCLES_LEDGER")
 DEPLOYER_ID=$(icp identity principal)
 echo "    mother:          $MOTHER_ID"
-echo "    miner:           $MINER_ID"
 echo "    dice:          $DICE_ID"
 echo "    frontend:        $FRONTEND_ID"
 echo "    dice-frontend: $DICE_FRONTEND_ID"
@@ -66,8 +63,8 @@ echo "==> Installing ledger..."
 icp build ledger -e ic
 icp canister install ledger -e ic --mode install --args-file ledger/icrc1_ledger_init.args -y
 
-echo "==> Deploying mother, miner, dice, frontend, dice-frontend..."
-icp deploy mother miner dice frontend dice-frontend -e ic -y
+echo "==> Deploying mother, dice, frontend, dice-frontend..."
+icp deploy mother dice frontend dice-frontend -e ic -y
 
 echo ""
 echo "==> Done. If any install step failed with 'out of cycles', top up and retry:"

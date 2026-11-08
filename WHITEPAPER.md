@@ -19,8 +19,7 @@ own principal. There is no team allocation, no presale, and no code path
 that mints PIKO any other way. Every hash attempt runs client-side -- in a
 browser tab (one search per available CPU core, hashing via a
 WASM-compiled SHA-256 implementation), in the open-source PikoNativeMiner
-desktop app (CPU or GPU, &sect;9), or in a self-owned canister running
-around the clock -- and every submission is independently re-verified by the
+desktop app (CPU or GPU, &sect;9) -- and every submission is independently re-verified by the
 coordinating canister before anything is minted. Miners can compete alone
 or pool their work through PikoPool (&sect;9).
 
@@ -60,8 +59,7 @@ the same height is accepted.
 1. **Approve.** The miner grants the coordinator canister an ICRC-2
    allowance on the ICP ledger, covering a few blocks' worth of mining fee.
 2. **Search.** One Web Worker per available CPU core in the browser (or
-   PikoNativeMiner's native CPU/GPU workers, &sect;9, or a timer loop
-   inside a self-deployed canister) repeatedly hashes candidate
+   PikoNativeMiner's native CPU/GPU workers, &sect;9) repeatedly hashes candidate
    nonces against the current header using SHA-256, entirely client-side.
    Each session's search starts from a random per-job base offset rather
    than nonce zero, so independent sessions -- this same account's other
@@ -460,11 +458,6 @@ Seventeen canisters, all on the Internet Computer, do the entire job:
 - **`mother`** -- the coordinator. Holds chain height and difficulty,
   independently re-verifies every submitted proof, burns the fee, and mints
   the reward.
-- **`miner`** -- an optional, self-owned canister for continuous mining on a
-  timer, for anyone who doesn't want to keep a browser tab open. CLI-only:
-  deploying and running one is `git clone` + `icp deploy` + a few
-  `icp canister call` commands (see the README), not something the mining
-  site itself walks you through.
 - **`frontend`** -- a static asset canister. The dashboard, wallet, and the
   in-browser miner (one Web Worker per CPU core, hashing via a
   WASM-compiled SHA-256 implementation) all ship from here.
@@ -534,7 +527,7 @@ been tested against concurrent, competing submissions to confirm exactly
 one winner is ever paid per block.
 
 What it cannot yet claim is trustlessness in the strict sense. `mother`,
-`ledger`, `miner`, `frontend`, `index`, `dice`, `dice-frontend`,
+`ledger`, `frontend`, `index`, `dice`, `dice-frontend`,
 `blackjack`, `blackjack-frontend`, `place`, `place-frontend`, `pikopoker`,
 `pikopoker-frontend`, `pikopool`, `legacy`, and `legacy-frontend`
 currently share a single controller. A canister
@@ -763,7 +756,6 @@ them.
 |---|---|---|
 | `mother` | `45mjf-rqaaa-aaaaj-qsedq-cai` | Coordinator |
 | `ledger` | `56aad-fiaaa-aaaaj-qsefa-cai` | PIKO ICRC-1 ledger |
-| `miner` | `5qcnl-6yaaa-aaaaj-qseea-cai` | Reference miner |
 | `frontend` | `5xdl7-taaaa-aaaaj-qseeq-cai` | Mining site & dashboard |
 | `dice` | `7yyso-myaaa-aaaaj-qseia-cai` | PIKO Dice game logic |
 | `dice-frontend` | `77zu2-baaaa-aaaaj-qseiq-cai` | PIKO Dice site |

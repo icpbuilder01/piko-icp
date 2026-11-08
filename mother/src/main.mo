@@ -1549,7 +1549,10 @@ actor self {
     if (Cycles.balance() < CYCLES_RESERVE_LIVE + TOP_UP_MIN_SURPLUS) { return nothing };
 
     let targets = Array.filterMap<?Principal, Principal>(
-      [?ledgerId, frontendId, referenceMinerId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId],
+      // The reference miner is no longer a target: it was deleted (2026-11),
+      // and a target whose balance can't be read sends the whole pass back to
+      // the fixed split.
+      [?ledgerId, frontendId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId],
       func(t) { t },
     );
     if (targets.size() == 0) { return nothing };

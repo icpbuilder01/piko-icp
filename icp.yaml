@@ -4,7 +4,6 @@ canisters:
   - ledger
   - index
   - mother
-  - miner
   - dice
   - dice-frontend
   - frontend

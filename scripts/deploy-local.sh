@@ -44,8 +44,8 @@ icp canister create ledger -q 2>/dev/null || true
 icp build ledger
 icp canister install ledger --mode reinstall --args-file ledger/icrc1_ledger_init.args -y
 
-echo "==> Deploying mother, miner, dice, frontend, dice-frontend..."
-icp deploy mother miner dice frontend dice-frontend -y
+echo "==> Deploying mother, dice, frontend, dice-frontend..."
+icp deploy mother dice frontend dice-frontend -y
 
 FRONTEND_ID=$(icp canister status frontend -i)
 DICE_FRONTEND_ID=$(icp canister status dice-frontend -i)

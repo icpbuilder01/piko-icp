@@ -3,8 +3,8 @@
 PIKO is a fixed-supply, no-premine token you can mine **right in your
 browser** -- no wallet software or CLI needed, just Internet Identity --
 entirely hosted on the Internet Computer (ICP): the ledger, the mining
-coordinator, the reference miner, and the website are all canisters. No
-off-chain server, no off-chain database.
+coordinator, and the website are all canisters. No off-chain server, no
+off-chain database.
 
 **Live on mainnet:**
 
@@ -13,7 +13,6 @@ off-chain server, no off-chain database.
 | landing | `7w27g-xiaaa-aaaaj-qseja-cai` | https://www.piko.network/ |
 | frontend | `5xdl7-taaaa-aaaaj-qseeq-cai` | https://5xdl7-taaaa-aaaaj-qseeq-cai.icp.net/ |
 | mother | `45mjf-rqaaa-aaaaj-qsedq-cai` | https://45mjf-rqaaa-aaaaj-qsedq-cai.icp.net/ |
-| miner (reference instance) | `5qcnl-6yaaa-aaaaj-qseea-cai` | https://5qcnl-6yaaa-aaaaj-qseea-cai.icp.net/ |
 | ledger | `56aad-fiaaa-aaaaj-qsefa-cai` | https://56aad-fiaaa-aaaaj-qsefa-cai.icp.net/ |
 | index | `ymzxo-vqaaa-aaaaj-qse3q-cai` | https://ymzxo-vqaaa-aaaaj-qse3q-cai.icp.net/ |
 
@@ -82,8 +81,7 @@ purpose -- opting into one is never a bundled default for the others:
   never talks to any canister itself -- no wallet, no login, nothing to
   approve here.
 - **`frontend`** is the mining application: log in with Internet Identity,
-  mine in-browser or point a self-deployed `miner` canister at `mother`,
-  watch the live chain dashboard.
+  mine in-browser, watch the live chain dashboard.
 - **`dice-frontend`** is the betting application (PIKO Dice): a separate
   login/approval flow, a separate site, deliberately not merged into
   `frontend` -- playing is an opt-in choice distinct from mining, not
@@ -120,14 +118,9 @@ connected to bob.fun or BOB in any way.**
     candidate nonces locally with the Web Crypto API against the current
     block header. Requires being logged in with Internet Identity (rewards go
     to your principal); stops when you close the tab.
-  - **A dedicated `miner` canister**, for continuous/unattended mining --
-    same hashing, same rewards, driven by a timer instead of your browser
-    tab. No longer a site feature (it was, and got pulled after repeated
-    real-world breakage -- see "Upgrading `mother` or `miner` safely" and
-    the git history for `frontend/src/components/DeployMiner.tsx` if you're
-    curious what it looked like): deploying and running one is now a CLI-only
-    path, `git clone` + `icp deploy miner` + `icp canister call miner start`,
-    see "Run it locally" below.
+  - **In [PikoNativeMiner](https://github.com/icpbuilder01/pikonativeminer)**, the open-source desktop app, for long
+    mining sessions: same rules, same rewards, on your CPU or GPU, and much
+    faster than a browser tab.
   - Both search for a nonce such that `sha256(previousHash # height # nonce)`
     has enough leading zero bits to clear the current difficulty.
 - The first to find a valid proof submits it to the **`mother`**
@@ -253,13 +246,12 @@ This mirrors the design the project was inspired by, with a few explicit
 
 ```
 piko-icp/
-  icp.yaml                          canisters: ledger, mother, miner, frontend
+  icp.yaml                          canisters: ledger, mother, frontend
   ledger/                           official pre-built ICRC-1/ICRC-2 ledger (dfinity/ic)
     ic-icrc1-ledger.wasm             downloaded from the ledger-suite-icrc-2026-03-09 release
     ledger.did                       candid interface, extracted from the wasm itself (`ic-wasm metadata`)
     icrc1_ledger_init.args.template  init args template (minting_account is filled in at deploy time)
   mother/                           Motoko -- mining coordinator ("mother node")
-  miner/                            Motoko -- reference miner canister (deploy your own copy)
   frontend/                         React/Vite site -- dashboard, Internet Identity login, in-browser miner
   scripts/deploy-local.sh           deploys everything to the local network
 ```
@@ -302,11 +294,6 @@ icp canister call mother getRecentBlocks
 icp canister call mother getPendingAdminChanges   # any queued proposeIcpFeeTarget/proposeCyclesFundRatioBps waiting on its timelock?
 icp canister call mother getTotalPendingRewards   # unclaimed PIKO owed across all miners
 
-# Mine with the reference miner
-icp canister call miner start
-icp canister call miner getStatus
-icp canister call miner stop
-
 # Check your PIKO balance
 icp canister call ledger icrc1_balance_of '(record { owner = principal "<your-principal>" })'
 ```
@@ -343,9 +330,9 @@ icp canister top-up <name> --amount <cycles> -e ic
 icp deploy <name> -e ic -y
 ```
 
-## Upgrading `mother` or `miner` safely
+## Upgrading `mother` safely
 
-Both are `actor { ... }` bodies compiled with `--default-persistent-actors`
+`mother` is an `actor { ... }` body compiled with `--default-persistent-actors`
 (enhanced orthogonal persistence): every top-level `let`/`var` is part of the
 canister's persisted state by default. In practice, tested against a real
 upgrade of the deployed `mother` canister:
@@ -370,7 +357,7 @@ upgrade of the deployed `mother` canister:
 ## Trust model and known limitations (read before relying on this)
 
 - **Canister controllers can upgrade code, which overrides all on-chain
-  logic.** `mother`, `ledger`, `miner`, and `frontend` are all currently
+  logic.** `mother`, `ledger`, and `frontend` are all currently
   controlled by a single identity (the deployer's). That controller could, in
   principle, push a new `mother` build that ignores the 21,000,000 supply
   cap, or a new `ledger` build that mints itself PIKO directly. None of
@@ -452,16 +439,6 @@ upgrade of the deployed `mother` canister:
   now retargets itself automatically from on-chain block timestamps (see
   "How it works" above) with no controller in the loop, so blackholing
   `mother` no longer freezes it.
-- **The `miner` canister has no way to move its own ICP without a
-  controller/owner-only call.** `withdrawIcp(to, amount)` exists specifically
-  so ICP sent to fund a miner's mining fees isn't stuck if you want to
-  reclaim it.
-- Fixed: earlier versions of `miner` initialized `owner` to the anonymous
-  principal as a placeholder before the first `start()` call, and
-  `requireOwner` only checked `caller != owner` -- meaning an anonymous
-  caller matched that placeholder and could operate a freshly deployed,
-  not-yet-started miner. `requireOwner` now rejects anonymous callers
-  explicitly, closing that window.
 
 ## Automatic cycle self-funding
 
