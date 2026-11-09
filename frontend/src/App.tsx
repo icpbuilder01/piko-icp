@@ -1027,6 +1027,22 @@ function App() {
               </div>
             )}
           </section>
+          <section className="block ledger-card">
+            <h2>
+              Piko ledger ID <span className="section-icon">🔖</span>
+            </h2>
+            <p className="section-intro">
+              Not your wallet address (that's above ↑) — this is PIKO's ledger
+              canister ID. Add it to the NNS dapp, or any other ICRC-1-aware
+              wallet, to see and manage your PIKO there too.
+            </p>
+            <div className="wallet-address-row">
+              <code className="wallet-address">{ledgerCanisterId}</code>
+              <button type="button" className="button secondary small" onClick={handleCopyLedger}>
+                {copiedLedger ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </section>
         </div>
         <aside className="app-side">
           <section className="block chain-status">
@@ -1135,22 +1151,6 @@ function App() {
                 No blocks mined yet — be the first, see "Mine" above.
               </div>
             )}
-          </section>
-          <section className="block">
-            <h2>
-              Piko ledger ID <span className="section-icon">🔖</span>
-            </h2>
-            <p className="section-intro">
-              Not your wallet address (that's above ↑) — this is PIKO's ledger
-              canister ID. Add it to the NNS dapp, or any other ICRC-1-aware
-              wallet, to see and manage your PIKO there too.
-            </p>
-            <div className="wallet-address-row">
-              <code className="wallet-address">{ledgerCanisterId}</code>
-              <button type="button" className="button secondary small" onClick={handleCopyLedger}>
-                {copiedLedger ? "Copied" : "Copy"}
-              </button>
-            </div>
           </section>
         </aside>
       </div>

@@ -198,7 +198,15 @@ body {
 @media (max-width: 920px) {
   .app-grid,
   .app-more {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* One column: flatten both columns so the ledger card can stay last. */
+  .app-main,
+  .app-side {
+    display: contents;
+  }
+  .ledger-card {
+    order: 1;
   }
   .topbar {
     flex-wrap: wrap;
