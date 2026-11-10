@@ -57,8 +57,11 @@ actor self {
   transient let BLACKJACK_PAYOUT_BPS_LIVE : Nat = 25_000; // natural blackjack pays 3:2 -- 2.5x total return
   transient let WIN_PAYOUT_BPS_LIVE : Nat = 20_000; // an ordinary win pays 2:1 -- 2x total return
   transient let PUSH_PAYOUT_BPS_LIVE : Nat = 10_000; // a tie returns the stake, 1x
-  transient let DEALER_STANDS_ON_LIVE : Nat = 17; // dealer hits below this, stands at/above it -- no soft-17 exception
-  transient let ROUND_EXPIRY_NANOS_LIVE : Int = 24 * 60 * 60 * 1_000_000_000; // 24h -- see resolveExpiredRound below
+  transient let DEALER_STANDS_ON_LIVE : Nat = 17; // dealer hits below this, stands at/above it, except on a soft 17 (see dealerMustDraw)
+  // 1h, was 24h: an open round's reservation counts against the bankroll cap
+  // shared by every player, so one abandoned max bet blocked the whole table
+  // for a day (2026-11-10 audit). See resolveExpiredRound below.
+  transient let ROUND_EXPIRY_NANOS_LIVE : Int = 60 * 60 * 1_000_000_000;
 
   func payoutBpsFor(status : Types.ResolvedStatus) : Nat {
     switch (status) {
@@ -155,6 +158,15 @@ actor self {
   // needing that is what determines whether the dealer needs to draw at
   // all (skip entirely if every hand already resolved itself, e.g. all
   // busted, or a natural was already decided at deal() time).
+  // The dealer hits a soft 17 and splits of Aces get one card each (see
+  // split()). With the earlier rules (stand on every 17, Aces hit freely) an
+  // exact calculation gave a perfect player +0.17% over a bankroll nobody can
+  // refill; these two give the house about 0.16% (2026-11-10 audit).
+  func dealerMustDraw(cards : [Nat8]) : Bool {
+    let total = Cards.handTotal(cards);
+    total < DEALER_STANDS_ON_LIVE or (total == DEALER_STANDS_ON_LIVE and Cards.isSoft(cards));
+  };
+
   func dealerNeedsToPlay(hands : [PlayerHand]) : Bool {
     switch (Array.find<PlayerHand>(hands, func(h) { h.status == null })) {
       case (?_) { true };
@@ -334,7 +346,7 @@ actor self {
     setBankrollCache(token, if (next < 0) { 0 } else { Int.abs(next) });
   };
 
-  func refreshBankrollCache(token : Types.TokenKind) : async () {
+  func refreshBankrollCache(token : Types.TokenKind) : async* () {
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
     let balance = try {
       await Ledger.icrc1_balance_of({ owner = Principal.fromActor(self); subaccount = null });
@@ -342,10 +354,10 @@ actor self {
     setBankrollCache(token, balance);
   };
 
-  func ensureBankrollCacheInitialized() : async () {
+  func ensureBankrollCacheInitialized() : async* () {
     if (bankrollCacheInitialized) { return };
-    await refreshBankrollCache(#PIKO);
-    await refreshBankrollCache(#ICP);
+    await* refreshBankrollCache(#PIKO);
+    await* refreshBankrollCache(#ICP);
     bankrollCacheInitialized := true;
   };
 
@@ -356,8 +368,8 @@ actor self {
   // it) when you don't want to wait even one poll interval.
   public shared ({ caller }) func refreshBankrollCaches() : async () {
     requireController(caller);
-    await refreshBankrollCache(#PIKO);
-    await refreshBankrollCache(#ICP);
+    await* refreshBankrollCache(#PIKO);
+    await* refreshBankrollCache(#ICP);
   };
 
   let pendingIcpPayouts : Map.Map<Principal, Nat> = Map.empty<Principal, Nat>();
@@ -390,7 +402,11 @@ actor self {
     } else { combined };
   };
 
-  func pay(token : Types.TokenKind, to : Principal, amount : Nat) : async () {
+  // async* (not async): runs inside the caller's message instead of as a
+  // self-call. A self-call can fail to even be sent when the canister is short
+  // of cycles, and that failure would skip the rest of the caller, losing the
+  // payout. Here only the ledger call can fail, and it is caught below.
+  func pay(token : Types.TokenKind, to : Principal, amount : Nat) : async* () {
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
     let outcome = try {
       ?(
@@ -435,6 +451,8 @@ actor self {
     {
       deckCount = 1;
       dealerStandsOn = DEALER_STANDS_ON_LIVE;
+      dealerHitsSoft17 = true;
+      oneCardOnSplitAces = true;
       blackjackPayoutBps = BLACKJACK_PAYOUT_BPS_LIVE;
       doubleDownAllowed = true;
       splitAllowed = true;
@@ -555,7 +573,7 @@ actor self {
     let owed = switch (Map.get(m, Principal.compare, caller)) { case (?v) { v }; case null { 0 } };
     if (owed == 0) { return #Err(#InvalidAmount) };
     Map.remove(m, Principal.compare, caller);
-    await pay(token, caller, owed);
+    await* pay(token, caller, owed);
     #Ok(owed);
   };
 
@@ -566,9 +584,9 @@ actor self {
   // resolved hand against that one dealer result, sums payouts across
   // hands, releases the committed payout, updates counters/history exactly
   // once, and pays out the sum if anything is owed.
-  func finalizeWholeRound(player : Principal, round : Round) : async Types.BlackjackView {
+  func finalizeWholeRound(player : Principal, round : Round) : async* Types.BlackjackView {
     if (dealerNeedsToPlay(round.hands)) {
-      while (Cards.handTotal(round.dealerCards) < DEALER_STANDS_ON_LIVE) {
+      while (dealerMustDraw(round.dealerCards)) {
         let card = round.deck[round.nextIndex];
         round.nextIndex += 1;
         round.dealerCards := Array.concat(round.dealerCards, [card]);
@@ -617,7 +635,7 @@ actor self {
 
     if (resolved.totalPayoutAmount > 0) {
       adjustBankrollCache(round.token, -resolved.totalPayoutAmount); // the ACTUAL payout -- see the comment above releaseCommittedPayout
-      await pay(round.token, player, resolved.totalPayoutAmount);
+      await* pay(round.token, player, resolved.totalPayoutAmount);
     };
 
     view;
@@ -627,12 +645,12 @@ actor self {
   // every hand is done and the whole round finalizes. Shared by hit()
   // (only once the active hand becomes done), stand(), and doubleDown()
   // (which always forces its hand done).
-  func advanceOrFinalizeRound(player : Principal, round : Round) : async Types.BlackjackView {
+  func advanceOrFinalizeRound(player : Principal, round : Round) : async* Types.BlackjackView {
     if (round.activeHandIndex + 1 < round.hands.size()) {
       round.activeHandIndex += 1;
       viewOf(round);
     } else {
-      await finalizeWholeRound(player, round);
+      await* finalizeWholeRound(player, round);
     };
   };
 
@@ -673,7 +691,7 @@ actor self {
 
     let Ledger : Types.LedgerActor = actor (Principal.toText(ledgerIdFor(token)));
     let Management : Types.ManagementActor = actor ("aaaaa-aa");
-    await ensureBankrollCacheInitialized(); // a no-op await after the very first round ever -- see the cache's own comment
+    await* ensureBankrollCacheInitialized(); // a no-op await after the very first round ever -- see the cache's own comment
     let bankroll = bankrollCacheFor(token);
 
     let reservedPayout = amountE8s * BLACKJACK_PAYOUT_BPS_LIVE / 10_000;
@@ -694,19 +712,34 @@ actor self {
     // means this call pays for roughly the *slower* of the two
     // inter-canister round trips, not their sum, which is most of where
     // deal()'s real end-to-end latency was going.
-    let transferFuture = Ledger.icrc2_transfer_from({
-      spender_subaccount = null;
-      from = { owner = caller; subaccount = null };
-      to = { owner = Principal.fromActor(self); subaccount = null };
-      amount = amountE8s;
-      fee = null;
-      memo = null;
-      created_at_time = null;
-    });
-    let randFuture = Management.raw_rand();
+    //
+    // Each send is guarded on its own: when the canister is short of cycles
+    // (every outstanding call reserves some), a call can fail to even be
+    // sent, which throws. Unguarded, a failed raw_rand send after the stake
+    // pull had gone out skipped every refund and release below: found by a
+    // local load test (30 players, 1.9T cycles), it lost stakes and leaked
+    // committedPayout until the next upgrade.
+    let transferFuture = try {
+      ?Ledger.icrc2_transfer_from({
+        spender_subaccount = null;
+        from = { owner = caller; subaccount = null };
+        to = { owner = Principal.fromActor(self); subaccount = null };
+        amount = amountE8s;
+        fee = null;
+        memo = null;
+        created_at_time = null;
+      });
+    } catch (_e) { null };
+    let randFuture = try { ?Management.raw_rand() } catch (_e) { null };
 
-    let pullOutcome = try { ?(await transferFuture) } catch (_e) { null };
-    let randOutcome = try { ?(await randFuture) } catch (_e) { null };
+    let pullOutcome = switch (transferFuture) {
+      case (?f) { try { ?(await f) } catch (_e) { null } };
+      case null { null };
+    };
+    let randOutcome = switch (randFuture) {
+      case (?f) { try { ?(await f) } catch (_e) { null } };
+      case null { null };
+    };
 
     switch (pullOutcome) {
       case (? #Ok(_)) { adjustBankrollCache(token, amountE8s) };
@@ -735,7 +768,7 @@ actor self {
       case null {
         releaseCommittedPayout(token, reservedPayout);
         adjustBankrollCache(token, -amountE8s);
-        await pay(token, caller, amountE8s); // refund
+        await* pay(token, caller, amountE8s); // refund
         return #Err(#RandomnessFailed);
       };
     };
@@ -773,7 +806,7 @@ actor self {
       case (?_) {
         releaseCommittedPayout(token, reservedPayout);
         adjustBankrollCache(token, -amountE8s);
-        await pay(token, caller, amountE8s);
+        await* pay(token, caller, amountE8s);
         return #Err(#RoundAlreadyOpen);
       };
       case null {};
@@ -791,7 +824,7 @@ actor self {
     let dealerNatural = Cards.handTotal(round.dealerCards) == 21;
     if (playerNatural or dealerNatural) {
       hand.status := ?(if (playerNatural and dealerNatural) { #Push } else if (playerNatural) { #PlayerBlackjack } else { #DealerWin });
-      let view = await finalizeWholeRound(caller, round);
+      let view = await* finalizeWholeRound(caller, round);
       return #Ok(view);
     };
 
@@ -812,7 +845,7 @@ actor self {
         if (Cards.handTotal(hand.cards) > 21) {
           hand.status := ?#PlayerBust;
           hand.done := true;
-          let view = await advanceOrFinalizeRound(caller, round);
+          let view = await* advanceOrFinalizeRound(caller, round);
           #Ok(view);
         } else {
           #Ok(viewOf(round));
@@ -830,7 +863,7 @@ actor self {
         let hand = round.hands[round.activeHandIndex];
         if (hand.done) { return #Err(#ActionNotAllowed) };
         hand.done := true;
-        let view = await advanceOrFinalizeRound(caller, round);
+        let view = await* advanceOrFinalizeRound(caller, round);
         #Ok(view);
       };
     };
@@ -915,7 +948,7 @@ actor self {
                 hand.cards := Array.concat(hand.cards, [card]);
                 hand.done := true;
                 if (Cards.handTotal(hand.cards) > 21) { hand.status := ?#PlayerBust };
-                let view = await advanceOrFinalizeRound(caller, round);
+                let view = await* advanceOrFinalizeRound(caller, round);
                 #Ok(view);
               };
               case null {
@@ -927,7 +960,7 @@ actor self {
                 // the round's own finalize already released the full
                 // newWorstCase (including `extra`); don't release it again
                 // here, just refund the just-pulled extra stake.
-                await pay(round.token, caller, round.amount);
+                await* pay(round.token, caller, round.amount);
                 #Err(#ActionNotAllowed);
               };
             };
@@ -1026,13 +1059,20 @@ actor self {
                   { var cards = [original.cards[1], card2]; var betAmount = round.amount; var done = false; var status = null },
                 ];
                 round.activeHandIndex := 0;
-                #Ok(viewOf(round));
+                if (Cards.rankOf(original.cards[0]) == 12) {
+                  // Aces: one card each, then straight to the dealer.
+                  for (h in round.hands.vals()) { h.done := true };
+                  let view = await* finalizeWholeRound(caller, round);
+                  #Ok(view);
+                } else {
+                  #Ok(viewOf(round));
+                };
               };
               case null {
                 // See doubleDown()'s identical branch: reservedPayout was
                 // already bumped before this await, so finalize already
                 // released the full newWorstCase -- don't release again.
-                await pay(round.token, caller, round.amount);
+                await* pay(round.token, caller, round.amount);
                 #Err(#ActionNotAllowed);
               };
             };
@@ -1074,19 +1114,47 @@ actor self {
         // active -- so an abandoned round walked away from mid-way through
         // hand 2 of a split still gets that hand fairly concluded too.
         for (hand in round.hands.vals()) { if (not hand.done) { hand.done := true } };
-        let view = await finalizeWholeRound(player, round);
+        let view = await* finalizeWholeRound(player, round);
         #Ok(view);
       };
     };
   };
 
   // Permissionless, but only once a round has genuinely sat open past
-  // ROUND_EXPIRY_NANOS (24h, see getRules()) -- bounds worst-case aggregate
+  // ROUND_EXPIRY_NANOS (see getRules()) -- bounds worst-case aggregate
   // committedPayout exposure from abandoned rounds to "however many can be
   // opened in one expiry window", rather than "until an admin happens to
   // notice". Anyone can call this for anyone; it can only ever conclude an
   // already-fairly-dealt hand exactly the way stand() would, never change
   // its outcome.
+  // Run by the sweep timer: closes every round left open past
+  // ROUND_EXPIRY_NANOS_LIVE, exactly as resolveExpiredRound would. Without it
+  // an abandoned round kept its reservation forever, since nobody can find a
+  // round without knowing its player.
+  transient let MAX_EXPIRED_ROUNDS_PER_SWEEP : Nat = 25;
+  func resolveExpiredRounds() : async* () {
+    let now = Time.now();
+    var expired : [(Principal, Round)] = [];
+    label scan for ((player, round) in Map.entries(rounds)) {
+      if (expired.size() >= MAX_EXPIRED_ROUNDS_PER_SWEEP) { break scan };
+      if (not round.actionInFlight and now - round.openedAt >= ROUND_EXPIRY_NANOS_LIVE) {
+        expired := Array.concat(expired, [(player, round)]);
+      };
+    };
+    for ((player, round) in expired.vals()) {
+      // Re-checked: earlier rounds' payouts awaited in this loop.
+      switch (Map.get(rounds, Principal.compare, player)) {
+        case (?current) {
+          if (current.openedAt == round.openedAt and not current.actionInFlight) {
+            for (hand in current.hands.vals()) { if (not hand.done) { hand.done := true } };
+            ignore (await* finalizeWholeRound(player, current));
+          };
+        };
+        case null {};
+      };
+    };
+  };
+
   public shared func resolveExpiredRound(player : Principal) : async Types.BlackjackResult {
     switch (Map.get(rounds, Principal.compare, player)) {
       case null { #Err(#NoOpenRound) };
@@ -1094,7 +1162,7 @@ actor self {
         if (round.actionInFlight) { return #Err(#ActionNotAllowed) };
         if (Time.now() - round.openedAt < ROUND_EXPIRY_NANOS_LIVE) { Runtime.trap("round has not expired yet") };
         for (hand in round.hands.vals()) { if (not hand.done) { hand.done := true } };
-        let view = await finalizeWholeRound(player, round);
+        let view = await* finalizeWholeRound(player, round);
         #Ok(view);
       };
     };
@@ -1174,7 +1242,7 @@ actor self {
         // The one operation that could otherwise push the bankroll cache
         // higher than the real balance (see its own comment) -- refreshed
         // for real, right here, so that gap never opens at all.
-        await refreshBankrollCache(p.token);
+        await* refreshBankrollCache(p.token);
         result;
       };
     };
@@ -1260,27 +1328,12 @@ actor self {
   };
 
   public shared func topUpBlackjackFrontend() : async { sent : Nat } {
-    let now = Time.now();
-    if (now - lastTopUpBlackjackFrontendAt < MIN_MAINTENANCE_INTERVAL_NANOS_LIVE) { return { sent = 0 } };
-    lastTopUpBlackjackFrontendAt := now;
-
-    let balance = Cycles.balance();
-    if (balance <= CYCLES_RESERVE_LIVE) { return { sent = 0 } };
-    switch (blackjackFrontendId) {
-      case null { { sent = 0 } };
-      case (?target) {
-        let surplus = balance - CYCLES_RESERVE_LIVE;
-        let Management : Types.ManagementActor = actor ("aaaaa-aa");
-        let outcome = try {
-          await (with cycles = surplus) Management.deposit_cycles({ canister_id = target });
-          ?();
-        } catch (_e) { null };
-        switch (outcome) {
-          case (?()) { { sent = surplus } };
-          case null { { sent = 0 } };
-        };
-      };
-    };
+    // Disabled 2026-11-08: mother now tops up by measured burn, and cycles
+    // forwarded on from here would look to it like this canister burning
+    // them, so it would keep sending more, only for them to end up on a
+    // frontend that already holds decades of cycles. Kept as a no-op so the
+    // public interface doesn't change.
+    { sent = 0 };
   };
 
   // lastDealAttempt is transient and unbounded: any caller can add an entry
@@ -1325,13 +1378,13 @@ actor self {
       #seconds SWEEP_INTERVAL_SECONDS_LIVE,
       func() : async () {
         ignore (await sweepIcpProfit());
-        ignore (await topUpBlackjackFrontend());
         // sweepIcpProfit already resyncs the ICP side of the bankroll
         // cache for free; PIKO has no equivalent periodic sweep of its
         // own, so resync it here on the same cadence.
-        await refreshBankrollCache(#PIKO);
+        await* refreshBankrollCache(#PIKO);
         ignore (await pruneStaleDealAttempts());
         ignore (await pruneStaleClaimAttempts());
+        await* resolveExpiredRounds();
       },
     );
   };

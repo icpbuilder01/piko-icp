@@ -82,4 +82,20 @@ module {
     };
     total;
   };
+
+  // True when an Ace is still being counted as 11 in the best total: such a
+  // hand can't bust on the next card. Same reduction as handTotal.
+  public func isSoft(cards : [Nat8]) : Bool {
+    var total = 0;
+    var aces = 0;
+    for (c in cards.vals()) {
+      total += rankValue(c);
+      if (rankOf(c) == 12) { aces += 1 };
+    };
+    while (total > 21 and aces > 0) {
+      total -= 10;
+      aces -= 1;
+    };
+    aces > 0;
+  };
 }

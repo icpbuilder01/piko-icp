@@ -175,6 +175,8 @@ module {
   public type Rules = {
     deckCount : Nat;
     dealerStandsOn : Nat;
+    dealerHitsSoft17 : Bool;
+    oneCardOnSplitAces : Bool;
     blackjackPayoutBps : Nat;
     doubleDownAllowed : Bool;
     splitAllowed : Bool;

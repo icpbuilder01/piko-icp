@@ -113,7 +113,7 @@ export function BlackjackTable({ round, dealing, shakeTrigger, stamp, rules, bet
         <span className="bj-banner-title">Blackjack</span>
         {rules && (
           <span className="bj-banner-ribbon">
-            Blackjack pays {(Number(rules.blackjackPayoutBps) / 10000 - 1).toFixed(1)} to 1 &middot; Dealer stands on {Number(rules.dealerStandsOn)}
+            Blackjack pays {(Number(rules.blackjackPayoutBps) / 10000 - 1).toFixed(1)} to 1 &middot; Dealer hits soft 17
           </span>
         )}
       </div>

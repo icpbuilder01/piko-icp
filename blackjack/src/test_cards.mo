@@ -91,6 +91,13 @@ let twoOfHearts = Cards.cardOf(c(0, 0));
 check("cardOf: rank decodes to Two", twoOfHearts.rank == #Two);
 check("cardOf: suit decodes to Hearts", twoOfHearts.suit == #Hearts);
 
+// isSoft: rank 12 = Ace, 4 = 6, 5 = 7, 8 = 10.
+check("isSoft: A+6 is soft", Cards.isSoft([c(0, 12), c(0, 4)]));
+check("isSoft: 10+7 is hard", not Cards.isSoft([c(0, 8), c(0, 5)]));
+check("isSoft: A+6+10 is hard (Ace must count as 1)", not Cards.isSoft([c(0, 12), c(0, 4), c(0, 8)]));
+check("isSoft: A+A+5 is soft", Cards.isSoft([c(0, 12), c(1, 12), c(0, 3)]));
+check("isSoft: A+A+10+10 is hard", not Cards.isSoft([c(0, 12), c(1, 12), c(0, 8), c(1, 8)]));
+
 if (failures > 0) {
   Debug.print(Nat.toText(failures) # " FAILURE(S)");
   Runtime.trap("test_cards.mo: failures detected, see output above");

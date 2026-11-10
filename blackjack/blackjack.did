@@ -59,7 +59,9 @@ type Stats =
 type Rules = 
  record {
    blackjackPayoutBps: nat;
+   dealerHitsSoft17: bool;
    dealerStandsOn: nat;
+   oneCardOnSplitAces: bool;
    deckCount: nat;
    doubleAfterSplitAllowed: bool;
    doubleDownAllowed: bool;
