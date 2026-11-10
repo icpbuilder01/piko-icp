@@ -115,7 +115,7 @@ connected to bob.fun or BOB in any way.**
 
 - **Two ways to mine, same rules:**
   - **In the browser** (the site's "Mine" panel): a Web Worker hashes
-    candidate nonces locally with the Web Crypto API against the current
+    candidate nonces locally with WebAssembly SHA-256 (`hash-wasm`) against the current
     block header. Requires being logged in with Internet Identity (rewards go
     to your principal); stops when you close the tab.
   - **In [PikoNativeMiner](https://github.com/icpbuilder01/pikonativeminer)**, the open-source desktop app, for long

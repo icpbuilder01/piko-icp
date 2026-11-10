@@ -1181,8 +1181,8 @@ function App() {
             </p>
             <ul className="tech-list">
               <li>
-                Hashing runs <strong>in your browser</strong> via the Web Crypto
-                API (<code>crypto.subtle.digest</code>) — real SHA-256, computed
+                Hashing runs <strong>in your browser</strong> via a WebAssembly
+                build of SHA-256 (<code>hash-wasm</code>) — real SHA-256, computed
                 on your device.
               </li>
               <li>
