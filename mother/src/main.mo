@@ -150,6 +150,11 @@ actor self {
   // The landing site (www.piko.network) is a static site with no income of
   // its own, so without this loop it stops once nobody tops it up by hand.
   transient let landingId : ?Principal = ?Principal.fromText("7w27g-xiaaa-aaaaj-qseja-cai");
+  // 2026-11-14: the Dice and Pixel sites used to be refilled by their own
+  // backends (topUpDiceFrontend / place), a relay disabled on 2026-11-08.
+  // Listed here so nothing in the family is left without a refill.
+  transient let diceFrontendId : ?Principal = ?Principal.fromText("77zu2-baaaa-aaaaj-qseiq-cai");
+  transient let placeFrontendId : ?Principal = ?Principal.fromText("cglm2-byaaa-aaaac-bf4aq-cai");
   // index (the official ic-icrc1-index-ng canister, see ../index/
   // canister.yaml) is same-workspace, so PUBLIC_CANISTER_ID:index is
   // auto-injected exactly like frontend/miner/dice above. It has no income
@@ -1555,7 +1560,7 @@ actor self {
       // The reference miner is no longer a target: it was deleted (2026-11),
       // and a target whose balance can't be read sends the whole pass back to
       // the fixed split.
-      [?ledgerId, frontendId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId],
+      [?ledgerId, frontendId, diceId, blackjackId, blackjackFrontendId, placeId, indexId, pikopokerId, pikopoolId, pikopokerFrontendId, legacyId, legacyFrontendId, monitorId, landingId, diceFrontendId, placeFrontendId],
       func(t) { t },
     );
     if (targets.size() == 0) { return nothing };
