@@ -234,6 +234,7 @@ service : {
   getRecentRounds: () -> (vec RecentRound) query;
   getRules: () -> (Rules) query;
   getStats: () -> (Stats);
+  getStatsView: () -> (Stats) query;
   hit: () -> (BlackjackResult);
   lockBankrollConfig: () -> ();
   lockPikoLedgerId: () -> ();

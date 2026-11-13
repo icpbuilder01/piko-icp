@@ -145,6 +145,7 @@ service : {
   getPendingPayout: (token: TokenKind) -> (nat) query;
   getRecentBets: () -> (vec RecentBet) query;
   getStats: () -> (Stats);
+  getStatsView: () -> (Stats) query;
   lockRiskConfig: () -> ();
   lockWithdrawals: () -> ();
   placeBet: (token: TokenKind, amountE8s: nat, target: nat) -> (BetResult);

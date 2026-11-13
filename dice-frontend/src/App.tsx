@@ -12,6 +12,7 @@ import "./App.css";
 import "./theme.css";
 
 const POLL_MS = 5000;
+const BANKROLL_REFRESH_MS = 5 * 60_000; // matches the canister's once-per-5-min getStats window
 
 
 function formatCycles(raw: bigint): string {
@@ -32,7 +33,7 @@ function App() {
   const refresh = useCallback(async () => {
     try {
       const dice = getDiceActor();
-      const [s, bets, lb] = await Promise.all([dice.getStats(), dice.getRecentBets(), dice.getLeaderboard()]);
+      const [s, bets, lb] = await Promise.all([dice.getStatsView(), dice.getRecentBets(), dice.getLeaderboard()]);
       setStats(s);
       setRecentBets(bets.slice().reverse());
       setLeaderboard(lb);
@@ -47,6 +48,16 @@ function App() {
     const id = setInterval(refresh, POLL_MS);
     return () => clearInterval(id);
   }, [refresh]);
+
+  // getStatsView is a free query that serves the canister's cached bankroll.
+  // The paid getStats re-reads the real balances; the canister accepts it at
+  // most once every 5 minutes from anyone, so a refused call is expected.
+  useEffect(() => {
+    const nudge = () => { getDiceActor().getStats().catch(() => {}); };
+    nudge();
+    const id = setInterval(nudge, BANKROLL_REFRESH_MS);
+    return () => clearInterval(id);
+  }, []);
 
   async function handleLogin() {
     const id = await login();

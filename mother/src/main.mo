@@ -1717,4 +1717,64 @@ actor self {
   };
 
   armSweepTimer<system>();
+
+  // ---- Ingress filter (anti-spam) ----
+  //
+  // Runs before a user's call is accepted; a call refused here costs this
+  // canister no cycles. It is only an early "no": it runs on one node and
+  // canister callers skip it, so every method still does all of its own
+  // checks. Public methods are listed explicitly; anything else (admin
+  // methods, queries sent as paid update calls, timer-only maintenance) is
+  // left to controllers. Timers call their methods as self-calls, which never
+  // come through here.
+  system func inspect({
+    caller : Principal;
+    arg : Blob;
+    msg : {
+      #getWork : Any;
+      #getStats : Any;
+      #getRecentBlocks : Any;
+      #getRetargetHistory : Any;
+      #getPendingReward : Any;
+      #getTotalPendingRewards : Any;
+      #cyclesBalance : Any;
+      #submitProof : () -> Nat;
+      #getLeaderboard : Any;
+      #getMinerCount : Any;
+      #getMinerStats : Any;
+      #claimPendingReward : Any;
+      #getPendingAdminChanges : Any;
+      #setMiningFeeE8s : Any;
+      #proposeIcpFeeTarget : Any;
+      #cancelPendingIcpFeeTarget : Any;
+      #executeIcpFeeTarget : Any;
+      #lockIcpFeeTarget : Any;
+      #proposeCyclesFundRatioBps : Any;
+      #cancelPendingCyclesFundRatio : Any;
+      #executeCyclesFundRatioBps : Any;
+      #lockCyclesFundRatio : Any;
+      #pruneStaleAttempts : Any;
+      #getPendingCmcNotifies : Any;
+      #sweepTreasury : Any;
+      #backfillTotalIcpBurned : Any;
+      #backfillTotalIcpConvertedToCycles : Any;
+      #getTopUpObservations : Any;
+      #topUpProject : Any;
+    };
+  }) : Bool {
+    if (arg.size() > 1024) { return false };
+    let now = Time.now();
+    switch msg {
+      // One bit of slack: this node's clock can sit just before a decay step.
+      case (#submitProof nonce) {
+        not Principal.isAnonymous(caller) and leadingZeroBits(computeHash(previousHash, height, nonce())) + 1 >= effectiveDifficultyBits(now);
+      };
+      case (#claimPendingReward _) { Map.containsKey(pendingRewards, Principal.compare, caller) };
+      case (#executeIcpFeeTarget _) { pendingIcpFeeTarget != null };
+      case (#executeCyclesFundRatioBps _) { pendingCyclesFundRatio != null };
+      case (#sweepTreasury _) { now - lastSweepTreasuryAt >= MIN_MAINTENANCE_INTERVAL_NANOS };
+      case (#topUpProject _) { now - lastTopUpProjectAt >= TOP_UP_MIN_INTERVAL_NANOS };
+      case _ { Principal.isController(caller) };
+    };
+  };
 };

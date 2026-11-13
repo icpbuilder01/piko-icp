@@ -129,6 +129,10 @@ actor self {
   // of this literal would silently never take effect without this
   // annotation (see security audit).
   transient let MIN_BET_INTERVAL_NANOS : Int = 300_000_000; // 0.3s
+  // 1 PIKO. Below that, the house edge on a bet is worth less than the cycles
+  // the bet burns, which made tiny bets a cheap way to drain the canister.
+  // ICP bets already pay a 0.0001 ICP ledger fee, more than their cycles.
+  transient let MIN_PIKO_BET_E8S : Nat = 100_000_000;
   transient let lastBetAttempt : Map.Map<Principal, Time.Time> = Map.empty<Principal, Time.Time>();
 
   // Never share cycles below this floor -- keeps whatever this canister
@@ -306,9 +310,27 @@ actor self {
   // few seconds, so serving a short-lived cache in between is invisible to
   // real players.
   transient let MIN_STATS_REFRESH_INTERVAL_NANOS : Int = 5_000_000_000; // 5s
+  transient let STATS_INGRESS_MIN_INTERVAL_NANOS : Int = 300_000_000_000; // see inspect
   var lastStatsRefreshAt : Int = 0;
   var icpBankrollCache : Nat = 0;
   var pikoBankrollCache : Nat = 0;
+
+  func statsRecord() : Types.Stats {
+    {
+      betsPlaced;
+      betsWon;
+      totalWageredIcpE8s;
+      totalWageredPiko;
+      totalPaidOutIcpE8s;
+      totalPaidOutPiko;
+      icpBankrollE8s = icpBankrollCache;
+      pikoBankroll = pikoBankrollCache;
+      cyclesBalance = Cycles.balance();
+    };
+  };
+
+  // Same numbers without refreshing anything: free, for the site's polling.
+  public query func getStatsView() : async Types.Stats { statsRecord() };
 
   public func getStats() : async Types.Stats {
     let now = Time.now();
@@ -324,17 +346,7 @@ actor self {
         await PikoLedger.icrc1_balance_of({ owner = self_; subaccount = null });
       } catch (_e) { pikoBankrollCache };
     };
-    {
-      betsPlaced;
-      betsWon;
-      totalWageredIcpE8s;
-      totalWageredPiko;
-      totalPaidOutIcpE8s;
-      totalPaidOutPiko;
-      icpBankrollE8s = icpBankrollCache;
-      pikoBankroll = pikoBankrollCache;
-      cyclesBalance = Cycles.balance();
-    };
+    statsRecord();
   };
 
   public query func getRecentBets() : async [Types.RecentBet] { recentBets };
@@ -400,6 +412,14 @@ actor self {
   // already gone, atomically, before raw_rand() is ever called, so there is
   // no point at which the caller can see the outcome and still back out.
   public shared ({ caller }) func placeBet<system>(token : Types.TokenKind, amountE8s : Nat, target : Nat) : async Types.BetResult {
+    let now = Time.now();
+    switch (enterPaid(caller, now)) { case (?wait) { return #Err(#TooSoon({ retryAfterNanos = wait })) }; case null {} };
+    let result = await* placeBetBody<system>(caller, token, amountE8s, target);
+    noteOutcome(caller, switch (result) { case (#Ok(_)) { ?true }; case (#Err(#TooSoon(_))) { null }; case _ { ?false } }, Time.now());
+    result;
+  };
+
+  func placeBetBody<system>(caller : Principal, token : Types.TokenKind, amountE8s : Nat, target : Nat) : async* Types.BetResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
 
     let now = Time.now();
@@ -417,6 +437,7 @@ actor self {
 
     if (target < MIN_TARGET or target > MAX_TARGET) { return #Err(#InvalidTarget) };
     if (amountE8s == 0) { return #Err(#InvalidAmount) };
+    if (token == #PIKO and amountE8s < MIN_PIKO_BET_E8S) { return #Err(#InvalidAmount) };
     if (Map.get(pendingBets, Principal.compare, caller) != null) {
       return #Err(#BetInProgress);
     };
@@ -776,4 +797,147 @@ actor self {
   system func postupgrade() { armSweepTimer<system>() };
 
   armSweepTimer<system>();
+
+  // ---- Paid entry points: who gets in ----
+  //
+  // A paid call (bet, deal, pixel, ad, vault) costs this canister cycles even
+  // when the payment fails, and a new identity costs nothing to make. Known
+  // players (anyone who has already paid here) always get in, but after a few
+  // failures in a row each further failure makes them wait longer, up to an
+  // hour; one success clears it. Everyone else shares a small newcomer
+  // allowance that refills over time, so a flood of throwaway identities can
+  // only burn a bounded amount of cycles. All transient: an upgrade starts
+  // again from a full allowance and clean slates.
+  transient let NEWCOMER_BURST : Int = 30;
+  transient let NEWCOMER_REFILL_NANOS : Int = 120_000_000_000; // one more newcomer every 2 min
+  transient var newcomerCredit : Int = NEWCOMER_BURST * NEWCOMER_REFILL_NANOS;
+  transient var newcomerCreditAt : Int = 0;
+  transient let FREE_FAILURES : Nat = 3;
+  transient let FAILURE_BACKOFF_BASE_NANOS : Int = 10_000_000_000;
+  transient let FAILURE_BACKOFF_MAX_NANOS : Int = 3_600_000_000_000;
+  // Only known players get an entry here, so it stays as small as the player list.
+  transient let failureStreaks : Map.Map<Principal, (Nat, Int)> = Map.empty<Principal, (Nat, Int)>();
+
+  func isKnownPlayer(p : Principal) : Bool { Map.containsKey(playerWageredPiko, Principal.compare, p) or Map.containsKey(playerWageredIcp, Principal.compare, p) };
+
+  func newcomerCreditNow(now : Int) : Int {
+    Int.min(NEWCOMER_BURST * NEWCOMER_REFILL_NANOS, newcomerCredit + (now - newcomerCreditAt));
+  };
+
+  func takeNewcomerSlot(now : Int) : Bool {
+    let credit = newcomerCreditNow(now);
+    if (credit < NEWCOMER_REFILL_NANOS) { return false };
+    newcomerCredit := credit - NEWCOMER_REFILL_NANOS;
+    newcomerCreditAt := now;
+    true;
+  };
+
+  func blockedUntil(p : Principal) : Int {
+    switch (Map.get(failureStreaks, Principal.compare, p)) { case (?(_, until)) { until }; case null { 0 } };
+  };
+
+  // Ok resets the streak; a failure by a known player lengthens it; neutral
+  // outcomes (TooSoon) change nothing.
+  func noteOutcome(p : Principal, succeeded : ?Bool, now : Int) {
+    switch (succeeded) {
+      case (?true) { Map.remove(failureStreaks, Principal.compare, p) };
+      case (?false) {
+        if (isKnownPlayer(p)) {
+          let streak = switch (Map.get(failureStreaks, Principal.compare, p)) { case (?(k, _)) { k + 1 }; case null { 1 } };
+          let wait = if (streak <= FREE_FAILURES) { 0 } else {
+            Int.min(FAILURE_BACKOFF_MAX_NANOS, FAILURE_BACKOFF_BASE_NANOS * (2 ** Nat.min(20, streak - FREE_FAILURES - 1 : Nat)));
+          };
+          Map.add(failureStreaks, Principal.compare, p, (streak, now + wait));
+        };
+      };
+      case null {};
+    };
+  };
+
+  // Admission check shared by inspect (free refusal) and the method itself
+  // (for canister callers, which skip inspect). Returns the wait in
+  // nanoseconds when refused.
+  func paidRefusal(caller : Principal, now : Int) : ?Nat {
+    if (isKnownPlayer(caller)) {
+      let until = blockedUntil(caller);
+      if (until > now) { ?Int.abs(until - now) } else { null };
+    } else if (newcomerCreditNow(now) < NEWCOMER_REFILL_NANOS) {
+      ?Int.abs(NEWCOMER_REFILL_NANOS - newcomerCreditNow(now));
+    } else { null };
+  };
+
+  func admitPaid(caller : Principal, now : Int, lastAttempt : ?Int, interval : Int) : Bool {
+    if (Principal.isAnonymous(caller)) { return false };
+    if (isKnownPlayer(caller)) {
+      switch (lastAttempt) { case (?t) { if (now - t < interval) { return false } }; case null {} };
+    };
+    paidRefusal(caller, now) == null;
+  };
+
+  // In the method: refuse, or take a newcomer slot.
+  func enterPaid(caller : Principal, now : Int) : ?Nat {
+    if (Principal.isAnonymous(caller)) { return null }; // the method answers Anonymous itself
+    switch (paidRefusal(caller, now)) {
+      case (?wait) { ?wait };
+      case null {
+        if (not isKnownPlayer(caller)) { ignore takeNewcomerSlot(now) };
+        null;
+      };
+    };
+  };
+
+  // ---- Ingress filter (anti-spam) ----
+  //
+  // Runs before a user's call is accepted; a call refused here costs this
+  // canister no cycles. It is only an early "no": it runs on one node and
+  // canister callers skip it, so every method still does all of its own
+  // checks. Public methods are listed explicitly; anything else (admin
+  // methods, queries sent as paid update calls, timer-only maintenance) is
+  // left to controllers. Timers call their methods as self-calls, which never
+  // come through here.
+  system func inspect({
+    caller : Principal;
+    arg : Blob;
+    msg : {
+      #getConfig : Any;
+      #getStats : Any;
+      #getStatsView : Any;
+      #getRecentBets : Any;
+      #getLeaderboard : Any;
+      #getPendingPayout : Any;
+      #claimPendingPayout : () -> Types.TokenKind;
+      #placeBet : () -> (Types.TokenKind, Nat, Nat);
+      #getPendingAdminChanges : Any;
+      #proposeRiskConfig : Any;
+      #cancelPendingRiskConfig : Any;
+      #executeRiskConfig : Any;
+      #lockRiskConfig : Any;
+      #proposeWithdrawal : Any;
+      #cancelPendingWithdrawal : Any;
+      #executeWithdrawal : Any;
+      #lockWithdrawals : Any;
+      #sweepIcpProfit : Any;
+      #topUpDiceFrontend : Any;
+      #pruneStaleBetAttempts : Any;
+    };
+  }) : Bool {
+    if (arg.size() > 1024) { return false };
+    let now = Time.now();
+    switch msg {
+      case (#placeBet f) {
+        let (token, amountE8s, _) = f();
+        not (token == #PIKO and amountE8s < MIN_PIKO_BET_E8S) and admitPaid(caller, now, Map.get(lastBetAttempt, Principal.compare, caller), MIN_BET_INTERVAL_NANOS);
+      };
+      // Refreshing needs two ledger calls: one ingress refresh per 5 min at most.
+      case (#getStats _) { now - lastStatsRefreshAt >= STATS_INGRESS_MIN_INTERVAL_NANOS };
+      case (#claimPendingPayout token) {
+        let m = switch (token()) { case (#ICP) { pendingIcpPayouts }; case (#PIKO) { pendingPikoPayouts } };
+        Map.containsKey(m, Principal.compare, caller);
+      };
+      case (#executeRiskConfig _) { pendingRiskConfig != null };
+      case (#executeWithdrawal _) { pendingWithdrawal != null };
+      case (#sweepIcpProfit _) { now - lastSweepIcpProfitAt >= MIN_MAINTENANCE_INTERVAL_NANOS };
+      case _ { Principal.isController(caller) };
+    };
+  };
 };

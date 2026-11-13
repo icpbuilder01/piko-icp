@@ -37,6 +37,7 @@ const APPROVE_ROLLS = 20;
 // ledger/icrc1_ledger_init.args.template), unrelated to ICP's, but happens
 // to share the same value today.
 const PIKO_LEDGER_FEE_E8S = 10_000n;
+const MIN_BET_E8S = 100_000_000n; // 1 PIKO, enforced by the canister too
 // How many of this session's rolls the history strip keeps.
 const HISTORY_SIZE = 14;
 
@@ -56,7 +57,7 @@ function betErrorMessage(err: BetError, attemptedPayout: bigint | null): string 
     case "TooSoon":
       return "Slow down a little -- try again in a moment.";
     case "InvalidAmount":
-      return "Enter a valid bet amount.";
+      return "Enter a valid bet amount (minimum 1 PIKO).";
     case "InvalidTarget":
       return "Pick a target in range.";
     case "BetInProgress":
@@ -203,7 +204,9 @@ export function Dice({ identity, onLogin }: DiceProps) {
 
   const minTarget = Number(config.minTarget);
   const maxTarget = Number(config.maxTarget);
-  const amount = parseAmount(amountInput);
+  const parsedAmount = parseAmount(amountInput);
+  // Below the minimum counts as no valid amount: Approve and Roll stay disabled.
+  const amount = parsedAmount !== null && parsedAmount >= MIN_BET_E8S ? parsedAmount : null;
   const payoutMultiplier = target > 0 ? Number(config.payoutNumerator) / target : 0;
   const potentialPayout = amount !== null ? (amount * config.payoutNumerator) / BigInt(target) : null;
   const feeApproved = amount !== null ? (allowance ?? 0n) >= amount + PIKO_LEDGER_FEE_E8S : false;
@@ -313,7 +316,7 @@ export function Dice({ identity, onLogin }: DiceProps) {
             <div className="wallet-send-row">
               <input
                 className="input"
-                placeholder="Bet amount (PIKO)"
+                placeholder="Bet amount (PIKO, min 1)"
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 inputMode="decimal"

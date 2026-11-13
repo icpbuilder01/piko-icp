@@ -62,6 +62,9 @@ actor self {
   // shared by every player, so one abandoned max bet blocked the whole table
   // for a day (2026-11-10 audit). See resolveExpiredRound below.
   transient let ROUND_EXPIRY_NANOS_LIVE : Int = 60 * 60 * 1_000_000_000;
+  // 1 PIKO minimum stake: tiny rounds cost the canister more cycles than they
+  // cost the player. ICP stakes already pay a 0.0001 ICP ledger fee.
+  transient let MIN_PIKO_BET_E8S : Nat = 100_000_000;
 
   func payoutBpsFor(status : Types.ResolvedStatus) : Nat {
     switch (status) {
@@ -475,7 +478,24 @@ actor self {
   // split() size bets against, so this is never less fresh than what
   // actually gates real money movement.
   transient let MIN_STATS_REFRESH_INTERVAL_NANOS : Int = 5_000_000_000; // 5s
+  transient let STATS_INGRESS_MIN_INTERVAL_NANOS : Int = 300_000_000_000; // see inspect
   var lastStatsRefreshAt : Int = 0;
+
+  func statsRecord() : Types.Stats {
+    {
+      roundsPlayed;
+      totalWageredIcpE8s;
+      totalWageredPiko;
+      totalPaidOutIcpE8s;
+      totalPaidOutPiko;
+      icpBankrollE8s = bankrollCacheFor(#ICP);
+      pikoBankroll = bankrollCacheFor(#PIKO);
+      cyclesBalance = Cycles.balance();
+    };
+  };
+
+  // Same numbers without refreshing anything: free, for the site's polling.
+  public query func getStatsView() : async Types.Stats { statsRecord() };
 
   public func getStats() : async Types.Stats {
     let now = Time.now();
@@ -502,16 +522,7 @@ actor self {
       setBankrollCache(#ICP, icpBankrollE8s);
       setBankrollCache(#PIKO, pikoBankroll);
     };
-    {
-      roundsPlayed;
-      totalWageredIcpE8s;
-      totalWageredPiko;
-      totalPaidOutIcpE8s;
-      totalPaidOutPiko;
-      icpBankrollE8s = bankrollCacheFor(#ICP);
-      pikoBankroll = bankrollCacheFor(#PIKO);
-      cyclesBalance = Cycles.balance();
-    };
+    statsRecord();
   };
 
   public query func getRecentRounds() : async [Types.RecentRound] { recentRounds };
@@ -668,6 +679,14 @@ actor self {
   // overlapping worst-case reservations against shared bankroll headroom
   // under one identity).
   public shared ({ caller }) func deal<system>(token : Types.TokenKind, amountE8s : Nat) : async Types.BlackjackResult {
+    let now = Time.now();
+    switch (enterPaid(caller, now)) { case (?wait) { return #Err(#TooSoon({ retryAfterNanos = wait })) }; case null {} };
+    let result = await* dealBody<system>(caller, token, amountE8s);
+    noteOutcome(caller, switch (result) { case (#Ok(_)) { ?true }; case (#Err(#TooSoon(_))) { null }; case _ { ?false } }, Time.now());
+    result;
+  };
+
+  func dealBody<system>(caller : Principal, token : Types.TokenKind, amountE8s : Nat) : async* Types.BlackjackResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
 
     let now = Time.now();
@@ -684,6 +703,7 @@ actor self {
     Map.add(lastDealAttempt, Principal.compare, caller, now);
 
     if (amountE8s == 0) { return #Err(#InvalidAmount) };
+    if (token == #PIKO and amountE8s < MIN_PIKO_BET_E8S) { return #Err(#InvalidAmount) };
     switch (Map.get(rounds, Principal.compare, caller)) {
       case (?_) { return #Err(#RoundAlreadyOpen) };
       case null {};
@@ -879,6 +899,14 @@ actor self {
   // why that's the same ceiling split() reserves, so both share this exact
   // reservation-bump shape.
   public shared ({ caller }) func doubleDown() : async Types.BlackjackResult {
+    let now = Time.now();
+    switch (enterPaid(caller, now)) { case (?wait) { return #Err(#TooSoon({ retryAfterNanos = wait })) }; case null {} };
+    let result = await* doubleDownBody(caller);
+    noteOutcome(caller, switch (result) { case (#Ok(_)) { ?true }; case (#Err(#TooSoon(_))) { null }; case _ { ?false } }, Time.now());
+    result;
+  };
+
+  func doubleDownBody(caller : Principal) : async* Types.BlackjackResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
     switch (Map.get(rounds, Principal.compare, caller)) {
       case null { #Err(#NoOpenRound) };
@@ -991,6 +1019,14 @@ actor self {
   // original pre-split deal, already fully resolved before split() is ever
   // reachable -- so a split hand landing 21 is just an ordinary strong win.
   public shared ({ caller }) func split() : async Types.BlackjackResult {
+    let now = Time.now();
+    switch (enterPaid(caller, now)) { case (?wait) { return #Err(#TooSoon({ retryAfterNanos = wait })) }; case null {} };
+    let result = await* splitBody(caller);
+    noteOutcome(caller, switch (result) { case (#Ok(_)) { ?true }; case (#Err(#TooSoon(_))) { null }; case _ { ?false } }, Time.now());
+    result;
+  };
+
+  func splitBody(caller : Principal) : async* Types.BlackjackResult {
     if (Principal.isAnonymous(caller)) { return #Err(#Anonymous) };
     switch (Map.get(rounds, Principal.compare, caller)) {
       case null { #Err(#NoOpenRound) };
@@ -1428,4 +1464,179 @@ actor self {
   };
 
   armSweepTimer<system>();
+
+  // ---- Paid entry points: who gets in ----
+  //
+  // A paid call (bet, deal, pixel, ad, vault) costs this canister cycles even
+  // when the payment fails, and a new identity costs nothing to make. Known
+  // players (anyone who has already paid here) always get in, but after a few
+  // failures in a row each further failure makes them wait longer, up to an
+  // hour; one success clears it. Everyone else shares a small newcomer
+  // allowance that refills over time, so a flood of throwaway identities can
+  // only burn a bounded amount of cycles. All transient: an upgrade starts
+  // again from a full allowance and clean slates.
+  transient let NEWCOMER_BURST : Int = 30;
+  transient let NEWCOMER_REFILL_NANOS : Int = 120_000_000_000; // one more newcomer every 2 min
+  transient var newcomerCredit : Int = NEWCOMER_BURST * NEWCOMER_REFILL_NANOS;
+  transient var newcomerCreditAt : Int = 0;
+  transient let FREE_FAILURES : Nat = 3;
+  transient let FAILURE_BACKOFF_BASE_NANOS : Int = 10_000_000_000;
+  transient let FAILURE_BACKOFF_MAX_NANOS : Int = 3_600_000_000_000;
+  // Only known players get an entry here, so it stays as small as the player list.
+  transient let failureStreaks : Map.Map<Principal, (Nat, Int)> = Map.empty<Principal, (Nat, Int)>();
+
+  func isKnownPlayer(p : Principal) : Bool { Map.containsKey(playerWageredPiko, Principal.compare, p) or Map.containsKey(playerWageredIcp, Principal.compare, p) };
+
+  func newcomerCreditNow(now : Int) : Int {
+    Int.min(NEWCOMER_BURST * NEWCOMER_REFILL_NANOS, newcomerCredit + (now - newcomerCreditAt));
+  };
+
+  func takeNewcomerSlot(now : Int) : Bool {
+    let credit = newcomerCreditNow(now);
+    if (credit < NEWCOMER_REFILL_NANOS) { return false };
+    newcomerCredit := credit - NEWCOMER_REFILL_NANOS;
+    newcomerCreditAt := now;
+    true;
+  };
+
+  func blockedUntil(p : Principal) : Int {
+    switch (Map.get(failureStreaks, Principal.compare, p)) { case (?(_, until)) { until }; case null { 0 } };
+  };
+
+  // Ok resets the streak; a failure by a known player lengthens it; neutral
+  // outcomes (TooSoon) change nothing.
+  func noteOutcome(p : Principal, succeeded : ?Bool, now : Int) {
+    switch (succeeded) {
+      case (?true) { Map.remove(failureStreaks, Principal.compare, p) };
+      case (?false) {
+        if (isKnownPlayer(p)) {
+          let streak = switch (Map.get(failureStreaks, Principal.compare, p)) { case (?(k, _)) { k + 1 }; case null { 1 } };
+          let wait = if (streak <= FREE_FAILURES) { 0 } else {
+            Int.min(FAILURE_BACKOFF_MAX_NANOS, FAILURE_BACKOFF_BASE_NANOS * (2 ** Nat.min(20, streak - FREE_FAILURES - 1 : Nat)));
+          };
+          Map.add(failureStreaks, Principal.compare, p, (streak, now + wait));
+        };
+      };
+      case null {};
+    };
+  };
+
+  // Admission check shared by inspect (free refusal) and the method itself
+  // (for canister callers, which skip inspect). Returns the wait in
+  // nanoseconds when refused.
+  func paidRefusal(caller : Principal, now : Int) : ?Nat {
+    if (isKnownPlayer(caller)) {
+      let until = blockedUntil(caller);
+      if (until > now) { ?Int.abs(until - now) } else { null };
+    } else if (newcomerCreditNow(now) < NEWCOMER_REFILL_NANOS) {
+      ?Int.abs(NEWCOMER_REFILL_NANOS - newcomerCreditNow(now));
+    } else { null };
+  };
+
+  func admitPaid(caller : Principal, now : Int, lastAttempt : ?Int, interval : Int) : Bool {
+    if (Principal.isAnonymous(caller)) { return false };
+    if (isKnownPlayer(caller)) {
+      switch (lastAttempt) { case (?t) { if (now - t < interval) { return false } }; case null {} };
+    };
+    paidRefusal(caller, now) == null;
+  };
+
+  // In the method: refuse, or take a newcomer slot.
+  func enterPaid(caller : Principal, now : Int) : ?Nat {
+    if (Principal.isAnonymous(caller)) { return null }; // the method answers Anonymous itself
+    switch (paidRefusal(caller, now)) {
+      case (?wait) { ?wait };
+      case null {
+        if (not isKnownPlayer(caller)) { ignore takeNewcomerSlot(now) };
+        null;
+      };
+    };
+  };
+
+  // ---- Ingress filter (anti-spam) ----
+  //
+  // Runs before a user's call is accepted; a call refused here costs this
+  // canister no cycles. It is only an early "no": it runs on one node and
+  // canister callers skip it, so every method still does all of its own
+  // checks. Public methods are listed explicitly; anything else (admin
+  // methods, queries sent as paid update calls, timer-only maintenance) is
+  // left to controllers. Timers call their methods as self-calls, which never
+  // come through here.
+  system func inspect({
+    caller : Principal;
+    arg : Blob;
+    msg : {
+      #setPikoLedgerId : Any;
+      #lockPikoLedgerId : Any;
+      #refreshBankrollCaches : Any;
+      #getConfig : Any;
+      #getRules : Any;
+      #getStats : Any;
+      #getStatsView : Any;
+      #getRecentRounds : Any;
+      #getOpenRound : Any;
+      #getOpenRoundsCount : Any;
+      #getLeaderboard : Any;
+      #getPendingPayout : Any;
+      #claimPendingPayout : () -> Types.TokenKind;
+      #deal : () -> (Types.TokenKind, Nat);
+      #hit : Any;
+      #stand : Any;
+      #doubleDown : Any;
+      #split : Any;
+      #forceResolveRound : Any;
+      #resolveExpiredRound : () -> Principal;
+      #getPendingAdminChanges : Any;
+      #proposeBankrollConfig : Any;
+      #cancelPendingBankrollConfig : Any;
+      #executeBankrollConfig : Any;
+      #lockBankrollConfig : Any;
+      #proposeWithdrawal : Any;
+      #cancelPendingWithdrawal : Any;
+      #executeWithdrawal : Any;
+      #lockWithdrawals : Any;
+      #sweepIcpProfit : Any;
+      #topUpBlackjackFrontend : Any;
+      #pruneStaleDealAttempts : Any;
+      #pruneStaleClaimAttempts : Any;
+    };
+  }) : Bool {
+    if (arg.size() > 1024) { return false };
+    let now = Time.now();
+    switch msg {
+      case (#deal f) {
+        let (token, amountE8s) = f();
+        not (token == #PIKO and amountE8s < MIN_PIKO_BET_E8S) and admitPaid(caller, now, Map.get(lastDealAttempt, Principal.compare, caller), MIN_DEAL_INTERVAL_NANOS_LIVE);
+      };
+      // Refreshing needs two ledger calls: one ingress refresh per 5 min at most.
+      case (#getStats _) { now - lastStatsRefreshAt >= STATS_INGRESS_MIN_INTERVAL_NANOS };
+      case (#hit _ or #stand _) {
+        switch (Map.get(rounds, Principal.compare, caller)) {
+          case (?round) { not round.actionInFlight };
+          case null { false };
+        };
+      };
+      case (#doubleDown _ or #split _) {
+        switch (Map.get(rounds, Principal.compare, caller)) {
+          // Both pull a second stake: a failing pull must not be retried in a loop.
+          case (?round) { not round.actionInFlight and round.hands.size() == 1 and not round.hands[0].done and round.hands[0].cards.size() == 2 and blockedUntil(caller) <= now };
+          case null { false };
+        };
+      };
+      case (#claimPendingPayout token) {
+        let m = switch (token()) { case (#ICP) { pendingIcpPayouts }; case (#PIKO) { pendingPikoPayouts } };
+        Map.containsKey(m, Principal.compare, caller);
+      };
+      case (#resolveExpiredRound player) {
+        switch (Map.get(rounds, Principal.compare, player())) {
+          case (?round) { not round.actionInFlight and now - round.openedAt >= ROUND_EXPIRY_NANOS_LIVE };
+          case null { false };
+        };
+      };
+      case (#executeBankrollConfig _) { pendingBankrollConfig != null };
+      case (#executeWithdrawal _) { pendingWithdrawal != null };
+      case (#sweepIcpProfit _) { now - lastSweepIcpProfitAt >= MIN_MAINTENANCE_INTERVAL_NANOS_LIVE };
+      case _ { Principal.isController(caller) };
+    };
+  };
 };
