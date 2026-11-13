@@ -253,7 +253,10 @@ actor self {
   // 10-25B cycles/day, so 2T was only a few months of runway if mining (its
   // only cycles income) ever dried up. 10T is roughly 1-3 years. transient, for the same
   // reason as MIN_DIFFICULTY_BITS_LIVE below.
-  transient let CYCLES_RESERVE_LIVE : Nat = 10_000_000_000_000; // 10T
+  // 2026-11-14: raised to 40T before blackholing (roughly 5-10 years at that
+  // burn). Mother is the one canister nobody else tops up, and once it stops
+  // every other canister stops being refilled too.
+  transient let CYCLES_RESERVE_LIVE : Nat = 40_000_000_000_000; // 40T
 
   // ---- Mining state ----
   // Genesis header: a fixed, reproducible seed (not a real value, just a
