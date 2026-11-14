@@ -873,6 +873,17 @@ actor self {
       return #Err(#InvalidProof);
     };
 
+    // Paid entry (see the anti-spam section at the end): the fee pull below
+    // costs a ledger call even when it fails. PikoPool already paid its
+    // participants' checks itself and only calls with a real block.
+    let viaPool = ?caller == pikopoolId;
+    if (not viaPool) {
+      switch (enterPaidRefusal(caller, now)) {
+        case (?wait) { return #Err(#TooSoon({ retryAfterNanos = wait })) };
+        case null {};
+      };
+    };
+
     if (miningFeeE8s > 0) {
       let IcpLedger : Types.IcpLedgerActor = actor (Principal.toText(icpLedgerId));
       let feeOutcome = try {
@@ -890,8 +901,14 @@ actor self {
       } catch (_e) { null };
 
       switch (feeOutcome) {
-        case (? #Ok(_)) { totalIcpFeesCollected += miningFeeE8s };
-        case (? #Err(e)) { return #Err(#IcpFeeFailed(e)) };
+        case (? #Ok(_)) {
+          totalIcpFeesCollected += miningFeeE8s;
+          notePaidOutcome(caller, true, now);
+        };
+        case (? #Err(e)) {
+          notePaidOutcome(caller, false, now);
+          return #Err(#IcpFeeFailed(e));
+        };
         case null {
           return #Err(#IcpFeeFailed(#TemporarilyUnavailable));
         };
@@ -1726,6 +1743,99 @@ actor self {
 
   armSweepTimer<system>();
 
+  // ---- Paid entries and spend budget (2026-11-14) ----
+  //
+  // A proof that clears the target still costs this canister a call to the
+  // ICP ledger, and at a low difficulty such proofs are cheap to make. So:
+  // known miners (anyone who has ever paid the fee or won a block) get 3
+  // free failed fee pulls, then a wait of 10 s that doubles per failure up
+  // to 1 h; one paid submission clears it. Everyone else shares a small
+  // allowance: 30 at once, then one more every 2 min.
+  //
+  // On top of that, every accepted paid call draws on a spend credit that
+  // refills at about 1% of this canister's balance per day (up to one
+  // hour's worth at once). Whatever gets past the other checks can then
+  // drain at most about 1% a day, shrinking with the balance.
+  let feePayers : Map.Map<Principal, Bool> = Map.empty<Principal, Bool>();
+  func isKnownMiner(p : Principal) : Bool {
+    Map.containsKey(feePayers, Principal.compare, p) or Map.containsKey(minerBlocks, Principal.compare, p);
+  };
+
+  transient let NEWCOMER_BURST : Int = 30;
+  transient let NEWCOMER_REFILL_NANOS : Int = 120_000_000_000;
+  transient var newcomerCredit : Int = NEWCOMER_BURST * NEWCOMER_REFILL_NANOS;
+  transient var newcomerCreditAt : Int = 0;
+  transient let FREE_FAILURES : Nat = 3;
+  transient let FAILURE_BACKOFF_BASE_NANOS : Int = 10_000_000_000;
+  transient let FAILURE_BACKOFF_MAX_NANOS : Int = 3_600_000_000_000;
+  transient let failureStreaks : Map.Map<Principal, (Nat, Int)> = Map.empty<Principal, (Nat, Int)>();
+
+  transient let SPEND_BPS_PER_DAY : Nat = 100; // 1%
+  transient let SPEND_COST : Int = 20_000_000; // per paid call, a little above what it costs
+  transient let SPEND_BURST_SECONDS : Int = 3_600;
+  transient var spendCredit : Int = 0;
+  transient var spendCreditAt : Int = 0;
+  transient var spendStarted : Bool = false;
+
+  func spendRatePerSecond() : Int { Cycles.balance() * SPEND_BPS_PER_DAY / 10_000 / 86_400 };
+  func spendCreditNow(now : Int) : Int {
+    let rate = spendRatePerSecond();
+    let cap = rate * SPEND_BURST_SECONDS;
+    if (not spendStarted) { return cap };
+    Int.min(cap, spendCredit + (now - spendCreditAt) * rate / 1_000_000_000);
+  };
+  func spendWait(now : Int) : ?Nat {
+    let credit = spendCreditNow(now);
+    if (credit >= SPEND_COST) { return null };
+    ?Int.abs((SPEND_COST - credit) * 1_000_000_000 / Int.max(1, spendRatePerSecond()));
+  };
+
+  func newcomerCreditNow(now : Int) : Int {
+    Int.min(NEWCOMER_BURST * NEWCOMER_REFILL_NANOS, newcomerCredit + (now - newcomerCreditAt));
+  };
+
+  // null = admitted; ?n = refused, retry in about n nanoseconds.
+  func paidRefusal(caller : Principal, now : Int) : ?Nat {
+    if (isKnownMiner(caller)) {
+      switch (Map.get(failureStreaks, Principal.compare, caller)) {
+        case (?(_, until)) { if (until > now) { return ?Int.abs(until - now) } };
+        case null {};
+      };
+    } else {
+      let credit = newcomerCreditNow(now);
+      if (credit < NEWCOMER_REFILL_NANOS) { return ?Int.abs(NEWCOMER_REFILL_NANOS - credit) };
+    };
+    spendWait(now);
+  };
+
+  func enterPaidRefusal(caller : Principal, now : Int) : ?Nat {
+    switch (paidRefusal(caller, now)) {
+      case (?wait) { return ?wait };
+      case null {};
+    };
+    if (not isKnownMiner(caller)) {
+      newcomerCredit := newcomerCreditNow(now) - NEWCOMER_REFILL_NANOS;
+      newcomerCreditAt := now;
+    };
+    spendCredit := spendCreditNow(now) - SPEND_COST;
+    spendCreditAt := now;
+    spendStarted := true;
+    null;
+  };
+
+  func notePaidOutcome(p : Principal, paid : Bool, now : Int) {
+    if (paid) {
+      Map.add(feePayers, Principal.compare, p, true);
+      Map.remove(failureStreaks, Principal.compare, p);
+    } else if (isKnownMiner(p)) {
+      let streak = switch (Map.get(failureStreaks, Principal.compare, p)) { case (?(k, _)) { k + 1 }; case null { 1 } };
+      let wait = if (streak <= FREE_FAILURES) { 0 } else {
+        Int.min(FAILURE_BACKOFF_MAX_NANOS, FAILURE_BACKOFF_BASE_NANOS * (2 ** Nat.min(20, streak - FREE_FAILURES - 1 : Nat)));
+      };
+      Map.add(failureStreaks, Principal.compare, p, (streak, now + wait));
+    };
+  };
+
   // ---- Ingress filter (anti-spam) ----
   //
   // Runs before a user's call is accepted; a call refused here costs this
@@ -1773,9 +1883,15 @@ actor self {
     if (arg.size() > 1024) { return false };
     let now = Time.now();
     switch msg {
-      // One bit of slack: this node's clock can sit just before a decay step.
+      // Valid now, or within 30 s: difficulty only ever decays with time, so
+      // this covers a node clock sitting just before a decay step without
+      // accepting proofs a bit short of the target. Then the same paid-entry
+      // admission as the method (interval, failures, newcomers, spend).
       case (#submitProof nonce) {
-        not Principal.isAnonymous(caller) and leadingZeroBits(computeHash(previousHash, height, nonce())) + 1 >= effectiveDifficultyBits(now);
+        not Principal.isAnonymous(caller)
+        and leadingZeroBits(computeHash(previousHash, height, nonce())) >= effectiveDifficultyBits(now + 30_000_000_000)
+        and (switch (Map.get(lastAttempt, Principal.compare, caller)) { case (?t) { now - t >= MIN_SUBMIT_INTERVAL_NANOS }; case null { true } })
+        and paidRefusal(caller, now) == null;
       };
       case (#claimPendingReward _) { Map.containsKey(pendingRewards, Principal.compare, caller) };
       case (#executeIcpFeeTarget _) { pendingIcpFeeTarget != null };

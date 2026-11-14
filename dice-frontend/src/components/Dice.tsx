@@ -3,7 +3,7 @@ import type { Identity } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
 import { getDiceActor, getLedgerActor } from "../lib/actors";
 import { diceCanisterId } from "../lib/canister-env";
-import { formatPiko, parseAmount } from "../lib/format";
+import { formatPiko, parseAmount, refusalText } from "../lib/format";
 import { TokenKind, type Config, type BetResult, type BetError } from "../bindings/dice/dice";
 import { Confetti } from "./Confetti";
 import { DiceStage, type HistoryEntry, type Outcome } from "./DiceStage";
@@ -155,7 +155,7 @@ export function Dice({ identity, onLogin }: DiceProps) {
       }
     } catch (err) {
       console.error("claimPendingPayout failed", err);
-      setMessage("Couldn't send your winnings yet, try again in a moment.");
+      setMessage(refusalText(err) ?? "Couldn't send your winnings yet, try again in a moment.");
     } finally {
       setClaiming(false);
       refreshPendingPayout(identity);
@@ -227,7 +227,7 @@ export function Dice({ identity, onLogin }: DiceProps) {
       }
     } catch (err) {
       console.error("Dice approval failed", err);
-      setMessage("Approval failed.");
+      setMessage(refusalText(err) ?? "Approval failed.");
     } finally {
       setApproving(false);
     }
@@ -256,7 +256,7 @@ export function Dice({ identity, onLogin }: DiceProps) {
     } catch (err) {
       console.error("placeBet failed", err);
       setRolling(false);
-      setMessage("Bet failed, nothing was charged if this was a network error -- check your balance.");
+      setMessage(refusalText(err) ?? "Bet failed, nothing was charged if this was a network error -- check your balance.");
     } finally {
       setAwaiting(false);
     }

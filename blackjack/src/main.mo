@@ -1527,10 +1527,40 @@ actor self {
   func paidRefusal(caller : Principal, now : Int) : ?Nat {
     if (isKnownPlayer(caller)) {
       let until = blockedUntil(caller);
-      if (until > now) { ?Int.abs(until - now) } else { null };
+      if (until > now) { return ?Int.abs(until - now) };
     } else if (newcomerCreditNow(now) < NEWCOMER_REFILL_NANOS) {
-      ?Int.abs(NEWCOMER_REFILL_NANOS - newcomerCreditNow(now));
-    } else { null };
+      return ?Int.abs(NEWCOMER_REFILL_NANOS - newcomerCreditNow(now));
+    };
+    spendWait(now);
+  };
+
+  // Spend budget (2026-11-14): every accepted deal, double or split draws SPEND_COST from a
+  // credit that refills at about 1% of this canister's balance per day (one
+  // hour's worth at most at once). Real but tiny bets still pass the checks
+  // above; this bounds what they, or anything else that slips through, can
+  // cost: about 1% of the balance a day, shrinking with the balance.
+  transient let SPEND_BPS_PER_DAY : Nat = 100;
+  transient let SPEND_COST : Int = 30_000_000;
+  transient let SPEND_BURST_SECONDS : Int = 3_600;
+  transient var spendCredit : Int = 0;
+  transient var spendCreditAt : Int = 0;
+  transient var spendStarted : Bool = false;
+  func spendRatePerSecond() : Int { Cycles.balance() * SPEND_BPS_PER_DAY / 10_000 / 86_400 };
+  func spendCreditNow(now : Int) : Int {
+    let rate = spendRatePerSecond();
+    let cap = rate * SPEND_BURST_SECONDS;
+    if (not spendStarted) { return cap };
+    Int.min(cap, spendCredit + (now - spendCreditAt) * rate / 1_000_000_000);
+  };
+  func spendWait(now : Int) : ?Nat {
+    let credit = spendCreditNow(now);
+    if (credit >= SPEND_COST) { return null };
+    ?Int.abs((SPEND_COST - credit) * 1_000_000_000 / Int.max(1, spendRatePerSecond()));
+  };
+  func takeSpend(now : Int) {
+    spendCredit := spendCreditNow(now) - SPEND_COST;
+    spendCreditAt := now;
+    spendStarted := true;
   };
 
   func admitPaid(caller : Principal, now : Int, lastAttempt : ?Int, interval : Int) : Bool {
@@ -1548,6 +1578,7 @@ actor self {
       case (?wait) { ?wait };
       case null {
         if (not isKnownPlayer(caller)) { ignore takeNewcomerSlot(now) };
+        takeSpend(now);
         null;
       };
     };

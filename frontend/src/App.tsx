@@ -470,6 +470,9 @@ function App() {
       }
     } catch (err) {
       console.error("submitProof failed", err);
+      // Refused by mother's entry filter (the block moved on, or too many
+      // tries in a row): it never ran, so there is no win to look for.
+      const refused = /inspect_message explicitly refused|IC0406/i.test(String((err as { message?: unknown } | null)?.message ?? err));
       // A real report from a miner showed exactly this: "Submission
       // failed" shown locally (no confetti, session counter never bumped)
       // while the block was actually won and the reward landed -- the
@@ -480,7 +483,7 @@ function App() {
       // snapshot taken right before this call, it won regardless of what
       // this client ever heard back.
       let confirmedWin = false;
-      if (statsBeforeSubmit) {
+      if (statsBeforeSubmit && !refused) {
         // A single immediate re-query wasn't enough in practice: query calls
         // can be served by a replica whose state hasn't caught up with the
         // update that just committed a few hundred ms earlier (ordinary IC
@@ -515,7 +518,11 @@ function App() {
       }
       if (!confirmedWin) {
         setMiningMessageKind(null);
-        setMiningMessage("Submission failed, still mining...");
+        setMiningMessage(
+          refused
+            ? "Not accepted (someone else found this block first, or too many tries) -- nothing was charged, still mining..."
+            : "Submission failed, still mining...",
+        );
       }
     }
     if (miningRef.current) {
